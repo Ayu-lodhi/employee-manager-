@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const User = require('./admin.model');
 
-// Generate a default password like TBI@x7k2m9
+// Generate default password: TBI@ + 6 chars + 2 digits
 const generateDefaultPassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let pass = 'TBI@';
@@ -27,10 +27,11 @@ exports.createUser = async (data) => {
     phone: data.phone || '',
     role: data.role || 'T1_VOLUNTEER',
     password: hashedPassword,
-    mustChangePassword: true,
+    mustChangePassword: true,   // ⭐ Force password change on first login
     isActive: true,
   });
 
+  // TODO: Send tempPassword via email + SMS in production
   return { user: user.toObject({ virtuals: false }), tempPassword };
 };
 
@@ -61,4 +62,33 @@ exports.deleteUser = async (id) => {
   const user = await User.findByIdAndDelete(id);
   if (!user) throw new Error('User not found');
   return user;
+};
+
+// ⭐ Reset password — generate a NEW temp password + force change
+exports.resetPassword = async (id) => {
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+
+  const tempPassword = generateDefaultPassword();
+  user.password = await bcrypt.hash(tempPassword, 12);
+  user.mustChangePassword = true;
+  await user.save();
+
+  return { user: user.toObject({ virtuals: false }), tempPassword };
+};
+
+// ⭐ Super Admin sets a custom password directly (no forced change)
+exports.setPassword = async (id, newPassword) => {
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+
+  if (!newPassword || newPassword.length < 8) {
+    throw new Error('Password must be at least 8 characters');
+  }
+
+  user.password = await bcrypt.hash(newPassword, 12);
+  user.mustChangePassword = false; // Directly set — no forced change
+  await user.save();
+
+  return { user: user.toObject({ virtuals: false }) };
 };

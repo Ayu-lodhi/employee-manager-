@@ -21,21 +21,42 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [initializing, setInitializing] = useState(true);
+
+  // Restore session from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem('tbi_user');
-    if (stored) setUser(JSON.parse(stored));
+    try {
+      const storedUser = localStorage.getItem('tbi_user');
+      const storedToken = localStorage.getItem('tbi_token');
+      if (storedUser && storedToken) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (err) {
+      console.error('Failed to restore session:', err);
+      localStorage.removeItem('tbi_user');
+      localStorage.removeItem('tbi_token');
+    } finally {
+      setInitializing(false);
+    }
   }, []);
+
   const login = (u, t) => {
     setUser(u);
     localStorage.setItem('tbi_user', JSON.stringify(u));
     localStorage.setItem('tbi_token', t);
   };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('tbi_user');
     localStorage.removeItem('tbi_token');
   };
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, initializing }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 // ====================================================================
@@ -388,11 +409,27 @@ export const Placeholder = ({ title }) => (
 );
 
 export const ProtectedRoute = ({ children, roles }) => {
-  const { user } = useAuth();
+  const { user, initializing } = useAuth();
+
+  // Wait for localStorage to be read before deciding
+  if (initializing) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return <Navigate to="/login" replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to={ROLES[user.role].route} replace />;
+  if (roles && !roles.includes(user.role)) {
+    return <Navigate to={ROLES[user.role].route} replace />;
+  }
   return <Layout>{children}</Layout>;
 };
+
 
 // ====================================================================
 // DASHBOARDS
@@ -491,30 +528,70 @@ export const T1Dashboard = () => {
 };
 
 // ====================================================================
-// USER MANAGEMENT
+// USER MANAGEMENT — Connected to real backend
 // ====================================================================
 export const UserManagement = () => {
-  const [users, setUsers] = useState([
-    { _id: '1', name: 'Ayush', email: 'ayush@tbi.org', role: 'T1_VOLUNTEER' },
-    { _id: '2', name: 'Mayank', email: 'mayank@tbi.org', role: 'T3_EXECUTIVE' },
-    { _id: '3', name: 'Abhishek Singh', email: 'abhishek@tbi.org', role: 'T2_ASSOCIATE' },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', role: 'T1_VOLUNTEER' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'T1_VOLUNTEER' });
+  const [saving, setSaving] = useState(false);
   const [revokeModal, setRevokeModal] = useState(null);
+  const [revokeReason, setRevokeReason] = useState('');
+  const [revokeNotes, setRevokeNotes] = useState('');
 
-  const addUser = (e) => {
+  // Fetch users from backend
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await api.get('/admin/users');
+        setUsers(res.data.data);
+      } catch (err) {
+        console.error('Failed to load users:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Create user via API
+  const addUser = async (e) => {
     e.preventDefault();
-    setUsers([...users, { _id: Date.now().toString(), ...form }]);
-    setModal(false);
-    setForm({ name: '', email: '', role: 'T1_VOLUNTEER' });
+    setSaving(true);
+    try {
+      const res = await api.post('/admin/users', form);
+      setUsers([res.data.data, ...users]);
+      setModal(false);
+      setForm({ name: '', email: '', phone: '', role: 'T1_VOLUNTEER' });
+      if (res.data.tempPassword) {
+        alert(`✅ User created!\n\nTemporary password: ${res.data.tempPassword}\n\n(In production, this is sent via email + SMS.)`);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create user');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const revokeUser = (e) => {
+  // Revoke access via API
+  const revokeUser = async (e) => {
     e.preventDefault();
-    setUsers(users.filter(u => u._id !== revokeModal._id));
-    setRevokeModal(null);
+    if (!revokeReason) return alert('Please select a reason');
+    try {
+      await api.post(`/admin/users/${revokeModal._id}/revoke`, {
+        reason: revokeReason,
+        notes: revokeNotes,
+      });
+      setUsers(users.filter(u => u._id !== revokeModal._id));
+      setRevokeModal(null);
+      setRevokeReason('');
+      setRevokeNotes('');
+      alert(`🚫 ${revokeModal.name}'s access has been revoked.`);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to revoke');
+    }
   };
 
   const filteredUsers = users.filter(u =>
@@ -522,8 +599,14 @@ export const UserManagement = () => {
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const roleLabel = { T1_VOLUNTEER: 'T1', T2_ASSOCIATE: 'T2', T3_EXECUTIVE: 'T3' };
-  const roleColor = { T1_VOLUNTEER: 'bg-green-100 text-green-700', T2_ASSOCIATE: 'bg-blue-100 text-blue-700', T3_EXECUTIVE: 'bg-purple-100 text-purple-700' };
+  const roleLabel = { T1_VOLUNTEER: 'T1', T2_ASSOCIATE: 'T2', T3_EXECUTIVE: 'T3', ADMIN: 'AD', SUPER_ADMIN: 'SA' };
+  const roleColor = {
+    T1_VOLUNTEER: 'bg-green-100 text-green-700',
+    T2_ASSOCIATE: 'bg-blue-100 text-blue-700',
+    T3_EXECUTIVE: 'bg-purple-100 text-purple-700',
+    ADMIN: 'bg-orange-100 text-orange-700',
+    SUPER_ADMIN: 'bg-red-100 text-red-700',
+  };
 
   return (
     <div className="space-y-6">
@@ -535,6 +618,7 @@ export const UserManagement = () => {
         <button onClick={() => setModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">+ Add User</button>
       </div>
 
+      {/* Search */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex items-center gap-3">
           <Search className="w-5 h-5 text-gray-400" />
@@ -544,36 +628,42 @@ export const UserManagement = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filteredUsers.map((u) => (
-              <tr key={u._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium">{u.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{u.email}</td>
-                <td className="px-6 py-4">
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${roleColor[u.role]}`}>{roleLabel[u.role]}</span>
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  <button onClick={() => setRevokeModal(u)} className="text-red-500 hover:underline">Revoke</button>
-                </td>
+      {/* Users table */}
+      {loading ? (
+        <SkeletonTable rows={4} cols={4} />
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
-            ))}
-            {filteredUsers.length === 0 && (
-              <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">No users match your search</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredUsers.map((u) => (
+                <tr key={u._id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm font-medium">{u.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{u.email}</td>
+                  <td className="px-6 py-4">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${roleColor[u.role]}`}>{roleLabel[u.role]}</span>
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <button onClick={() => setRevokeModal(u)} className="text-red-500 hover:underline">Revoke</button>
+                  </td>
+                </tr>
+              ))}
+              {filteredUsers.length === 0 && (
+                <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">No users match your search</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
+      {/* Add User Modal */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setModal(false)} />
@@ -583,12 +673,17 @@ export const UserManagement = () => {
               <div>
                 <label className="block text-sm font-medium mb-1.5">Full Name</label>
                 <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none" />
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Email</label>
                 <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none" />
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Phone (optional)</label>
+                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Role</label>
@@ -599,28 +694,63 @@ export const UserManagement = () => {
                   <option value="T3_EXECUTIVE">T3 Executive</option>
                 </select>
               </div>
-              <button type="submit" className="w-full h-11 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">Create User</button>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start gap-2">
+                <Info size={14} className="mt-0.5 flex-shrink-0" />
+                <span>A default password will be generated and shown after creation.</span>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  {saving ? 'Creating...' : 'Create User'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* Revoke Modal */}
       {revokeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setRevokeModal(null)} />
           <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
-            <h3 className="text-lg font-semibold mb-5">Revoke Access — {revokeModal.name}</h3>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Revoke Access — {revokeModal.name}</h3>
+                <p className="text-xs text-gray-500">{revokeModal.email}</p>
+              </div>
+            </div>
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
+              <p className="text-sm text-red-800 font-medium mb-2">This action will:</p>
+              <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+                <li>Immediately end all active sessions</li>
+                <li>Remove access to all events and teams</li>
+                <li>Log this action for audit (immutable)</li>
+              </ul>
+            </div>
             <form onSubmit={revokeUser} className="space-y-4">
-              <select required className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none">
-                <option value="">Select a reason...</option>
-                <option>Policy Violation</option>
-                <option>Security Breach</option>
-                <option>Role Change</option>
-                <option>Resignation</option>
-                <option>Other</option>
-              </select>
-              <textarea required rows={3} placeholder="Reason details..."
-                className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none" />
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Reason *</label>
+                <select required value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none">
+                  <option value="">Select a reason...</option>
+                  <option value="Policy Violation">Policy Violation</option>
+                  <option value="Security Breach">Security Breach</option>
+                  <option value="Role Change">Role Change</option>
+                  <option value="Resignation">Resignation</option>
+                  <option value="Inactive Account">Inactive Account</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Additional Notes</label>
+                <textarea required minLength={10} rows={3} value={revokeNotes} onChange={(e) => setRevokeNotes(e.target.value)}
+                  placeholder="Reason details (min 10 characters)..."
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none" />
+              </div>
               <div className="flex gap-3 justify-end">
                 <button type="button" onClick={() => setRevokeModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600">Revoke Access</button>
@@ -1678,50 +1808,328 @@ export const BulkImportPage = () => {
 };
 
 // ====================================================================
-// TEAMS
+// TEAMS — Create teams, add members, view details
 // ====================================================================
 export const TeamsPage = () => {
-  const [teams, setTeams] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const canManage = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
 
+  const [teams, setTeams] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [createModal, setCreateModal] = useState(false);
+  const [addMemberModal, setAddMemberModal] = useState(null); // team obj
+  const [detailModal, setDetailModal] = useState(null);       // team obj
+  const [form, setForm] = useState({ name: '', description: '', leadId: '' });
+  const [memberSearch, setMemberSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Fetch teams + users on mount
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get('/teams');
-        setTeams(res.data.data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
+        const [teamsRes, usersRes] = await Promise.all([
+          api.get('/teams'),
+          canManage ? api.get('/admin/users') : Promise.resolve({ data: { data: [] } }),
+        ]);
+        setTeams(teamsRes.data.data);
+        setUsers(usersRes.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, []);
+  }, [canManage]);
 
-  if (loading) return <div className="space-y-6"><Skeleton className="h-8 w-48" /><SkeletonCardGrid count={3} /></div>;
+  // Create team
+  const createTeam = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await api.post('/teams', {
+        name: form.name,
+        description: form.description,
+        leadId: form.leadId || null,
+      });
+      setTeams([res.data.data, ...teams]);
+      setCreateModal(false);
+      setForm({ name: '', description: '', leadId: '' });
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create team');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Add member to team
+  const addMember = async (teamId, userId) => {
+    try {
+      const res = await api.post(`/teams/${teamId}/members`, { userId });
+      setTeams(teams.map(t => t._id === teamId ? res.data.data : t));
+      setMemberSearch('');
+      alert('✅ Member added');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add member');
+    }
+  };
+
+  // Remove member
+  const removeMember = async (teamId, userId, userName) => {
+    if (!confirm(`Remove ${userName} from this team?`)) return;
+    try {
+      const res = await api.delete(`/teams/${teamId}/members/${userId}`);
+      setTeams(teams.map(t => t._id === teamId ? res.data.data : t));
+      if (detailModal?._id === teamId) setDetailModal(res.data.data);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to remove');
+    }
+  };
+
+  // Filter users for "add member" — excludes those already in team
+  const availableUsers = (team) => {
+    if (!team) return [];
+    const memberIds = team.members?.map(m => m._id) || [];
+    return users.filter(u =>
+      !memberIds.includes(u._id) &&
+      (u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+       u.email.toLowerCase().includes(memberSearch.toLowerCase()))
+    );
+  };
+
+  if (loading) {
+    return <div className="space-y-6"><Skeleton className="h-8 w-48" /><SkeletonCardGrid count={3} /></div>;
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Teams</h1>
-        <p className="text-gray-500">All active teams and their chat rooms</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Teams</h1>
+          <p className="text-gray-500">All active teams and their members</p>
+        </div>
+        {canManage && (
+          <button onClick={() => setCreateModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 flex items-center gap-2">
+            <Plus size={16} /> Create Team
+          </button>
+        )}
       </div>
+
       {teams.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <UsersRound className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No teams yet</h3>
+          <p className="text-gray-500 mb-4">Create your first team to get started</p>
+          {canManage && (
+            <button onClick={() => setCreateModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
+              + Create Team
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {teams.map((t) => (
-            <div key={t._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition">
+            <div key={t._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-lg">{t.name}</h3>
                 {t.chatActive && <MessageSquare className="w-4 h-4 text-green-500" />}
               </div>
-              <p className="text-sm text-gray-600 mb-3">Lead: {t.leadName || 'Not assigned'}</p>
-              <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                <span className="text-sm text-gray-500 flex items-center gap-1"><Users size={14} /> {t.members} members</span>
-                <button className="text-xs px-3 py-1 bg-blue-500 text-white rounded">Open Chat</button>
+
+              {t.description && <p className="text-xs text-gray-500 mb-2">{t.description}</p>}
+
+              <p className="text-sm text-gray-600 mb-3">
+                Lead: <span className="font-medium">{t.leadName || t.leadId?.name || 'Not assigned'}</span>
+              </p>
+
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <span className="text-sm text-gray-500 flex items-center gap-1">
+                  <Users size={14} /> {t.memberCount || t.members?.length || 0} members
+                </span>
+                <div className="flex gap-1">
+                  <button onClick={() => setDetailModal(t)} className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50">
+                    View
+                  </button>
+                  {canManage && (
+                    <button onClick={() => setAddMemberModal(t)} className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                      + Member
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ---------- CREATE TEAM MODAL ---------- */}
+      {createModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setCreateModal(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <h3 className="text-lg font-semibold mb-5">Create New Team</h3>
+            <form onSubmit={createTeam} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Team Name *</label>
+                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. Tech Team"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Description</label>
+                <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Brief description..."
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Assign Team Lead (Optional)</label>
+                <select value={form.leadId} onChange={(e) => setForm({ ...form, leadId: e.target.value })}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none">
+                  <option value="">Select a lead...</option>
+                  {users.filter(u => ['T3_EXECUTIVE', 'T2_ASSOCIATE'].includes(u.role)).map(u => (
+                    <option key={u._id} value={u._id}>{u.name} ({u.email})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Team leads get access to team management</p>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setCreateModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  {saving ? 'Creating...' : 'Create Team'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- ADD MEMBER MODAL ---------- */}
+      {addMemberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setAddMemberModal(null)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h3 className="text-lg font-semibold">Add Member</h3>
+                <p className="text-sm text-gray-500">to {addMemberModal.name}</p>
+              </div>
+              <button onClick={() => setAddMemberModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-3">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder="Search users by name or email..."
+                  className="flex-1 bg-transparent border-none outline-none text-sm" />
+              </div>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto space-y-2">
+              {availableUsers(addMemberModal).length === 0 ? (
+                <p className="text-center text-gray-500 py-8 text-sm">No users available to add</p>
+              ) : availableUsers(addMemberModal).map((u) => (
+                <div key={u._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                      {u.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{u.name}</p>
+                      <p className="text-xs text-gray-500">{u.email} · {u.role.replace('_', ' ')}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => addMember(addMemberModal._id, u._id)}
+                    className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600">
+                    + Add
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+              <span className="text-xs text-gray-500">
+                Current members: {addMemberModal.members?.length || 0}
+              </span>
+              <button onClick={() => setAddMemberModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- TEAM DETAIL MODAL ---------- */}
+      {detailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDetailModal(null)} />
+          <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-5">
+              <div>
+                <h3 className="text-xl font-bold">{detailModal.name}</h3>
+                {detailModal.description && <p className="text-sm text-gray-500 mt-1">{detailModal.description}</p>}
+              </div>
+              <button onClick={() => setDetailModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-500">Total Members</p>
+                <p className="text-2xl font-bold">{detailModal.members?.length || 0}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-500">Team Lead</p>
+                <p className="text-sm font-semibold mt-1">{detailModal.leadName || detailModal.leadId?.name || '—'}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-500">Chat Room</p>
+                <p className="text-sm font-semibold mt-1 text-green-600">● Active</p>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-semibold">Members</h4>
+              {canManage && (
+                <button onClick={() => { setDetailModal(null); setAddMemberModal(detailModal); }}
+                  className="text-xs px-3 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600">
+                  + Add Member
+                </button>
+              )}
+            </div>
+
+            {(!detailModal.members || detailModal.members.length === 0) ? (
+              <div className="bg-gray-50 rounded-lg p-8 text-center">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No members yet</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {detailModal.members.map((m) => (
+                  <div key={m._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                        {m.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{m.name}</p>
+                        <p className="text-xs text-gray-500">{m.email}</p>
+                      </div>
+                      {m._id === (detailModal.leadId?._id || detailModal.leadId) && (
+                        <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">LEAD</span>
+                      )}
+                    </div>
+                    {canManage && m._id !== (detailModal.leadId?._id || detailModal.leadId) && (
+                      <button onClick={() => removeMember(detailModal._id, m._id, m.name)}
+                        className="text-xs text-red-500 hover:underline">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
