@@ -30,6 +30,7 @@ import {
 
   // ---------- OPERATIONS ----------
   EventsPage,
+  EventDetailPage,
   ApplicationsPage,
   MyApplicationsPage,     // Student view (T1/T2) — status tracking
   AttendancePage,
@@ -100,6 +101,7 @@ function App() {
           <Route path="/admin/users/bulk" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><BulkImportPage /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><AnalyticsPage /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><EventsPage /></ProtectedRoute>} />
+          <Route path="/admin/events/:id" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><EventDetailPage /></ProtectedRoute>} />
           <Route path="/admin/teams" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><TeamsPage /></ProtectedRoute>} />
           <Route path="/admin/shifts" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><Placeholder title="Shifts" /></ProtectedRoute>} />
           <Route path="/admin/certificates" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><CertificatesPage /></ProtectedRoute>} />
@@ -108,6 +110,7 @@ function App() {
               T3 EXECUTIVE ROUTES — Lead teams, review, verify
               ================================================== */}
           <Route path="/t3" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><T3DashboardEnhanced /></ProtectedRoute>} />
+          <Route path="/t3/events/:id" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><EventDetailPage /></ProtectedRoute>} />
           <Route path="/t3/teams" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><MyTeamsPage /></ProtectedRoute>} />
           <Route path="/t3/applications" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><ApplicationsPage /></ProtectedRoute>} />
           <Route path="/t3/attendance" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><AttendancePage /></ProtectedRoute>} />

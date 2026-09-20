@@ -1,4 +1,5 @@
 const Application = require('./applications.model');
+const { notify } = require('../notifications/notifications.service');
 
 exports.getAllApplications = async () => {
   return await Application.find().sort({ appliedAt: -1 });
@@ -36,5 +37,21 @@ exports.updateStatus = async (id, status, reviewerId) => {
     { new: true }
   );
   if (!app) throw new Error('Application not found');
+
+  // Notify the applicant
+  const title = status === 'approved'
+    ? 'Application Approved!'
+    : status === 'rejected'
+    ? 'Application Not Selected'
+    : 'You are on the Waitlist';
+
+  const message = status === 'approved'
+    ? `You've been approved for ${app.eventTitle}. You've been added to the team chat.`
+    : status === 'rejected'
+    ? `Your application for ${app.eventTitle} was not selected this time.`
+    : `You've been waitlisted for ${app.eventTitle}. We'll notify you if a spot opens up.`;
+
+  await notify(app.studentId, 'application', title, message);
+
   return app;
 };

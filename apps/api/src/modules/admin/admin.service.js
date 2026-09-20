@@ -27,7 +27,7 @@ exports.createUser = async (data) => {
     phone: data.phone || '',
     role: data.role || 'T1_VOLUNTEER',
     password: hashedPassword,
-    mustChangePassword: true,   // ⭐ Force password change on first login
+    mustChangePassword: true,   // Force password change on first login
     isActive: true,
   });
 
@@ -64,7 +64,7 @@ exports.deleteUser = async (id) => {
   return user;
 };
 
-// ⭐ Reset password — generate a NEW temp password + force change
+// Reset password — generate a NEW temp password + force change
 exports.resetPassword = async (id) => {
   const user = await User.findById(id);
   if (!user) throw new Error('User not found');
@@ -77,7 +77,7 @@ exports.resetPassword = async (id) => {
   return { user: user.toObject({ virtuals: false }), tempPassword };
 };
 
-// ⭐ Super Admin sets a custom password directly (no forced change)
+// Super Admin sets a custom password directly (no forced change)
 exports.setPassword = async (id, newPassword) => {
   const user = await User.findById(id);
   if (!user) throw new Error('User not found');

@@ -42,8 +42,15 @@ app.get('/', (req, res) => {
 
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 app.use((err, req, res, next) => {
-  console.error('Server error:', err.message);
+  console.error('Server error:', err);
   res.status(err.status || 500).json({ success: false, message: err.message });
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
 });
 
 // DATABASE

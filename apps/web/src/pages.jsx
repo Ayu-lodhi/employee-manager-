@@ -3,7 +3,7 @@
 // ====================================================================
 
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { Navigate, NavLink, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import api from './lib/api';
 import {
   LayoutDashboard, Users, ScrollText, Monitor, Settings, Shield, FileText,
@@ -350,7 +350,26 @@ export const Sidebar = () => {
 // ====================================================================
 export const Topbar = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const cfg = ROLES[user.role];
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Poll unread count every 15 seconds
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await api.get('/notifications');
+        const unread = res.data.data.filter((n) => !n.isRead).length;
+        setUnreadCount(unread);
+      } catch (err) {
+        // Silently fail
+      }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200">
       <div className="flex items-center gap-3 flex-1 max-w-md">
@@ -358,9 +377,13 @@ export const Topbar = () => {
         <input type="text" placeholder="Search..." className="flex-1 bg-transparent border-none outline-none text-sm" />
       </div>
       <div className="flex items-center gap-4">
-        <button className="relative p-2 rounded-lg hover:bg-gray-100">
+        <button onClick={() => navigate('/notifications')} className="relative p-2 rounded-lg hover:bg-gray-100">
           <Bell className="w-5 h-5 text-gray-600" />
-          <span className="absolute top-1 right-1 w-4 h-4 text-[10px] rounded-full text-white flex items-center justify-center" style={{ backgroundColor: cfg.color }}>3</span>
+          {unreadCount > 0 && (
+            <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 text-[10px] rounded-full text-white flex items-center justify-center font-bold" style={{ backgroundColor: cfg.color }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: cfg.color }}>
@@ -566,7 +589,7 @@ export const UserManagement = () => {
       setModal(false);
       setForm({ name: '', email: '', phone: '', role: 'T1_VOLUNTEER' });
       if (res.data.tempPassword) {
-        alert(`✅ User created!\n\nTemporary password: ${res.data.tempPassword}\n\n(In production, this is sent via email + SMS.)`);
+        alert(`User created!\n\nTemporary password: ${res.data.tempPassword}\n\n(In production, this is sent via email + SMS.)`);
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to create user');
@@ -588,7 +611,7 @@ export const UserManagement = () => {
       setRevokeModal(null);
       setRevokeReason('');
       setRevokeNotes('');
-      alert(`🚫 ${revokeModal.name}'s access has been revoked.`);
+      alert(`${revokeModal.name}'s access has been revoked.`);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to revoke');
     }
@@ -837,62 +860,290 @@ export const Chat = () => {
 };
 
 // ====================================================================
-// QR CHECK-IN
+// QR CHECK-IN — T1/T2 self check-in/check-out
 // ====================================================================
-export const QRCheckIn = () => (
-  <div className="max-w-md mx-auto space-y-6">
-    <h1 className="text-2xl font-bold">Check-In — Tech Team</h1>
-    <div className="bg-gray-900 rounded-xl aspect-square flex items-center justify-center">
-      <div className="w-64 h-64 border-4 border-green-400 rounded-lg flex items-center justify-center">
-        <QrCode className="w-32 h-32 text-white/50" />
+export const QRCheckIn = () => {
+  const { user } = useAuth();
+  const [teamName, setTeamName] = useState('Tech Team');
+  const [todayRecord, setTodayRecord] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [qrCode, setQrCode] = useState('');
+  const [history, setHistory] = useState([]);
+
+  // Fetch today's status + history
+  const fetchData = async () => {
+    try {
+      const [todayRes, historyRes] = await Promise.all([
+        api.get(`/attendance/today?teamName=${teamName}`),
+        api.get('/attendance/me'),
+      ]);
+      setTodayRecord(todayRes.data.data);
+      setHistory(historyRes.data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [teamName]);
+
+  // Check-in
+  const handleCheckIn = async () => {
+    setProcessing(true);
+    try {
+      const res = await api.post('/attendance/check-in', {
+        teamName,
+        method: qrCode ? 'qr' : 'self',
+      });
+      setTodayRecord(res.data.data);
+      setQrCode('');
+      alert(`Checked in at ${new Date(res.data.data.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Check-in failed');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Check-out
+  const handleCheckOut = async () => {
+    setProcessing(true);
+    try {
+      const res = await api.post('/attendance/check-out', { teamName });
+      setTodayRecord(res.data.data);
+      alert(`Checked out. Duration: ${res.data.data.durationMinutes} minutes`);
+      fetchData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Check-out failed');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const formatTime = (d) => d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
+  if (loading) return <SkeletonCardGrid count={2} />;
+
+  const hasCheckedIn = !!todayRecord?.checkInTime;
+  const hasCheckedOut = !!todayRecord?.checkOutTime;
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Check-In — {teamName}</h1>
+        <p className="text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </div>
+
+      {/* Team selector */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <label className="block text-sm font-medium mb-2">Select Team</label>
+        <select value={teamName} onChange={(e) => setTeamName(e.target.value)}
+          className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none">
+          <option value="Tech Team">Tech Team</option>
+          <option value="Media Team">Media Team</option>
+          <option value="Logistics">Logistics</option>
+        </select>
+      </div>
+
+      {/* Status card */}
+      {hasCheckedIn ? (
+        <div className="bg-white rounded-xl border-l-4 border-l-green-500 border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">Checked In</h3>
+              <p className="text-sm text-gray-500">at {formatTime(todayRecord.checkInTime)}</p>
+            </div>
+          </div>
+
+          {hasCheckedOut ? (
+            <div className="bg-blue-50 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Shift complete!</strong> You worked for {todayRecord.durationMinutes} minutes.
+              </p>
+              <p className="text-xs text-blue-600 mt-1">Checked out at {formatTime(todayRecord.checkOutTime)}</p>
+            </div>
+          ) : (
+            <button onClick={handleCheckOut} disabled={processing}
+              className="w-full h-12 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-medium rounded-lg flex items-center justify-center gap-2">
+              <LogOut size={18} /> {processing ? 'Processing...' : 'Check Out'}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <QrCode className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-bold mb-1">Ready to Check In?</h3>
+            <p className="text-sm text-gray-500">Enter the QR code shown by your Team Lead or click "Check In"</p>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1.5">QR Code (optional)</label>
+              <input value={qrCode} onChange={(e) => setQrCode(e.target.value.toUpperCase())}
+                placeholder="e.g. TBI-A3B7K9"
+                className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500 font-mono text-center tracking-wider" />
+            </div>
+            <button onClick={handleCheckIn} disabled={processing}
+              className="w-full h-12 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-medium rounded-lg flex items-center justify-center gap-2">
+              <CheckCircle size={18} /> {processing ? 'Checking in...' : 'Check In Now'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* History */}
+      {history.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-200">
+            <h3 className="font-semibold">Recent Attendance</h3>
+          </div>
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">Team</th>
+                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">In</th>
+                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">Out</th>
+                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {history.slice(0, 10).map((h) => (
+                <tr key={h._id}>
+                  <td className="px-4 py-3 text-sm">{h.date}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{h.teamName}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{formatTime(h.checkInTime)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{formatTime(h.checkOutTime)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      h.status === 'present' ? 'bg-green-100 text-green-700' :
+                      h.status === 'late' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                    }`}>{h.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
+
 
 // ====================================================================
-// EVENTS — Role-aware (Admin creates, T1/T2 review)
+// EVENTS — With Event Head assignment
 // ====================================================================
 export const EventsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const canCreate = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
 
-  const [events, setEvents] = useState([
-    { _id: '1', title: 'Annual Tech Fest 2026', date: 'Oct 15-17', location: 'Main Auditorium', status: 'published', teams: 3, applicants: 45 },
-    { _id: '2', title: 'Startup Pitch Day', date: 'Nov 5', location: 'Innovation Hub', status: 'published', teams: 2, applicants: 28 },
-  ]);
+  const [events, setEvents] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ title: '', date: '', location: '' });
-  const [reviewModal, setReviewModal] = useState(null);
-  const [reviewForm, setReviewForm] = useState({ rating: 5, feedback: '' });
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [form, setForm] = useState({
+    title: '',
+    date: '',
+    location: '',
+    description: '',
+    headId: '',
+    memberIds: [],
+  });
+  const [saving, setSaving] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
 
-  const addEvent = (e) => {
-    e.preventDefault();
-    setEvents([...events, { _id: Date.now().toString(), ...form, status: 'draft', teams: 0, applicants: 0 }]);
-    setModal(false);
-    setForm({ title: '', date: '', location: '' });
+  useEffect(() => {
+    (async () => {
+      try {
+        const [eventsRes, usersRes] = await Promise.all([
+          api.get('/events'),
+          canCreate ? api.get('/admin/users') : Promise.resolve({ data: { data: [] } }),
+        ]);
+        setEvents(eventsRes.data.data);
+        setUsers(usersRes.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [canCreate]);
+
+  const toggleMember = (userId) => {
+    setForm((f) => ({
+      ...f,
+      memberIds: f.memberIds.includes(userId)
+        ? f.memberIds.filter((id) => id !== userId)
+        : [...f.memberIds, userId],
+    }));
   };
 
-  const submitReview = (e) => {
+  const addEvent = async (e) => {
     e.preventDefault();
-    setReviewSubmitted(true);
-    setTimeout(() => {
-      setReviewModal(null);
-      setReviewSubmitted(false);
-      setReviewForm({ rating: 5, feedback: '' });
-    }, 1500);
+    setSaving(true);
+    try {
+      // Clean payload — no empty strings
+      const payload = {
+        title: form.title,
+        date: form.date,
+        location: form.location,
+        description: form.description || '',
+      };
+      if (form.headId) payload.headId = form.headId;
+      if (form.memberIds.length > 0) payload.memberIds = form.memberIds;
+
+      const res = await api.post('/events', payload);
+      setEvents([res.data.data, ...events]);
+      setModal(false);
+      setForm({ title: '', date: '', location: '', description: '', headId: '', memberIds: [] });
+      setMemberSearch('');
+      alert('Event created! Notifications sent.');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create event');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const statusColor = {
+    published: 'bg-green-100 text-green-700',
+    draft: 'bg-gray-100 text-gray-700',
+    closed: 'bg-red-100 text-red-700',
+  };
+
+  const eligibleHeads = users.filter((u) =>
+    ['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(u.role) && u._id !== user._id
+  );
+
+  const eligibleMembers = users.filter((u) =>
+    ['T1_VOLUNTEER', 'T2_ASSOCIATE', 'T3_EXECUTIVE'].includes(u.role) &&
+    u._id !== user._id &&
+    u._id !== form.headId &&
+    (u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(memberSearch.toLowerCase()))
+  );
+
+  if (loading) return <div className="space-y-6"><Skeleton className="h-8 w-48" /><SkeletonCardGrid count={3} /></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Events</h1>
-          <p className="text-gray-500">
-            {canCreate ? 'Create and manage all TBI events' : 'Browse events and share your feedback'}
-          </p>
+          <p className="text-gray-500">{canCreate ? 'Create and manage events' : 'Browse events'}</p>
         </div>
         {canCreate && (
           <button onClick={() => setModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">
@@ -901,112 +1152,142 @@ export const EventsPage = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {events.map((ev) => (
-          <div key={ev._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition">
-            <div onClick={() => canCreate && navigate(`/admin/events/${ev._id}`)} className={canCreate ? 'cursor-pointer' : ''}>
-              <h3 className="font-semibold text-lg mb-2">{ev.title}</h3>
-              <p className="text-sm text-gray-500">{ev.date}</p>
-              <p className="text-sm text-gray-500 mb-3">{ev.location}</p>
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{ev.status}</span>
-            </div>
-            {!canCreate && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <button onClick={() => setReviewModal(ev)} className="w-full px-3 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 flex items-center justify-center gap-2">
-                  <Star size={14} /> Review Event Feedback
-                </button>
+      {events.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No events yet</h3>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {events.map((ev) => (
+            <div key={ev._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition">
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="font-semibold text-lg">{ev.title}</h3>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[ev.status]}`}>{ev.status}</span>
               </div>
-            )}
-          </div>
-        ))}
-      </div>
+              <p className="text-sm text-gray-500 flex items-center gap-1 mb-1"><Calendar size={14} /> {ev.date}</p>
+              <p className="text-sm text-gray-500 flex items-center gap-1 mb-3"><MapPin size={14} /> {ev.location}</p>
 
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setModal(false)} />
-          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
-            <h3 className="text-lg font-semibold mb-5">Create Event</h3>
-            <form onSubmit={addEvent} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Event Title</label>
-                <input required placeholder="e.g. Annual Tech Fest 2026" value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Date</label>
-                  <input type="date" required value={form.date}
-                    onChange={(e) => setForm({ ...form, date: e.target.value })}
-                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              {ev.headName && (
+                <div className="flex items-center gap-2 mb-3 p-2 bg-purple-50 rounded-lg border border-purple-100">
+                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                    {ev.headName.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-purple-600 font-semibold uppercase">Event Head</p>
+                    <p className="text-xs text-purple-800 font-medium truncate">{ev.headName}</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Location</label>
-                  <input required placeholder="e.g. Main Auditorium" value={form.location}
-                    onChange={(e) => setForm({ ...form, location: e.target.value })}
-                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
-                </div>
+              )}
+
+              <div className="flex justify-between text-xs text-gray-500 mb-3 pt-2 border-t border-gray-100">
+                <span><Users size={12} className="inline" /> {ev.memberCount || 0} members</span>
               </div>
-              <div className="flex gap-3 justify-end">
-                <button type="button" onClick={() => setModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">Create Event</button>
-              </div>
-            </form>
-          </div>
+
+              <button
+                onClick={() => navigate(canCreate ? `/admin/events/${ev._id}` : `/t3/events/${ev._id}`)}
+                className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600"
+              >
+                View Details
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
-      {reviewModal && (
+      {/* Create Event Modal */}
+      {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setReviewModal(null)} />
-          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
-            {reviewSubmitted ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-xl font-bold mb-2">Thanks for your feedback!</h3>
-                <p className="text-gray-500">Your review helps improve future events.</p>
+          <div className="absolute inset-0 bg-black/50" onClick={() => setModal(false)} />
+          <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-semibold">Create Event</h3>
+              <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <form onSubmit={addEvent} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Event Title *</label>
+                <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="e.g. Annual Tech Fest 2026"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
               </div>
-            ) : (
-              <>
-                <div className="flex items-start justify-between mb-5">
-                  <div>
-                    <h3 className="text-lg font-semibold">Review Event</h3>
-                    <p className="text-sm text-gray-500">{reviewModal.title}</p>
-                  </div>
-                  <button onClick={() => setReviewModal(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Date *</label>
+                  <input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
                 </div>
-                <form onSubmit={submitReview} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">How would you rate this event?</label>
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <button key={n} type="button" onClick={() => setReviewForm({ ...reviewForm, rating: n })} className="p-1">
-                          <Star size={32} className={n <= reviewForm.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-300'} />
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {reviewForm.rating === 5 ? 'Excellent' : reviewForm.rating === 4 ? 'Good' : reviewForm.rating === 3 ? 'Average' : reviewForm.rating === 2 ? 'Below expectations' : 'Poor'}
-                    </p>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Location *</label>
+                  <input required value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
+                    placeholder="e.g. Main Auditorium"
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Event Head *</label>
+                <select required value={form.headId} onChange={(e) => setForm({ ...form, headId: e.target.value })}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
+                  <option value="">Select an event head...</option>
+                  {eligibleHeads.map((u) => (
+                    <option key={u._id} value={u._id}>{u.name} — {u.role.replace('_', ' ')}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Head coordinates the entire event</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Add Members (Optional)</label>
+                <div className="bg-gray-50 rounded-lg p-3 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Search size={16} className="text-gray-400" />
+                    <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder="Search users..."
+                      className="flex-1 bg-transparent border-none outline-none text-sm" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Your Feedback</label>
-                    <textarea required rows={4} value={reviewForm.feedback}
-                      onChange={(e) => setReviewForm({ ...reviewForm, feedback: e.target.value })}
-                      placeholder="What did you think about this event?"
-                      className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-purple-500" />
-                  </div>
-                  <div className="flex gap-3 justify-end">
-                    <button type="button" onClick={() => setReviewModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
-                    <button type="submit" className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 flex items-center gap-2">
-                      <Star size={16} /> Submit Review
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
+                </div>
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                  {eligibleMembers.length === 0 ? (
+                    <p className="text-center text-gray-500 py-6 text-sm">No users available</p>
+                  ) : eligibleMembers.map((u) => (
+                    <label key={u._id} className="flex items-center justify-between p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" checked={form.memberIds.includes(u._id)}
+                          onChange={() => toggleMember(u._id)} className="w-4 h-4" />
+                        <div>
+                          <p className="text-sm font-medium">{u.name}</p>
+                          <p className="text-xs text-gray-500">{u.email}</p>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
+                        u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                        'bg-purple-100 text-purple-700'
+                      }`}>{u.role.replace('_', ' ')}</span>
+                    </label>
+                  ))}
+                </div>
+                {form.memberIds.length > 0 && (
+                  <p className="text-xs text-blue-600 mt-1">{form.memberIds.length} member(s) selected</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Description</label>
+                <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="What's this event about?"
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500" />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  {saving ? 'Creating...' : 'Create Event'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1135,81 +1416,218 @@ export const ApplicationsPage = () => {
 };
 
 // ====================================================================
-// ATTENDANCE
+// ATTENDANCE — T3 view: Generate QR, mark manually, view stats
 // ====================================================================
 export const AttendancePage = () => {
+  const [teamName, setTeamName] = useState('Tech Team');
+  const [records, setRecords] = useState([]);
+  const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
+  const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
-  const members = [
-    { name: 'Ayush', status: 'present', time: '9:02 AM' },
-    { name: 'Abhishek Singh', status: 'present', time: '9:05 AM' },
-    { name: 'Mayank', status: 'late', time: '9:22 AM' },
-    { name: 'Karan Singh', status: 'absent', time: '--' },
-    { name: 'Anjali Verma', status: 'present', time: '8:58 AM' },
-  ];
+  const [qrToken, setQrToken] = useState('');
+  const [qrExpiry, setQrExpiry] = useState(0);
+  const [manualModal, setManualModal] = useState(false);
+  const [form, setForm] = useState({ studentName: '', status: 'present', notes: '' });
+
+  const date = new Date().toISOString().split('T')[0];
+
+  // Fetch team attendance
+  const fetchAttendance = async () => {
+    setLoading(true);
+    try {
+      const [recRes, statRes] = await Promise.all([
+        api.get(`/attendance/team?teamName=${teamName}&date=${date}`),
+        api.get(`/attendance/team/stats?teamName=${teamName}&date=${date}`),
+      ]);
+      setRecords(recRes.data.data);
+      setStats(statRes.data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [teamName]);
+
+  // QR token generator (session-based)
+  const generateQR = () => {
+    const token = 'TBI-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    setQrToken(token);
+    setQrExpiry(300); // 5 min in seconds
+    setShowQR(true);
+
+    // Countdown
+    const timer = setInterval(() => {
+      setQrExpiry(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setShowQR(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Manual mark
+  const submitManual = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/attendance/manual', {
+        studentName: form.studentName,
+        teamName,
+        status: form.status,
+        notes: form.notes,
+        date,
+      });
+      setManualModal(false);
+      setForm({ studentName: '', status: 'present', notes: '' });
+      fetchAttendance();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to mark attendance');
+    }
+  };
+
   const statusColor = {
     present: 'bg-green-100 text-green-700',
     late: 'bg-amber-100 text-amber-700',
     absent: 'bg-red-100 text-red-700',
   };
 
+  const formatTime = (d) => d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Attendance</h1>
-          <p className="text-gray-500">Tech Team / Hackathon 2026 / 9:00 AM - 1:00 PM</p>
+          <p className="text-gray-500">{teamName} / {date}</p>
         </div>
-        <button onClick={() => setShowQR(!showQR)} className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 flex items-center gap-2">
-          <QrCode size={16} /> {showQR ? 'Hide' : 'Generate'} QR
-        </button>
+        <div className="flex gap-3">
+          <select value={teamName} onChange={(e) => setTeamName(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none">
+            <option value="Tech Team">Tech Team</option>
+            <option value="Media Team">Media Team</option>
+            <option value="Logistics">Logistics</option>
+          </select>
+          <button onClick={generateQR} className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 flex items-center gap-2">
+            <QrCode size={16} /> Generate QR
+          </button>
+          <button onClick={() => setManualModal(true)} className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2">
+            <UserPlus size={16} /> Mark Manual
+          </button>
+        </div>
       </div>
 
+      {/* QR Display */}
       {showQR && (
         <div className="bg-white rounded-xl border border-gray-200 p-8 flex flex-col items-center">
-          <div className="w-64 h-64 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-            <QrCode className="w-32 h-32 text-gray-400" />
+          <div className="w-64 h-64 bg-gray-100 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-purple-300 relative">
+            <QrCode className="w-32 h-32 text-purple-500" />
+            <p className="absolute bottom-3 text-xs font-mono font-bold text-purple-600">{qrToken}</p>
           </div>
-          <p className="text-sm text-gray-500 mt-4">Students scan this QR code to check in</p>
+          <p className="text-sm text-gray-500 mt-4">Students scan this QR or enter the code</p>
+          <p className="text-xs text-amber-600 mt-1">Expires in {Math.floor(qrExpiry / 60)}:{String(qrExpiry % 60).padStart(2, '0')}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <p className="text-sm text-gray-500">Total</p>
+          <p className="text-3xl font-bold mt-2">{stats.total}</p>
+        </div>
         <div className="bg-white p-5 rounded-xl border border-gray-200">
           <p className="text-sm text-gray-500">Present</p>
-          <p className="text-3xl font-bold mt-2 text-green-600">{members.filter(m => m.status === 'present').length}</p>
+          <p className="text-3xl font-bold mt-2 text-green-600">{stats.present}</p>
         </div>
         <div className="bg-white p-5 rounded-xl border border-gray-200">
           <p className="text-sm text-gray-500">Late</p>
-          <p className="text-3xl font-bold mt-2 text-amber-600">{members.filter(m => m.status === 'late').length}</p>
+          <p className="text-3xl font-bold mt-2 text-amber-600">{stats.late}</p>
         </div>
         <div className="bg-white p-5 rounded-xl border border-gray-200">
           <p className="text-sm text-gray-500">Absent</p>
-          <p className="text-3xl font-bold mt-2 text-red-600">{members.filter(m => m.status === 'absent').length}</p>
+          <p className="text-3xl font-bold mt-2 text-red-600">{stats.absent}</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Member</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check-in</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {members.map((m, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium">{m.name}</td>
-                <td className="px-6 py-4"><span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[m.status]}`}>{m.status}</span></td>
-                <td className="px-6 py-4 text-sm text-gray-500">{m.time}</td>
-                <td className="px-6 py-4 text-sm"><button className="text-blue-500 hover:underline">Mark Present</button></td>
+      {/* Records table */}
+      {loading ? (
+        <SkeletonTable rows={5} cols={5} />
+      ) : records.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No attendance records</h3>
+          <p className="text-gray-500">Students haven't checked in yet</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check In</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check Out</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Method</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {records.map((r) => (
+                <tr key={r._id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm font-medium">{r.studentName}</td>
+                  <td className="px-6 py-4">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[r.status]}`}>{r.status}</span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{formatTime(r.checkInTime)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{formatTime(r.checkOutTime)}</td>
+                  <td className="px-6 py-4 text-xs text-gray-400 uppercase">{r.method}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Manual Mark Modal */}
+      {manualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setManualModal(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <h3 className="text-lg font-semibold mb-5">Mark Attendance — {teamName}</h3>
+            <form onSubmit={submitManual} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Student Name</label>
+                <input required value={form.studentName} onChange={(e) => setForm({ ...form, studentName: e.target.value })}
+                  placeholder="Enter student name"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Status</label>
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none">
+                  <option value="present">Present</option>
+                  <option value="late">Late</option>
+                  <option value="absent">Absent</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Notes (optional)</label>
+                <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  placeholder="Reason, etc."
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setManualModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">Mark</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1273,51 +1691,101 @@ export const CertificatesPage = () => {
 export const NotificationsPage = () => {
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+
+  const fetchNotifs = async () => {
+    try {
+      const res = await api.get('/notifications');
+      setNotifs(res.data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get('/notifications');
-        setNotifs(res.data.data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
-    })();
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 15000); // poll every 15s
+    return () => clearInterval(interval);
   }, []);
+
+  const markRead = async (id) => {
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      setNotifs(notifs.map((n) => n._id === id ? { ...n, isRead: true } : n));
+    } catch (err) { console.error(err); }
+  };
+
+  const markAllRead = async () => {
+    try {
+      await api.patch('/notifications/read-all');
+      setNotifs(notifs.map((n) => ({ ...n, isRead: true })));
+    } catch (err) { console.error(err); }
+  };
+
+  const filtered = filter === 'all' ? notifs : notifs.filter((n) => !n.isRead);
+  const unread = notifs.filter((n) => !n.isRead).length;
 
   const iconFor = (type) => {
     if (type === 'application') return <FileText className="w-5 h-5 text-blue-500" />;
     if (type === 'chat') return <MessageSquare className="w-5 h-5 text-green-500" />;
     if (type === 'certificate') return <Award className="w-5 h-5 text-amber-500" />;
-    return <CheckCircle className="w-5 h-5 text-purple-500" />;
+    if (type === 'attendance') return <CheckCircle className="w-5 h-5 text-purple-500" />;
+    return <Bell className="w-5 h-5 text-gray-500" />;
   };
 
-  if (loading) return <SkeletonTable rows={4} cols={2} />;
+  if (loading) return <div className="space-y-6"><Skeleton className="h-8 w-48" /><SkeletonTable rows={5} cols={2} /></div>;
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-bold">Notifications</h1>
-        <p className="text-gray-500">Stay updated on your activities</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Notifications</h1>
+          <p className="text-gray-500">{unread} unread · {notifs.length} total</p>
+        </div>
+        {unread > 0 && (
+          <button onClick={markAllRead} className="text-sm text-blue-500 hover:underline">
+            Mark all read
+          </button>
+        )}
       </div>
-      {notifs.length === 0 ? (
+
+      <div className="flex gap-2">
+        <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium ${filter === 'all' ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200'}`}>
+          All ({notifs.length})
+        </button>
+        <button onClick={() => setFilter('unread')} className={`px-4 py-2 rounded-lg text-sm font-medium ${filter === 'unread' ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200'}`}>
+          Unread ({unread})
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No notifications</h3>
+          <p className="text-gray-500">{filter === 'unread' ? "You're all caught up!" : 'Activities will appear here'}</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {notifs.map((n, i) => (
-            <div key={n._id} className={`p-4 flex gap-4 items-start ${i > 0 ? 'border-t border-gray-100' : ''} ${!n.isRead ? 'bg-blue-50/30' : ''}`}>
+          {filtered.map((n, i) => (
+            <div
+              key={n._id}
+              onClick={() => !n.isRead && markRead(n._id)}
+              className={`p-4 flex gap-4 items-start cursor-pointer ${i > 0 ? 'border-t border-gray-100' : ''} ${!n.isRead ? 'bg-blue-50/30 hover:bg-blue-50/50' : 'hover:bg-gray-50'}`}
+            >
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
                 {iconFor(n.type)}
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-medium text-sm">{n.title}</p>
+                  <p className={`text-sm ${n.isRead ? 'font-normal' : 'font-semibold'}`}>{n.title}</p>
                   {!n.isRead && <span className="w-2 h-2 rounded-full bg-blue-500" />}
                 </div>
                 <p className="text-sm text-gray-600 mt-0.5">{n.message}</p>
-                <p className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {new Date(n.createdAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
+                </p>
               </div>
             </div>
           ))}
@@ -1868,7 +2336,7 @@ export const TeamsPage = () => {
       const res = await api.post(`/teams/${teamId}/members`, { userId });
       setTeams(teams.map(t => t._id === teamId ? res.data.data : t));
       setMemberSearch('');
-      alert('✅ Member added');
+      alert('Member added');
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to add member');
     }
@@ -1876,7 +2344,7 @@ export const TeamsPage = () => {
 
   // Remove member
   const removeMember = async (teamId, userId, userName) => {
-    if (!confirm(`Remove ${userName} from this team?`)) return;
+    if (!confirm(`Remove ${userName} from this team?\n\nIf they're not in another team of the same event, they'll also be removed from the event.`)) return;
     try {
       const res = await api.delete(`/teams/${teamId}/members/${userId}`);
       setTeams(teams.map(t => t._id === teamId ? res.data.data : t));
@@ -2409,76 +2877,76 @@ export const MyTeamsPage = () => {
 export const T3DashboardEnhanced = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const teams = [
-    { name: 'Tech Team', event: 'Hackathon 2026', members: 8, present: 6, time: '9:00 AM - 1:00 PM' },
-    { name: 'Media Team', event: 'Startup Pitch Day', members: 5, present: 4, time: '2:00 PM - 6:00 PM' },
-  ];
-  const pendingApps = [
-    { name: 'Ayush', event: 'Hackathon 2026', role: 'Tech Team', time: '2h ago' },
-    { name: 'Abhishek Singh', event: 'Hackathon 2026', role: 'Media Team', time: '4h ago' },
-  ];
+  const [myEvents, setMyEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/events/me');
+        setMyEvents(res.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Hi {user.name.split(' ')[0]}!</h1>
-        <p className="text-gray-500">Your teams and pending tasks today</p>
+        <p className="text-gray-500">Your events and pending tasks</p>
       </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="My Teams" value="3" />
-        <KPI label="Pending Apps" value="12" change="New" />
-        <KPI label="Present Today" value="20/25" />
-        <KPI label="Avg Rating Given" value="4.7" />
+        <KPI label="My Events" value={myEvents.length} />
+        <KPI label="As Head" value={myEvents.filter(e => e.headId?._id === user._id).length} />
+        <KPI label="Applications" value="12" change="New" />
+        <KPI label="Avg Rating" value="4.7" />
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold">Today's Teams</h3>
-            <button onClick={() => navigate('/t3/teams')} className="text-xs text-purple-500 hover:underline">View All →</button>
-          </div>
-          <div className="space-y-3">
-            {teams.map((t, i) => (
-              <div key={i} className="border border-gray-200 rounded-lg p-4 hover:bg-purple-50 transition">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-medium">{t.name}</p>
-                    <p className="text-xs text-gray-500">{t.event}</p>
-                  </div>
-                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">{t.time}</span>
-                </div>
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                  <span className="text-xs text-gray-500 flex items-center gap-1"><Users size={12} /> {t.present}/{t.members} present</span>
-                  <div className="flex gap-2">
-                    <button className="text-xs px-2 py-1 bg-purple-500 text-white rounded">Chat</button>
-                    <button onClick={() => navigate('/t3/attendance')} className="text-xs px-2 py-1 border rounded">Attendance</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+
+      {/* EVENTS I'M ASSIGNED TO */}
+      <div className="bg-white p-5 rounded-xl border border-gray-200">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-semibold text-lg">My Events</h3>
+          <button onClick={() => navigate('/t3/events')} className="text-xs text-purple-500 hover:underline">View All →</button>
         </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold">Pending Applications</h3>
-            <button onClick={() => navigate('/t3/applications')} className="text-xs text-purple-500 hover:underline">Review All →</button>
+
+        {loading ? (
+          <SkeletonCardGrid count={2} />
+        ) : myEvents.length === 0 ? (
+          <div className="text-center py-8">
+            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No events assigned to you yet</p>
           </div>
+        ) : (
           <div className="space-y-3">
-            {pendingApps.map((a, i) => (
-              <div key={i} className="flex items-center justify-between border border-gray-200 rounded-lg p-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-bold">{a.name.charAt(0)}</div>
-                  <div>
-                    <p className="text-sm font-medium">{a.name}</p>
-                    <p className="text-xs text-gray-500">{a.event} / {a.role}</p>
+            {myEvents.map((ev) => {
+              const isHead = ev.headId?._id === user._id;
+              return (
+                <div key={ev._id} className={`border rounded-lg p-4 hover:bg-purple-50 transition cursor-pointer ${isHead ? 'border-purple-200 bg-purple-50/30' : 'border-gray-200'}`}
+                  onClick={() => navigate(`/t3/events/${ev._id}`)}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold">{ev.title}</p>
+                        {isHead && (
+                          <span className="text-[10px] px-2 py-0.5 bg-purple-500 text-white rounded-full font-semibold">HEAD</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">{ev.date} · {ev.location}</p>
+                    </div>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                      {ev.memberCount || 0} members
+                    </span>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <button className="p-1.5 bg-green-500 text-white rounded text-xs"><CheckCircle size={14} /></button>
-                  <button className="p-1.5 border border-red-300 text-red-500 rounded text-xs"><X size={14} /></button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -2583,27 +3051,121 @@ export const useFakeLoading = (ms = 600) => {
 };
 
 // ====================================================================
-// EVENT DETAIL
+// EVENT DETAIL — View details + Event Head manages members
 // ====================================================================
 export const EventDetailPage = () => {
   const navigate = useNavigate();
-  const loading = useFakeLoading(500);
-  const event = {
-    title: 'Annual Tech Fest 2026',
-    date: 'Oct 15-17, 2026',
-    location: 'Main Auditorium',
-    status: 'published',
-    description: 'A 3-day technology festival featuring hackathons, workshops, keynote speakers, and networking sessions for students across all years.',
+  const { id } = useParams();
+  const { user } = useAuth();
+
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]);
+  const [addMemberModal, setAddMemberModal] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ title: '', date: '', location: '', description: '', headId: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const canManage = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+  const isEventHead = event?.headId?._id === user._id || event?.headId === user._id;
+  const canAddMembers = canManage || isEventHead;
+
+  // Load event + users
+  const fetchEvent = async () => {
+    try {
+      const res = await api.get(`/events/${id}`);
+      setEvent(res.data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
-  const teams = [
-    { name: 'Tech Team', lead: 'Mayank', members: 8, applicants: 24 },
-    { name: 'Media Team', lead: 'Sneha Patel', members: 5, applicants: 12 },
-    { name: 'Logistics', lead: 'Abhishek Singh', members: 12, applicants: 18 },
-  ];
-  const shifts = [
-    { time: '9:00 AM - 1:00 PM', team: 'Tech Team', assigned: 8, required: 8 },
-    { time: '2:00 PM - 6:00 PM', team: 'Media Team', assigned: 4, required: 5 },
-  ];
+
+  useEffect(() => {
+    (async () => {
+      await fetchEvent();
+      if (canAddMembers) {
+        try {
+          const res = await api.get('/admin/users');
+          setUsers(res.data.data);
+        } catch (err) { console.error(err); }
+      }
+    })();
+  }, [id, canAddMembers]);
+
+  const addMember = async (userId) => {
+    setSaving(true);
+    try {
+      const res = await api.post(`/events/${id}/members`, { userId });
+      setEvent(res.data.data);
+      setMemberSearch('');
+      alert('Member added');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add member');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeMember = async (userId, userName) => {
+    if (!confirm(`Remove ${userName} from this event?`)) return;
+    try {
+      const res = await api.delete(`/events/${id}/members/${userId}`);
+      setEvent(res.data.data);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to remove member');
+    }
+  };
+
+  // Open edit modal with current values
+  const openEditModal = () => {
+    setEditForm({
+      title: event.title || '',
+      date: event.date || '',
+      location: event.location || '',
+      description: event.description || '',
+      headId: event.headId?._id || '',
+    });
+    setEditModal(true);
+  };
+
+  // Save event edits
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setSavingEdit(true);
+    try {
+      const res = await api.patch(`/events/${id}`, editForm);
+      setEvent(res.data.data);
+      setEditModal(false);
+      alert('Event updated successfully');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update event');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Filter users — exclude existing members + Event Head + only T1/T2 for non-admins
+  const eligibleUsers = users.filter((u) => {
+    const isMember = event?.members?.some((m) => m._id === u._id);
+    if (isMember) return false;
+    if (u._id === user._id) return false;
+
+    // Admin can add anyone except SUPER_ADMIN
+    if (canManage) return u.role !== 'SUPER_ADMIN';
+
+    // Event Head (T3) can only add T1/T2
+    if (isEventHead) return ['T1_VOLUNTEER', 'T2_ASSOCIATE'].includes(u.role);
+
+    return false;
+  }).filter((u) =>
+    u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+    u.email.toLowerCase().includes(memberSearch.toLowerCase())
+  );
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -2615,43 +3177,270 @@ export const EventDetailPage = () => {
       </div>
     );
   }
+
+  if (!event) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Event not found</p>
+        <button onClick={() => navigate(-1)} className="mt-4 text-blue-500 hover:underline">← Back</button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <button onClick={() => navigate(-1)} className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">← Back to Events</button>
+      <button onClick={() => navigate(-1)} className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
+        ← Back to Events
+      </button>
+
+      {/* Hero banner */}
       <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-8 text-white">
-        <span className="text-xs bg-white/20 backdrop-blur px-3 py-1 rounded-full font-medium">{event.status.toUpperCase()}</span>
-        <h1 className="text-3xl font-bold mb-3 mt-4">{event.title}</h1>
+        <div className="flex items-start justify-between mb-4">
+          <span className="text-xs bg-white/20 backdrop-blur px-3 py-1 rounded-full font-medium">
+            {event.status.toUpperCase()}
+          </span>
+          <Calendar className="w-8 h-8 text-white/60" />
+        </div>
+        <h1 className="text-3xl font-bold mb-3">{event.title}</h1>
         <div className="flex flex-wrap gap-4 text-sm text-white/90">
           <span className="flex items-center gap-2"><Calendar size={16} /> {event.date}</span>
           <span className="flex items-center gap-2"><MapPin size={16} /> {event.location}</span>
         </div>
+
+        {/* Event Head */}
+        {event.headName && (
+          <div className="mt-5 pt-5 border-t border-white/20 flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
+              {event.headName.charAt(0)}
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider opacity-80">Event Head</p>
+              <p className="font-semibold text-lg">{event.headName}</p>
+              <p className="text-xs opacity-70">{event.headEmail}</p>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="Teams" value={teams.length} />
-        <KPI label="Shifts" value={shifts.length} />
-        <KPI label="Total Applicants" value="54" change="12" />
-        <KPI label="Positions Filled" value="24/25" />
+        <KPI label="Total Members" value={event.memberCount || event.members?.length || 0} />
+        <KPI label="Teams" value={event.teams || 0} />
+        <KPI label="Total Applicants" value={event.applicants || 0} />
+        <KPI label="Status" value={event.status} />
       </div>
+
+      {/* Description */}
+      {event.description && (
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-3">About this Event</h3>
+          <p className="text-sm text-gray-600 leading-relaxed">{event.description}</p>
+        </div>
+      )}
+
+      {/* MEMBERS SECTION */}
       <div className="bg-white p-5 rounded-xl border border-gray-200">
-        <h3 className="font-semibold mb-3">About this Event</h3>
-        <p className="text-sm text-gray-600 leading-relaxed">{event.description}</p>
-      </div>
-      <div className="bg-white p-5 rounded-xl border border-gray-200">
-        <h3 className="font-semibold mb-4">Teams</h3>
-        <div className="space-y-3">
-          {teams.map((t, i) => (
-            <div key={i} className="border border-gray-200 rounded-lg p-4 hover:bg-blue-50 transition">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-medium">{t.name}</p>
-                  <p className="text-xs text-gray-500">Lead: {t.lead}</p>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Users className="w-5 h-5 text-gray-500" /> Event Members
+              <span className="text-sm font-normal text-gray-500">({event.memberCount || event.members?.length || 0})</span>
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {canAddMembers ? 'Manage the event workforce' : 'Members assigned to this event'}
+            </p>
+          </div>
+          {canAddMembers && (
+            <button onClick={() => setAddMemberModal(true)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 flex items-center gap-2">
+              <UserPlus size={16} /> Add Member
+            </button>
+          )}
+        </div>
+
+        {(!event.members || event.members.length === 0) ? (
+          <div className="text-center py-8">
+            <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No members yet</p>
+            {canAddMembers && (
+              <button onClick={() => setAddMemberModal(true)} className="mt-3 text-sm text-blue-500 hover:underline">
+                Add the first member
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {event.members.map((m) => {
+              const isHead = event.headId?._id === m._id || event.headId === m._id;
+              return (
+                <div key={m._id} className={`flex items-center justify-between p-3 border rounded-lg ${isHead ? 'border-purple-200 bg-purple-50' : 'border-gray-200'}`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${isHead ? 'bg-purple-500' : 'bg-blue-500'}`}>
+                      {m.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{m.name}</p>
+                        {isHead && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-200 text-purple-800 rounded-full font-semibold">
+                            HEAD
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">{m.email}</p>
+                    </div>
+                  </div>
+                  {canAddMembers && !isHead && (
+                    <button onClick={() => removeMember(m._id, m.name)}
+                      className="text-xs text-red-500 hover:underline flex-shrink-0 ml-2">
+                      Remove
+                    </button>
+                  )}
                 </div>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">{t.members} members</span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Admin Actions */}
+      {canManage && (
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-4">Admin Actions</h3>
+          <div className="flex flex-wrap gap-3">
+            <button onClick={openEditModal} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 flex items-center gap-2">
+              <Settings size={14} /> Edit Event
+            </button>
+            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Close Event</button>
+            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Export Report</button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {addMemberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setAddMemberModal(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Add Member</h3>
+                <p className="text-sm text-gray-500">to {event.title}</p>
+              </div>
+              <button onClick={() => setAddMemberModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-3">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder="Search by name or email..."
+                  className="flex-1 bg-transparent border-none outline-none text-sm" />
               </div>
             </div>
-          ))}
+
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {eligibleUsers.length === 0 ? (
+                <p className="text-center text-gray-500 py-8 text-sm">
+                  {memberSearch ? 'No users match your search' : 'No users available to add'}
+                </p>
+              ) : eligibleUsers.map((u) => (
+                <div key={u._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {u.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{u.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0 ${
+                      u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
+                      u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                      'bg-purple-100 text-purple-700'
+                    }`}>
+                      {u.role.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <button onClick={() => addMember(u._id)} disabled={saving}
+                    className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 disabled:opacity-50 flex-shrink-0 ml-2">
+                    + Add
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+              <span className="text-xs text-gray-500">
+                Current: {event.memberCount || event.members?.length || 0} members
+              </span>
+              <button onClick={() => setAddMemberModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
+                Done
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* EDIT EVENT MODAL */}
+      {editModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEditModal(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-semibold">Edit Event</h3>
+              <button onClick={() => setEditModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={saveEdit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Event Title *</label>
+                <input required value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Date *</label>
+                  <input type="date" required value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Location *</label>
+                  <input required value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Event Head *</label>
+                <select value={editForm.headId} onChange={(e) => setEditForm({ ...editForm, headId: e.target.value })}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
+                  <option value="">Select an event head...</option>
+                  {users.filter((u) => ['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(u.role)).map((u) => (
+                    <option key={u._id} value={u._id}>
+                      {u.name} — {u.role.replace('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Description</label>
+                <textarea rows={3} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500" />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setEditModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" disabled={savingEdit}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
