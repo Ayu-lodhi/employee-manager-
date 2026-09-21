@@ -1,4 +1,5 @@
 const Message = require('./chat.model');
+const { emitToRoom } = require('../../config/socket');
 
 exports.getRoomMessages = async (req, res) => {
   try {
@@ -24,6 +25,16 @@ exports.sendMessage = async (req, res) => {
       senderId: req.user.sub,
       senderName: req.user.name || 'User',
       text: text.trim(),
+    });
+
+    emitToRoom(roomId, 'chat:new_message', {
+      _id: message._id,
+      roomId: message.roomId,
+      roomName: message.roomName,
+      senderId: message.senderId,
+      senderName: message.senderName,
+      text: message.text,
+      createdAt: message.createdAt,
     });
 
     res.status(201).json({ success: true, data: message });

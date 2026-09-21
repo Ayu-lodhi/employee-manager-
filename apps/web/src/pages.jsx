@@ -12,12 +12,61 @@ import {
   Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, Crown, AlertTriangle,
   Info, Trash2, Construction, MapPin, Timer, BarChart3
 } from 'lucide-react';
+import { io } from 'socket.io-client';
 
 // ====================================================================
 // AUTH CONTEXT
 // ====================================================================
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
+
+// ====================================================================
+// SOCKET CONTEXT
+// ====================================================================
+const SocketContext = createContext(null);
+export const useSocket = () => useContext(SocketContext);
+
+export const SocketProvider = ({ children }) => {
+  const { user } = useAuth();
+  const [socket, setSocket] = useState(null);
+
+  useEffect(() => {
+    if (!user) {
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
+      return;
+    }
+
+    const token = localStorage.getItem('tbi_token');
+    if (!token) return;
+
+    const newSocket = io('http://localhost:5000', {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+    });
+
+    newSocket.on('connect', () => {
+      console.log('Real-time connected');
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.warn('Socket connection error:', err.message);
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [user]);
+
+  return <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -351,24 +400,32 @@ export const Sidebar = () => {
 export const Topbar = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const socket = useSocket();
   const cfg = ROLES[user.role];
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Poll unread count every 15 seconds
   useEffect(() => {
     const fetchCount = async () => {
       try {
         const res = await api.get('/notifications');
-        const unread = res.data.data.filter((n) => !n.isRead).length;
-        setUnreadCount(unread);
+        setUnreadCount(res.data.data.filter((n) => !n.isRead).length);
       } catch (err) {
-        // Silently fail
+        // silent
       }
     };
     fetchCount();
-    const interval = setInterval(fetchCount, 15000);
+    const interval = setInterval(fetchCount, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleNew = () => {
+      setUnreadCount((prev) => prev + 1);
+    };
+    socket.on('notification:new', handleNew);
+    return () => socket.off('notification:new', handleNew);
+  }, [socket]);
 
   return (
     <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200">
@@ -791,6 +848,7 @@ export const UserManagement = () => {
 // ====================================================================
 export const Chat = () => {
   const { user } = useAuth();
+  const socket = useSocket();
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -802,36 +860,67 @@ export const Chat = () => {
       try {
         const res = await api.get(`/chat/rooms/${roomId}/messages`);
         setMessages(res.data.data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.emit('chat:join', roomId);
+
+    const handleNewMessage = (msg) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m._id === msg._id)) return prev;
+        return [...prev, msg];
+      });
+    };
+
+    socket.on('chat:new_message', handleNewMessage);
+
+    return () => {
+      socket.emit('chat:leave', roomId);
+      socket.off('chat:new_message', handleNewMessage);
+    };
+  }, [socket]);
+
   const send = async () => {
     if (!message.trim()) return;
+    const text = message;
+    setMessage('');
     try {
-      const res = await api.post('/chat/messages', { roomId, roomName, text: message });
-      setMessages([...messages, res.data.data]);
-      setMessage('');
-    } catch (err) { alert('Failed to send'); }
+      await api.post('/chat/messages', { roomId, roomName, text });
+    } catch (err) {
+      alert('Failed to send');
+      setMessage(text);
+    }
   };
 
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-4">
       <div className="w-72 bg-white rounded-xl border border-gray-200 p-4">
         <h3 className="font-semibold mb-4">Rooms</h3>
-        <div className="p-3 rounded-lg cursor-pointer bg-blue-50 border-l-4 border-blue-500">
+        <div className="p-3 rounded-lg bg-blue-50 border-l-4 border-blue-500">
           <p className="font-medium text-sm">Tech Team</p>
           <p className="text-xs text-gray-500">Hackathon 2026</p>
         </div>
       </div>
       <div className="flex-1 bg-white rounded-xl border border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="font-semibold">{roomName}</h3>
+          <span className="text-xs text-green-600 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-green-500" /> Live
+          </span>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {loading ? <Skeleton className="h-8 w-64" /> : messages.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm mt-8">No messages yet. Say hello!</p>
+          {loading ? (
+            <Skeleton className="h-8 w-64" />
+          ) : messages.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm mt-8">No messages yet. Say hello</p>
           ) : messages.map((m) => {
             const own = m.senderId === user._id;
             return (
@@ -848,10 +937,13 @@ export const Chat = () => {
           })}
         </div>
         <div className="p-4 border-t border-gray-200 flex gap-2">
-          <input value={message} onChange={(e) => setMessage(e.target.value)}
+          <input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && send()}
             placeholder="Type a message..."
-            className="flex-1 h-10 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+            className="flex-1 h-10 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+          />
           <button onClick={send} className="px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Send</button>
         </div>
       </div>
@@ -1689,6 +1781,7 @@ export const CertificatesPage = () => {
 // NOTIFICATIONS
 // ====================================================================
 export const NotificationsPage = () => {
+  const socket = useSocket();
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -1706,9 +1799,16 @@ export const NotificationsPage = () => {
 
   useEffect(() => {
     fetchNotifs();
-    const interval = setInterval(fetchNotifs, 15000); // poll every 15s
-    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleNew = (notif) => {
+      setNotifs((prev) => [notif, ...prev]);
+    };
+    socket.on('notification:new', handleNew);
+    return () => socket.off('notification:new', handleNew);
+  }, [socket]);
 
   const markRead = async (id) => {
     try {
@@ -1742,12 +1842,10 @@ export const NotificationsPage = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Notifications</h1>
-          <p className="text-gray-500">{unread} unread · {notifs.length} total</p>
+          <p className="text-gray-500">{unread} unread / {notifs.length} total</p>
         </div>
         {unread > 0 && (
-          <button onClick={markAllRead} className="text-sm text-blue-500 hover:underline">
-            Mark all read
-          </button>
+          <button onClick={markAllRead} className="text-sm text-blue-500 hover:underline">Mark all read</button>
         )}
       </div>
 
@@ -1764,7 +1862,7 @@ export const NotificationsPage = () => {
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No notifications</h3>
-          <p className="text-gray-500">{filter === 'unread' ? "You're all caught up!" : 'Activities will appear here'}</p>
+          <p className="text-gray-500">{filter === 'unread' ? "You're all caught up" : 'Activities will appear here'}</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

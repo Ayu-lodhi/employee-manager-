@@ -83,12 +83,8 @@ exports.addMember = async (teamId, userId) => {
     }
   }
 
-  await notify(
-    userId,
-    'system',
-    'Added to Team',
-    `You've been added to "${team.name}". Open team chat to say hi!`
-  );
+  await notify(userId, 'system', 'Added to Team', `You've been added to "${team.name}".`);
+
 
   return await Team.findById(teamId)
     .populate('members', 'name email role')
@@ -125,21 +121,11 @@ exports.removeMember = async (teamId, userId) => {
         await event.save();
 
         // Notify
-        await notify(
-          userId,
-          'system',
-          'Removed from Event',
-          `You've been removed from "${event.title}" along with team "${team.name}".`
-        );
+        await notify(userId, 'system', 'Removed from Event', `You've been removed from "${event.title}" along with team "${team.name}".`);
       }
     } else {
       // Still in other teams — only notify about team removal
-      await notify(
-        userId,
-        'system',
-        'Removed from Team',
-        `You've been removed from team "${team.name}". You're still part of the event.`
-      );
+      await notify(userId, 'system', 'Removed from Team', `You've been removed from team "${team.name}".`);
     }
   }
 

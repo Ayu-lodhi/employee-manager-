@@ -40,7 +40,7 @@ exports.updateStatus = async (id, status, reviewerId) => {
 
   // Notify the applicant
   const title = status === 'approved'
-    ? 'Application Approved!'
+    ? 'Application Approved'
     : status === 'rejected'
     ? 'Application Not Selected'
     : 'You are on the Waitlist';

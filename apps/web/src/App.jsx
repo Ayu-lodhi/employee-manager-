@@ -10,7 +10,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 // Core auth context + shared guards
-import { AuthProvider, useAuth, ROLES, ProtectedRoute } from './pages';
+import { AuthProvider, useAuth, ROLES, ProtectedRoute, SocketProvider } from './pages';
 
 // All page components — grouped by module for readability
 import {
@@ -73,7 +73,8 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
+        <SocketProvider>
+          <Routes>
 
           {/* ==================================================
               PUBLIC ROUTES — No authentication required
@@ -147,7 +148,8 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>
-      </AuthProvider>
+      </SocketProvider>
+    </AuthProvider>
     </BrowserRouter>
   );
 }

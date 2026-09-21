@@ -152,24 +152,20 @@ class EventService extends BaseService {
 
   async _dispatchCreationNotifications(event, headId, members, creatorId) {
     try {
-      if (creatorId) {
-        await notifyAll(
-          creatorId,
-          'system',
-          'New Event Published',
-          `${event.title} — ${event.date} at ${event.location}`,
-          User
-        );
-      }
+      await notifyAll(
+        creatorId,
+        'system',
+        'New Event Published',
+        `${event.title} — ${event.date} at ${event.location}`,
+        User
+      );
 
       if (headId) {
         await notify(headId, 'system', 'You are the Event Head', `You lead "${event.title}".`);
       }
 
       for (const m of members) {
-        const mStr = m?.toString();
-        const headStr = headId?.toString();
-        if (mStr !== headStr) {
+        if (m !== headId) {
           await notify(m, 'system', 'Added to Event', `You've been added to "${event.title}".`);
         }
       }
