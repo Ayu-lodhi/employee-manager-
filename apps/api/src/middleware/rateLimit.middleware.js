@@ -31,3 +31,29 @@ exports.globalLimiter = (req, res, next) => {
 
   next();
 };
+
+const userCreateRequests = new Map();
+exports.createUserLimiter = (req, res, next) => {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const record = userCreateRequests.get(ip) || { count: 0, resetTime: now + 60 * 1000 };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + 60 * 1000;
+  } else {
+    record.count++;
+  }
+
+  userCreateRequests.set(ip, record);
+
+  if (record.count > 30) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many user creation requests, please try again later.',
+    });
+  }
+
+  next();
+};
+

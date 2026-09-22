@@ -31,6 +31,8 @@ app.use('/api/v1/notifications', require('./modules/notifications/notifications.
 app.use('/api/v1/certificates', require('./modules/certificates/certificates.routes'));
 app.use('/api/v1/chat', require('./modules/chat/chat.routes'));
 app.use('/api/v1/super-admin', require('./modules/super-admin/superAdmin.routes'));
+app.use('/api/v1/stats', require('./modules/stats/stats.routes'));
+app.use('/api/v1/preferences', require('./modules/users/preferences.routes'));
 
 app.get('/', (req, res) => {
   res.json({

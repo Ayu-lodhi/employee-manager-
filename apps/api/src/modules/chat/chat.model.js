@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
-  roomId: { type: String, required: true },      // e.g., "tech-team-hackathon-2026"
+  roomId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatRoom', required: true },
   roomName: { type: String, default: '' },
   senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   senderName: { type: String, required: true },

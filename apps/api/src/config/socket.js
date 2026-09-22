@@ -46,13 +46,13 @@ const initSocket = (httpServer) => {
 
     socket.on('chat:join', (roomId) => {
       if (typeof roomId === 'string' && roomId.length > 0) {
-        socket.join(`room:${roomId}`);
+        socket.join(`chat:${roomId}`);
       }
     });
 
     socket.on('chat:leave', (roomId) => {
       if (typeof roomId === 'string') {
-        socket.leave(`room:${roomId}`);
+        socket.leave(`chat:${roomId}`);
       }
     });
 
@@ -76,7 +76,8 @@ const emitToUser = (userId, event, data) => {
 
 const emitToRoom = (roomId, event, data) => {
   if (!io || !roomId) return;
-  io.to(`room:${roomId}`).emit(event, data);
+  const room = roomId.startsWith('room:') || roomId.startsWith('chat:') ? roomId : `chat:${roomId}`;
+  io.to(room).to(roomId).emit(event, data);
 };
 
 const emitToAll = (event, data) => {

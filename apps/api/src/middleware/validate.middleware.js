@@ -23,12 +23,21 @@ const validate = (schema) => (req, res, next) => {
   next();
 };
 
+const addUserSchema = Joi.object({
+  name: Joi.string().min(2).max(100).required(),
+  email: Joi.string().email().required(),
+  phone: Joi.string().allow('', null).optional(),
+  role: Joi.string().valid('SUPER_ADMIN', 'ADMIN', 'T3_EXECUTIVE', 'T2_ASSOCIATE', 'T1_VOLUNTEER').optional(),
+});
+
 const schemas = {
   createEvent: createEventSchema,
+  addUser: addUserSchema,
 };
 
 module.exports = {
   createEventSchema,
+  addUserSchema,
   schemas,
   validate,
 };

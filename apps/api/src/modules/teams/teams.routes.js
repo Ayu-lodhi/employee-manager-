@@ -5,10 +5,19 @@ const { protect, restrictTo } = require('../auth/auth.middleware');
 
 router.use(protect);
 
+// List all teams (Admin)
 router.get('/', teamController.getTeams);
-router.get('/me', teamController.getMyTeams);
-router.get('/:id', teamController.getTeam);
 
+// T3's own teams
+router.get('/me', teamController.getMyTeams);
+router.get('/me/members', teamController.getMyTeamMembers);
+router.get('/me/event-members', teamController.getMyEventMembers);
+
+// Team detail + members
+router.get('/:id', teamController.getTeam);
+router.get('/:id/members', teamController.getTeamMembers);
+
+// Create / delete / manage
 router.post('/', restrictTo('ADMIN', 'SUPER_ADMIN'), teamController.createTeam);
 router.post('/:id/members', restrictTo('ADMIN', 'SUPER_ADMIN', 'T3_EXECUTIVE'), teamController.addMember);
 router.delete('/:id/members/:userId', restrictTo('ADMIN', 'SUPER_ADMIN', 'T3_EXECUTIVE'), teamController.removeMember);

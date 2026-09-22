@@ -33,3 +33,13 @@ exports.getMe = async (req, res) => {
     res.status(404).json({ success: false, message: error.message });
   }
 };
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    await authService.changePassword(req.user.sub, oldPassword, newPassword);
+    res.status(200).json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

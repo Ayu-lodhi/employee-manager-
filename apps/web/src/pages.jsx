@@ -4,15 +4,20 @@
 
 import React, { useState, createContext, useContext, useEffect } from 'react';
 import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
-import api from './lib/api';
 import {
   LayoutDashboard, Users, ScrollText, Monitor, Settings, Shield, FileText,
   User as UserIcon, LogOut, Calendar, TrendingUp, UserPlus, Upload,
   UsersRound, Clock, Award, CheckCircle, MessageSquare, Star, Bell,
   Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, Crown, AlertTriangle,
-  Info, Trash2, Construction, MapPin, Timer, BarChart3
+  Info, Trash2, Construction, MapPin, Timer, BarChart3, ExternalLink, ChevronRight
 } from 'lucide-react';
+import api from './lib/api';
 import { io } from 'socket.io-client';
+import {
+  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  AreaChart, Area,
+} from 'recharts';
 
 // ====================================================================
 // AUTH CONTEXT
@@ -150,35 +155,29 @@ const MENUS = {
         { icon: ScrollText, label: 'Audit Logs', to: '/super-admin/audit', badge: 3 },
         { icon: Monitor, label: 'Sessions', to: '/super-admin/sessions' },
         { icon: UserIcon, label: 'My Profile', to: '/profile' },
+        { icon: Settings, label: 'Preferences', to: '/preferences' },
       ]
     },
   ],
   ADMIN: [
-    {
-      section: 'OVERVIEW', items: [
-        { icon: LayoutDashboard, label: 'Dashboard', to: '/admin' },
-        { icon: TrendingUp, label: 'Analytics', to: '/admin/analytics' },
-      ]
-    },
-    {
-      section: 'MANAGEMENT', items: [
-        { icon: Users, label: 'Users', to: '/admin/users', badge: 2 },
-        { icon: UserPlus, label: 'Add User', to: '/admin/users/new' },
-        { icon: Upload, label: 'Bulk Import', to: '/admin/users/bulk' },
-      ]
-    },
-    {
-      section: 'OPERATIONS', items: [
-        { icon: Calendar, label: 'Events', to: '/admin/events', badge: 5 },
-        { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
-        { icon: Award, label: 'Certificates', to: '/admin/certificates', badge: 12 },
-      ]
-    },
-    {
-      section: 'ACCOUNT', items: [
-        { icon: UserIcon, label: 'My Profile', to: '/profile' },
-      ]
-    },
+    { section: 'OVERVIEW', items: [
+      { icon: LayoutDashboard, label: 'Dashboard', to: '/admin' },
+      { icon: TrendingUp, label: 'Analytics', to: '/admin/analytics' },
+    ]},
+    { section: 'MANAGEMENT', items: [
+      { icon: Users, label: 'Users', to: '/admin/users' },
+      { icon: UserPlus, label: 'Add User', to: '/admin/users/new' },
+      { icon: Upload, label: 'Bulk Import', to: '/admin/users/bulk' },
+    ]},
+    { section: 'OPERATIONS', items: [
+      { icon: Calendar, label: 'Events', to: '/admin/events' },
+      { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
+      { icon: Award, label: 'Certificates', to: '/admin/certificates' },
+    ]},
+    { section: 'ACCOUNT', items: [
+      { icon: UserIcon, label: 'My Profile', to: '/profile' },
+      { icon: Settings, label: 'Preferences', to: '/preferences' },
+    ]},
   ],
   T3_EXECUTIVE: [
     {
@@ -198,6 +197,7 @@ const MENUS = {
     {
       section: 'ACCOUNT', items: [
         { icon: UserIcon, label: 'My Profile', to: '/profile' },
+        { icon: Settings, label: 'Preferences', to: '/preferences' },
       ]
     },
   ],
@@ -219,6 +219,7 @@ const MENUS = {
       section: 'ACHIEVEMENTS', items: [
         { icon: Award, label: 'Certificates', to: '/t2/certificates' },
         { icon: UserIcon, label: 'My Profile', to: '/profile' },
+        { icon: Settings, label: 'Preferences', to: '/preferences' },
       ]
     },
   ],
@@ -236,6 +237,7 @@ const MENUS = {
         { icon: MessageSquare, label: 'Team Chats', to: '/chat', badge: 2 },
         { icon: Star, label: 'My Reviews', to: '/t1/reviews' },
         { icon: UserIcon, label: 'My Profile', to: '/profile' },
+        { icon: Settings, label: 'Preferences', to: '/preferences' },
       ]
     },
   ],
@@ -516,47 +518,172 @@ export const ProtectedRoute = ({ children, roles }) => {
 // ====================================================================
 export const AdminDashboard = () => {
   const { user } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [tiers, setTiers] = useState(null);
+  const [trend, setTrend] = useState([]);
+  const [attendance, setAttendance] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statsRes, tiersRes, trendRes, attendRes] = await Promise.all([
+          api.get('/stats/admin'),
+          api.get('/stats/users-by-tier'),
+          api.get('/stats/applications-trend'),
+          api.get('/stats/attendance'),
+        ]);
+        setStats(statsRes.data.data);
+        setTiers(tiersRes.data.data);
+        setTrend(trendRes.data.data);
+        setAttendance(attendRes.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Skeleton className="h-72 rounded-xl" />
+          <Skeleton className="h-72 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
+  const tierPieData = [
+    { name: 'T1 Volunteers', value: tiers.T1, color: '#4CAF50' },
+    { name: 'T2 Associates', value: tiers.T2, color: '#2196F3' },
+    { name: 'T3 Executives', value: tiers.T3, color: '#9C27B0' },
+    { name: 'Admins', value: tiers.Admin + tiers.SuperAdmin, color: '#FF9800' },
+  ].filter((d) => d.value > 0);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Good morning, {user.name.split(' ')[0]}</h1>
         <p className="text-gray-500">Here's what's happening today.</p>
       </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="Total Users" value="245" change="12%" />
-        <KPI label="Active Events" value="12" change="3" />
-        <KPI label="Approval Rate" value="89%" change="5%" />
-        <KPI label="Certificates" value="156" change="18" />
+        <KPI label="Total Users" value={stats.totalUsers} />
+        <KPI label="Active Events" value={stats.activeEvents} />
+        <KPI label="Approval Rate" value={`${stats.approvalRate}%`} />
+        <KPI label="Teams" value={stats.totalTeams} />
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <h3 className="font-semibold mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-gray-500" /> Users by Tier</h3>
-          <div className="space-y-3">
-            {[
-              { label: 'T1 Volunteers', value: 180, color: 'bg-green-500', pct: 74 },
-              { label: 'T2 Associates', value: 45, color: 'bg-blue-500', pct: 18 },
-              { label: 'T3 Executives', value: 18, color: 'bg-purple-500', pct: 7 },
-              { label: 'Admins', value: 2, color: 'bg-orange-500', pct: 1 },
-            ].map((t) => (
-              <div key={t.label}>
-                <div className="flex justify-between text-sm mb-1"><span>{t.label}</span><span className="font-medium">{t.value}</span></div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={`h-full ${t.color}`} style={{ width: `${t.pct}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-gray-500" /> Users by Tier
+          </h3>
+          {tierPieData.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-gray-400">
+              No users yet
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={tierPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={3}
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${value}`}
+                  labelLine={false}
+                >
+                  {tierPieData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
+
         <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <h3 className="font-semibold mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-gray-500" /> Applications Trend</h3>
-          <div className="h-48 flex items-end gap-2">
-            {[12, 19, 15, 25, 32, 28, 40].map((v, i) => (
-              <div key={i} className="flex-1 bg-blue-500 rounded-t" style={{ height: `${(v / 40) * 100}%` }} />
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-gray-500 mt-2">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => <span key={d}>{d}</span>)}
-          </div>
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-gray-500" /> Applications (Last 7 Days)
+          </h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+              <Line type="monotone" dataKey="count" stroke="#0EA5E9" strokeWidth={3} dot={{ r: 5, fill: '#0EA5E9' }} activeDot={{ r: 7 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-gray-500" /> Attendance Today
+          </h3>
+          {!attendance || attendance.total === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-gray-400">
+              No check-ins today
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart
+                data={[
+                  { status: 'Present', count: attendance.present },
+                  { status: 'Late', count: attendance.late },
+                  { status: 'Absent', count: attendance.absent },
+                ]}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="status" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                  <Cell fill="#10B981" />
+                  <Cell fill="#F59E0B" />
+                  <Cell fill="#EF4444" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-gray-500" /> Application Status
+          </h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart
+              data={[
+                { status: 'Pending', count: stats.pendingApplications },
+                { status: 'Approved', count: stats.approvedApplications },
+                { status: 'Rejected', count: stats.rejectedApplications },
+              ]}
+              layout="vertical"
+              margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
+              <YAxis dataKey="status" type="category" tick={{ fontSize: 12 }} />
+              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+              <Bar dataKey="count" radius={[0, 8, 8, 0]} fill="#0EA5E9" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
@@ -565,15 +692,94 @@ export const AdminDashboard = () => {
 
 export const SuperAdminDashboard = () => {
   const { user } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [tiers, setTiers] = useState(null);
+  const [trend, setTrend] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statsRes, tiersRes, trendRes] = await Promise.all([
+          api.get('/stats/super-admin'),
+          api.get('/stats/users-by-tier'),
+          api.get('/stats/applications-trend'),
+        ]);
+        setStats(statsRes.data.data);
+        setTiers(tiersRes.data.data);
+        setTrend(trendRes.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+        </div>
+      </div>
+    );
+  }
+
+  const tierPieData = [
+    { name: 'T1', value: tiers.T1, color: '#4CAF50' },
+    { name: 'T2', value: tiers.T2, color: '#2196F3' },
+    { name: 'T3', value: tiers.T3, color: '#9C27B0' },
+    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#FF9800' },
+  ].filter((d) => d.value > 0);
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Welcome, {user.name}</h1>
-      <p className="text-gray-500">Full system overview and admin actions.</p>
+      <div>
+        <h1 className="text-2xl font-bold">Welcome, {user.name}</h1>
+        <p className="text-gray-500">Full system overview and admin actions.</p>
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="Admins" value="5" />
-        <KPI label="Total Users" value="245" change="12%" />
-        <KPI label="Active Events" value="12" change="3" />
-        <KPI label="Active Sessions" value="18" />
+        <KPI label="Admins" value={stats.admins} />
+        <KPI label="Total Users" value={stats.totalUsers} />
+        <KPI label="Active Events" value={stats.activeEvents} />
+        <KPI label="Check-ins Today" value={stats.sessionsToday} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-4">Users by Tier</h3>
+          {tierPieData.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-gray-400">No data</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={tierPieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value">
+                  {tierPieData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: '12px' }} iconType="circle" />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-4">Applications (7 Days)</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+              <Bar dataKey="count" fill="#EF4444" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );
@@ -582,26 +788,90 @@ export const SuperAdminDashboard = () => {
 export const T1Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/stats/t1');
+        setStats(res.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold">Hi {user.name.split(' ')[0]}</h1>
-        <p className="text-gray-500">You have 1 shift today.</p>
+        <p className="text-gray-500">
+          {stats.todayCheckedIn
+            ? stats.todayCheckedOut
+              ? 'Your shift is complete for today.'
+              : 'You are checked in. Remember to check out.'
+            : 'You have not checked in yet today.'}
+        </p>
       </div>
-      <div className="bg-white rounded-xl border-l-4 border-l-green-500 border border-gray-200 p-6">
-        <p className="text-sm font-semibold text-green-600 mb-3">TODAY'S SHIFT</p>
-        <h3 className="text-xl font-bold mb-4">Tech Team — Hackathon 2026</h3>
-        <p className="text-sm text-gray-600 mb-1">9:00 AM - 1:00 PM</p>
-        <p className="text-sm text-gray-600 mb-5">Booth 3, Main Auditorium</p>
-        <div className="flex gap-3">
-          <button onClick={() => navigate('/t1/checkin')} className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600">Check In Now</button>
-          <button onClick={() => navigate('/chat')} className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">Open Chat</button>
+
+      {/* Today's status card */}
+      {stats.todayCheckedIn ? (
+        <div className="bg-white rounded-xl border-l-4 border-l-green-500 border border-gray-200 p-6">
+          <p className="text-sm font-semibold text-green-600 mb-3">TODAY'S STATUS</p>
+          <h3 className="text-xl font-bold mb-2">
+            {stats.todayCheckedOut ? 'Shift Complete' : 'Checked In'}
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            {stats.todayCheckedOut
+              ? 'Great work today.'
+              : 'Don\'t forget to check out at the end of your shift.'}
+          </p>
+          {!stats.todayCheckedOut && (
+            <button
+              onClick={() => navigate('/t1/checkin')}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600"
+            >
+              Check Out
+            </button>
+          )}
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl border-l-4 border-l-blue-500 border border-gray-200 p-6">
+          <p className="text-sm font-semibold text-blue-600 mb-3">READY TO CHECK IN?</p>
+          <h3 className="text-xl font-bold mb-2">Start Your Shift</h3>
+          <p className="text-sm text-gray-600 mb-4">Scan the QR code from your team lead.</p>
+          <button
+            onClick={() => navigate('/t1/checkin')}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600"
+          >
+            Check In Now
+          </button>
+        </div>
+      )}
+
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <KPI label="Events" value="5" />
-        <KPI label="Approved" value="4" />
-        <KPI label="Certificates" value="2" />
+        <KPI label="Applications" value={stats.myApplications} />
+        <KPI label="Approved" value={stats.approved} />
+        <KPI label="Certificates" value={stats.certificates} />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <KPI label="Pending" value={stats.pending} />
+        <KPI label="Days Attended" value={stats.attendanceDays} />
+        <KPI label="My Teams" value={stats.myTeams} />
       </div>
     </div>
   );
@@ -611,6 +881,8 @@ export const T1Dashboard = () => {
 // USER MANAGEMENT — Connected to real backend
 // ====================================================================
 export const UserManagement = () => {
+  const { user: currentUser } = useAuth();
+  const canManageAccess = currentUser?.role === 'SUPER_ADMIN';
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -620,6 +892,7 @@ export const UserManagement = () => {
   const [revokeModal, setRevokeModal] = useState(null);
   const [revokeReason, setRevokeReason] = useState('');
   const [revokeNotes, setRevokeNotes] = useState('');
+  const [revoking, setRevoking] = useState(false);
 
   // Fetch users from backend
   useEffect(() => {
@@ -658,19 +931,41 @@ export const UserManagement = () => {
   // Revoke access via API
   const revokeUser = async (e) => {
     e.preventDefault();
-    if (!revokeReason) return alert('Please select a reason');
+    if (!revokeReason) {
+      alert('Please select a reason');
+      return;
+    }
+    setRevoking(true);
     try {
-      await api.post(`/admin/users/${revokeModal._id}/revoke`, {
+      const res = await api.post(`/admin/users/${revokeModal._id}/revoke`, {
         reason: revokeReason,
         notes: revokeNotes,
       });
-      setUsers(users.filter(u => u._id !== revokeModal._id));
+      setUsers(users.map((u) => u._id === revokeModal._id ? { ...u, isActive: false } : u));
       setRevokeModal(null);
       setRevokeReason('');
       setRevokeNotes('');
-      alert(`${revokeModal.name}'s access has been revoked.`);
+      alert(res.data.message || `${revokeModal.name}'s access revoked.`);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to revoke');
+    } finally {
+      setRevoking(false);
+    }
+  };
+
+  const handleResetPassword = async (u) => {
+    if (!confirm(`Send a new temporary password to ${u.name}?\n\nTheir current password will become invalid.`)) return;
+    try {
+      const res = await api.post(`/admin/users/${u._id}/reset-password`);
+      const { tempPassword, emailSent } = res.data;
+
+      if (emailSent) {
+        alert(`Password reset!\n\nEmail sent to: ${u.email}\n\nTemp password (also shown here for backup):\n${tempPassword}\n\nThis password is one-time use only.`);
+      } else {
+        alert(`Password reset but email failed to send.\n\nShare this manually with ${u.name}:\n\n${tempPassword}`);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to reset password');
     }
   };
 
@@ -731,7 +1026,25 @@ export const UserManagement = () => {
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${roleColor[u.role]}`}>{roleLabel[u.role]}</span>
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    <button onClick={() => setRevokeModal(u)} className="text-red-500 hover:underline">Revoke</button>
+                    {canManageAccess ? (
+                      <div className="flex gap-3 flex-wrap">
+                        <button
+                          onClick={() => handleResetPassword(u)}
+                          className="text-amber-600 hover:underline text-xs font-medium"
+                          title="Send reset password email"
+                        >
+                          Send Reset Password
+                        </button>
+                        <button
+                          onClick={() => setRevokeModal(u)}
+                          className="text-red-500 hover:underline text-xs font-medium"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -803,19 +1116,25 @@ export const UserManagement = () => {
                 <p className="text-xs text-gray-500">{revokeModal.email}</p>
               </div>
             </div>
+
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
               <p className="text-sm text-red-800 font-medium mb-2">This action will:</p>
               <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
-                <li>Immediately end all active sessions</li>
-                <li>Remove access to all events and teams</li>
-                <li>Log this action for audit (immutable)</li>
+                <li>Immediately deactivate the account</li>
+                <li>Invalidate their current password</li>
+                <li>Log this action for audit</li>
               </ul>
             </div>
+
             <form onSubmit={revokeUser} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1.5">Reason *</label>
-                <select required value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)}
-                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none">
+                <select
+                  required
+                  value={revokeReason}
+                  onChange={(e) => setRevokeReason(e.target.value)}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-red-500"
+                >
                   <option value="">Select a reason...</option>
                   <option value="Policy Violation">Policy Violation</option>
                   <option value="Security Breach">Security Breach</option>
@@ -827,13 +1146,25 @@ export const UserManagement = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Additional Notes</label>
-                <textarea required minLength={10} rows={3} value={revokeNotes} onChange={(e) => setRevokeNotes(e.target.value)}
-                  placeholder="Reason details (min 10 characters)..."
-                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none" />
+                <textarea
+                  rows={3}
+                  value={revokeNotes}
+                  onChange={(e) => setRevokeNotes(e.target.value)}
+                  placeholder="Optional details..."
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-red-500"
+                />
               </div>
               <div className="flex gap-3 justify-end">
-                <button type="button" onClick={() => setRevokeModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600">Revoke Access</button>
+                <button type="button" onClick={() => setRevokeModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!revokeReason || revoking}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 disabled:opacity-50"
+                >
+                  {revoking ? 'Revoking...' : 'Revoke Access'}
+                </button>
               </div>
             </form>
           </div>
@@ -849,31 +1180,109 @@ export const UserManagement = () => {
 export const Chat = () => {
   const { user } = useAuth();
   const socket = useSocket();
+  const [rooms, setRooms] = useState([]);
+  const [eligibleUsers, setEligibleUsers] = useState([]);
+  const [selectedRoom, setSelectedRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
-  const roomId = 'tech-team-hackathon-2026';
-  const roomName = 'Tech Team — Hackathon 2026';
+  const [loadingRooms, setLoadingRooms] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [createModal, setCreateModal] = useState(false);
+  const [addMemberModal, setAddMemberModal] = useState(false);
+  const [deleteRoomModal, setDeleteRoomModal] = useState(false);
+  const [form, setForm] = useState({ name: '', description: '', memberIds: [] });
+  const [memberSearch, setMemberSearch] = useState('');
+  const [saving, setSaving] = useState(false);
 
+  const canCreateRoom = ['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
+
+  // Fetch eligible users based on role
+  const fetchEligibleUsers = async () => {
+    try {
+      if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+        const res = await api.get('/admin/users');
+        setEligibleUsers(res.data.data);
+      } else if (user.role === 'T3_EXECUTIVE') {
+        // T3 only sees members from their teams + events
+        const [teamRes, eventRes] = await Promise.all([
+          api.get('/teams/me/members'),
+          api.get('/teams/me/event-members'),
+        ]);
+
+        // Merge + dedupe
+        const merged = new Map();
+        [...teamRes.data.data, ...eventRes.data.data].forEach((u) => {
+          merged.set(u._id, u);
+        });
+
+        // Remove self
+        merged.delete(user._id);
+
+        setEligibleUsers(Array.from(merged.values()));
+      } else {
+        setEligibleUsers([]);
+      }
+    } catch (err) {
+      console.error('Failed to load eligible users:', err);
+    }
+  };
+
+  // Fetch rooms + users on mount
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get(`/chat/rooms/${roomId}/messages`);
+        const roomsRes = await api.get('/chat/rooms');
+        setRooms(roomsRes.data.data);
+        if (roomsRes.data.data.length > 0) {
+          setSelectedRoom(roomsRes.data.data[0]);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingRooms(false);
+      }
+    })();
+
+    if (canCreateRoom) fetchEligibleUsers();
+  }, [canCreateRoom]);
+
+  // Auto-refresh eligible users every time modal opens
+  useEffect(() => {
+    if ((createModal || addMemberModal) && canCreateRoom) {
+      fetchEligibleUsers();
+    }
+  }, [createModal, addMemberModal]);
+
+  // Auto-refresh eligible users every 30 seconds (background sync)
+  useEffect(() => {
+    if (!canCreateRoom) return;
+    const interval = setInterval(fetchEligibleUsers, 30000);
+    return () => clearInterval(interval);
+  }, [canCreateRoom]);
+
+  // Fetch messages when room changes
+  useEffect(() => {
+    if (!selectedRoom) return;
+    setLoadingMessages(true);
+    (async () => {
+      try {
+        const res = await api.get(`/chat/rooms/${selectedRoom._id}/messages`);
         setMessages(res.data.data);
       } catch (err) {
         console.error(err);
       } finally {
-        setLoading(false);
+        setLoadingMessages(false);
       }
     })();
-  }, []);
+  }, [selectedRoom]);
 
+  // Real-time listener
   useEffect(() => {
-    if (!socket) return;
-
-    socket.emit('chat:join', roomId);
+    if (!socket || !selectedRoom) return;
+    socket.emit('chat:join', selectedRoom._id);
 
     const handleNewMessage = (msg) => {
+      if (msg.roomId !== selectedRoom._id) return;
       setMessages((prev) => {
         if (prev.some((m) => m._id === msg._id)) return prev;
         return [...prev, msg];
@@ -883,70 +1292,382 @@ export const Chat = () => {
     socket.on('chat:new_message', handleNewMessage);
 
     return () => {
-      socket.emit('chat:leave', roomId);
+      socket.emit('chat:leave', selectedRoom._id);
       socket.off('chat:new_message', handleNewMessage);
     };
-  }, [socket]);
+  }, [socket, selectedRoom]);
 
-  const send = async () => {
-    if (!message.trim()) return;
+  const toggleMember = (userId) => {
+    setForm((f) => ({
+      ...f,
+      memberIds: f.memberIds.includes(userId)
+        ? f.memberIds.filter((id) => id !== userId)
+        : [...f.memberIds, userId],
+    }));
+  };
+
+  const createRoom = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await api.post('/chat/rooms', form);
+      setRooms([res.data.data, ...rooms]);
+      setSelectedRoom(res.data.data);
+      setCreateModal(false);
+      setForm({ name: '', description: '', memberIds: [] });
+      setMemberSearch('');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create room');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addMemberToRoom = async (userId) => {
+    try {
+      const res = await api.post(`/chat/rooms/${selectedRoom._id}/members`, { userId });
+      setRooms(rooms.map((r) => r._id === selectedRoom._id ? res.data.data : r));
+      setSelectedRoom(res.data.data);
+      setMemberSearch('');
+      alert('Member added');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add member');
+    }
+  };
+
+  const deleteRoom = async () => {
+    if (!selectedRoom) return;
+    try {
+      await api.delete(`/chat/rooms/${selectedRoom._id}`);
+      setRooms(rooms.filter((r) => r._id !== selectedRoom._id));
+      setSelectedRoom(rooms.length > 1 ? rooms.find((r) => r._id !== selectedRoom._id) : null);
+      setDeleteRoomModal(false);
+      setMessages([]);
+      alert('Room deleted');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete room');
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!message.trim() || !selectedRoom) return;
     const text = message;
     setMessage('');
     try {
-      await api.post('/chat/messages', { roomId, roomName, text });
+      await api.post(`/chat/rooms/${selectedRoom._id}/messages`, { text });
     } catch (err) {
       alert('Failed to send');
       setMessage(text);
     }
   };
 
+  // Filter eligible users
+  const filterUsers = (excludeIds = []) => {
+    return eligibleUsers
+      .filter((u) => !excludeIds.includes(u._id))
+      .filter((u) =>
+        u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        u.email.toLowerCase().includes(memberSearch.toLowerCase())
+      );
+  };
+
+  const usersForCreate = filterUsers([user._id]);
+
+  const usersForAdd = selectedRoom
+    ? filterUsers([user._id, ...(selectedRoom.members || []).map((m) => m._id)])
+    : [];
+
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-4">
-      <div className="w-72 bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="font-semibold mb-4">Rooms</h3>
-        <div className="p-3 rounded-lg bg-blue-50 border-l-4 border-blue-500">
-          <p className="font-medium text-sm">Tech Team</p>
-          <p className="text-xs text-gray-500">Hackathon 2026</p>
+      {/* Sidebar */}
+      <div className="w-72 bg-white rounded-xl border border-gray-200 flex flex-col">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="font-semibold">Chat Rooms</h3>
+          {canCreateRoom && (
+            <button onClick={() => setCreateModal(true)}
+              className="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600">
+              <Plus size={16} />
+            </button>
+          )}
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {loadingRooms ? (
+            <Skeleton className="h-16 mx-2" />
+          ) : rooms.length === 0 ? (
+            <div className="text-center py-8 px-4">
+              <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No chat rooms yet</p>
+              {canCreateRoom && (
+                <button onClick={() => setCreateModal(true)} className="mt-3 text-sm text-blue-500 hover:underline">
+                  Create first room
+                </button>
+              )}
+            </div>
+          ) : rooms.map((r) => (
+            <button
+              key={r._id}
+              onClick={() => setSelectedRoom(r)}
+              className={`w-full text-left p-3 rounded-lg mb-1 transition ${selectedRoom?._id === r._id ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'}`}
+            >
+              <p className="font-medium text-sm truncate">{r.name}</p>
+              <p className="text-xs text-gray-500 truncate">{r.memberCount} members</p>
+            </button>
+          ))}
         </div>
       </div>
+
+      {/* Chat area */}
       <div className="flex-1 bg-white rounded-xl border border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="font-semibold">{roomName}</h3>
-          <span className="text-xs text-green-600 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-green-500" /> Live
-          </span>
+        {!selectedRoom ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">Select a room to start chatting</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <div className="min-w-0">
+                <h3 className="font-semibold truncate">{selectedRoom.name}</h3>
+                <p className="text-xs text-gray-500">{selectedRoom.memberCount} members</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {canCreateRoom && (
+                  <button onClick={() => setAddMemberModal(true)}
+                    className="text-xs px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-1">
+                    <UserPlus size={14} /> Add Member
+                  </button>
+                )}
+                {canCreateRoom && (
+                  <button onClick={() => setDeleteRoomModal(true)}
+                    className="text-xs px-3 py-1.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center gap-1">
+                    <Trash2 size={14} /> Delete Room
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {loadingMessages ? (
+                <Skeleton className="h-8 w-64" />
+              ) : messages.length === 0 ? (
+                <p className="text-center text-gray-400 text-sm mt-8">No messages yet. Say hello</p>
+              ) : messages.map((m) => {
+                const own = m.senderId === user._id;
+                return (
+                  <div key={m._id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-md flex flex-col ${own ? 'items-end' : 'items-start'}`}>
+                      {!own && (
+                        <p className="text-xs font-medium text-gray-600 mb-1 ml-1">{m.senderName}</p>
+                      )}
+                      <div className={`px-4 py-2 rounded-2xl ${own ? 'bg-blue-500 text-white rounded-tr-sm' : 'bg-gray-100 text-gray-900 rounded-tl-sm'}`}>
+                        <p className="text-sm break-words">{m.text}</p>
+                      </div>
+                      <p className="text-[10px] mt-0.5 text-gray-400 mx-1">
+                        {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-4 border-t border-gray-200 flex gap-2">
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder="Type a message..."
+                className="flex-1 h-10 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+              />
+              <button onClick={sendMessage} className="px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                Send
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Create Room Modal */}
+      {createModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setCreateModal(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-semibold">Create Chat Room</h3>
+              <button onClick={() => setCreateModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <form onSubmit={createRoom} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Room Name *</label>
+                <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. Tech Team Announcements"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Description (optional)</label>
+                <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="What's this room for?"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium">Add Members</label>
+                  <button type="button" onClick={fetchEligibleUsers} className="text-xs text-blue-500 hover:underline">
+                    Refresh
+                  </button>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Search size={16} className="text-gray-400" />
+                    <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder="Search users..."
+                      className="flex-1 bg-transparent border-none outline-none text-sm" />
+                  </div>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                  {usersForCreate.length === 0 ? (
+                    <div className="p-6 text-center">
+                      <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">
+                        {eligibleUsers.length === 0
+                          ? user.role === 'T3_EXECUTIVE'
+                            ? 'No team members yet. Ask Admin to add you to a team.'
+                            : 'No users available'
+                          : 'No users match your search'}
+                      </p>
+                    </div>
+                  ) : usersForCreate.map((u) => (
+                    <label key={u._id} className="flex items-center gap-3 p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
+                      <input type="checkbox" checked={form.memberIds.includes(u._id)}
+                        onChange={() => toggleMember(u._id)} className="w-4 h-4" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{u.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
+                          u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                            'bg-purple-100 text-purple-700'
+                        }`}>{u.role.replace('_', ' ')}</span>
+                    </label>
+                  ))}
+                </div>
+                {form.memberIds.length > 0 && (
+                  <p className="text-xs text-blue-600 mt-1">{form.memberIds.length} member(s) selected</p>
+                )}
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setCreateModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  {saving ? 'Creating...' : 'Create Room'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {loading ? (
-            <Skeleton className="h-8 w-64" />
-          ) : messages.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm mt-8">No messages yet. Say hello</p>
-          ) : messages.map((m) => {
-            const own = m.senderId === user._id;
-            return (
-              <div key={m._id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs px-4 py-2 rounded-2xl ${own ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>
-                  {!own && <p className="text-xs font-semibold mb-1 opacity-70">{m.senderName}</p>}
-                  <p className="text-sm">{m.text}</p>
-                  <p className={`text-[10px] mt-1 ${own ? 'text-blue-100' : 'text-gray-500'}`}>
-                    {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      )}
+
+      {/* Add Member Modal */}
+      {addMemberModal && selectedRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setAddMemberModal(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Add Member</h3>
+                <p className="text-sm text-gray-500">to {selectedRoom.name}</p>
+              </div>
+              <button onClick={() => setAddMemberModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Search size={16} className="text-gray-400" />
+                <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder="Search users..."
+                  className="flex-1 bg-transparent border-none outline-none text-sm" />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {usersForAdd.length === 0 ? (
+                <div className="p-6 text-center">
+                  <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">
+                    {eligibleUsers.length === 0
+                      ? 'No team members available'
+                      : 'All available members already in this room'}
                   </p>
                 </div>
+              ) : usersForAdd.map((u) => (
+                <div key={u._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {u.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{u.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => addMemberToRoom(u._id)}
+                    className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 flex-shrink-0 ml-2">
+                    Add
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
+              <span className="text-xs text-gray-500">Current: {selectedRoom.memberCount} members</span>
+              <button onClick={() => setAddMemberModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Room Confirmation */}
+      {deleteRoomModal && selectedRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteRoomModal(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
-            );
-          })}
+              <div>
+                <h3 className="text-lg font-semibold">Delete Chat Room</h3>
+                <p className="text-xs text-gray-500 truncate">{selectedRoom.name}</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
+              <p className="text-sm text-red-800 font-medium mb-1">This will permanently delete:</p>
+              <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+                <li>The chat room and all members</li>
+                <li>All messages in this room</li>
+                <li>This action cannot be undone</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setDeleteRoomModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">
+                Cancel
+              </button>
+              <button onClick={deleteRoom} className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 flex items-center gap-2">
+                <Trash2 size={14} /> Delete Forever
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="p-4 border-t border-gray-200 flex gap-2">
-          <input
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send()}
-            placeholder="Type a message..."
-            className="flex-1 h-10 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
-          />
-          <button onClick={send} className="px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Send</button>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -1118,10 +1839,9 @@ export const QRCheckIn = () => {
                   <td className="px-4 py-3 text-sm text-gray-500">{formatTime(h.checkInTime)}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{formatTime(h.checkOutTime)}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      h.status === 'present' ? 'bg-green-100 text-green-700' :
-                      h.status === 'late' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-                    }`}>{h.status}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${h.status === 'present' ? 'bg-green-100 text-green-700' :
+                        h.status === 'late' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                      }`}>{h.status}</span>
                   </td>
                 </tr>
               ))}
@@ -1353,11 +2073,10 @@ export const EventsPage = () => {
                           <p className="text-xs text-gray-500">{u.email}</p>
                         </div>
                       </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                        u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
-                        u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
-                        'bg-purple-100 text-purple-700'
-                      }`}>{u.role.replace('_', ' ')}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
+                          u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                            'bg-purple-100 text-purple-700'
+                        }`}>{u.role.replace('_', ' ')}</span>
                     </label>
                   ))}
                 </div>
@@ -1725,54 +2444,51 @@ export const AttendancePage = () => {
 };
 
 // ====================================================================
-// CERTIFICATES
+// CERTIFICATES — Redirects to external certificate portal
 // ====================================================================
 export const CertificatesPage = () => {
-  const [certs, setCerts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const EXTERNAL_CERT_URL = 'https://certificates.tbi.example.com';
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get('/certificates/me');
-        setCerts(res.data.data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
-    })();
-  }, []);
-
-  if (loading) return <SkeletonCardGrid count={3} />;
+  const handleRedirect = () => {
+    window.open(EXTERNAL_CERT_URL, '_blank', 'noopener,noreferrer');
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-2xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">My Certificates</h1>
-        <p className="text-gray-500">Download certificates from completed events</p>
+        <h1 className="text-2xl font-bold">Certificates</h1>
+        <p className="text-gray-500">Access your certificates on the external portal</p>
       </div>
-      {certs.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <Award className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No certificates yet</h3>
-          <p className="text-gray-500">Attend events to earn certificates</p>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+        <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
+          <Award className="w-10 h-10 text-amber-600" />
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {certs.map((c) => (
-            <div key={c._id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition">
-              <div className="h-40 bg-gradient-to-br from-amber-400 to-orange-500 flex flex-col items-center justify-center">
-                <Award className="w-16 h-16 text-white mb-2" />
-                <p className="text-white font-bold text-sm">CERTIFICATE</p>
-              </div>
-              <div className="p-5">
-                <h3 className="font-semibold mb-1">{c.eventTitle}</h3>
-                <p className="text-sm text-gray-500 mb-1">{c.role}</p>
-                <p className="text-xs text-gray-400 mb-4">ID: {c.certificateId}</p>
-                <button className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">Download PDF</button>
-              </div>
-            </div>
-          ))}
+        <h2 className="text-xl font-bold mb-2">Certificate Portal</h2>
+        <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
+          Your event certificates are hosted on a dedicated portal. Click below to access, download, and verify certificates.
+        </p>
+        <button
+          onClick={handleRedirect}
+          className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 inline-flex items-center gap-2"
+        >
+          <Award size={18} /> Open Certificate Portal
+          <ExternalLink size={16} />
+        </button>
+        <p className="text-xs text-gray-400 mt-4 break-all">{EXTERNAL_CERT_URL}</p>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+        <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-blue-800">
+          <p className="font-medium mb-1">What you'll find there</p>
+          <ul className="text-xs space-y-1 list-disc list-inside">
+            <li>All certificates earned from TBI events</li>
+            <li>QR-verifiable digital certificates</li>
+            <li>Downloadable PDF versions</li>
+          </ul>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -2115,51 +2831,166 @@ export const AdminManagementPage = () => {
 // ====================================================================
 // ANALYTICS
 // ====================================================================
-export const AnalyticsPage = () => (
-  <div className="space-y-6">
-    <div>
-      <h1 className="text-2xl font-bold">Analytics</h1>
-      <p className="text-gray-500">Insights and trends across the platform</p>
-    </div>
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <KPI label="Total Users" value="245" change="12%" />
-      <KPI label="Events This Month" value="8" change="2" />
-      <KPI label="Certificates Issued" value="156" change="18" />
-      <KPI label="Avg Attendance" value="87%" change="3%" />
-    </div>
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <div className="bg-white p-5 rounded-xl border border-gray-200">
-        <h3 className="font-semibold mb-4">Users by Tier</h3>
-        <div className="space-y-3">
-          {[
-            { label: 'T1 Volunteers', value: 180, color: 'bg-green-500', pct: 74 },
-            { label: 'T2 Associates', value: 45, color: 'bg-blue-500', pct: 18 },
-            { label: 'T3 Executives', value: 18, color: 'bg-purple-500', pct: 7 },
-            { label: 'Admins', value: 2, color: 'bg-orange-500', pct: 1 },
-          ].map((t) => (
-            <div key={t.label}>
-              <div className="flex justify-between text-sm mb-1"><span>{t.label}</span><span className="font-medium">{t.value}</span></div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className={`h-full ${t.color}`} style={{ width: `${t.pct}%` }} />
-              </div>
+export const AnalyticsPage = () => {
+  const [stats, setStats] = useState(null);
+  const [tiers, setTiers] = useState(null);
+  const [monthly, setMonthly] = useState([]);
+  const [top, setTop] = useState([]);
+  const [attendance, setAttendance] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statsRes, tiersRes, monthlyRes, topRes, attendRes] = await Promise.all([
+          api.get('/stats/admin'),
+          api.get('/stats/users-by-tier'),
+          api.get('/stats/monthly-applications'),
+          api.get('/stats/top-performers'),
+          api.get('/stats/attendance'),
+        ]);
+        setStats(statsRes.data.data);
+        setTiers(tiersRes.data.data);
+        setMonthly(monthlyRes.data.data);
+        setTop(topRes.data.data);
+        setAttendance(attendRes.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+        </div>
+        <Skeleton className="h-80 rounded-xl" />
+      </div>
+    );
+  }
+
+  const tierPieData = [
+    { name: 'T1', value: tiers.T1, color: '#4CAF50' },
+    { name: 'T2', value: tiers.T2, color: '#2196F3' },
+    { name: 'T3', value: tiers.T3, color: '#9C27B0' },
+    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#FF9800' },
+  ].filter((d) => d.value > 0);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Analytics</h1>
+        <p className="text-gray-500">Insights and trends across the platform</p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPI label="Total Users" value={stats.totalUsers} />
+        <KPI label="Active Events" value={stats.activeEvents} />
+        <KPI label="Approval Rate" value={`${stats.approvalRate}%`} />
+        <KPI label="Today Attendance" value={attendance ? `${attendance.rate}%` : '—'} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-4">User Distribution</h3>
+          {tierPieData.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-gray-400">No data</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={tierPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={3} dataKey="value">
+                  {tierPieData.map((entry, index) => (
+                    <Cell key={index} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: '12px' }} iconType="circle" />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-gray-200 lg:col-span-2">
+          <h3 className="font-semibold mb-4">Applications — Last 12 Months</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={monthly} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorApps" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0EA5E9" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#0EA5E9" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+              <Area type="monotone" dataKey="count" stroke="#0EA5E9" strokeWidth={2.5} fillOpacity={1} fill="url(#colorApps)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-4">Today's Attendance</h3>
+          {!attendance || attendance.total === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-gray-400">No check-ins today</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Present', value: attendance.present },
+                    { name: 'Late', value: attendance.late },
+                    { name: 'Absent', value: attendance.absent },
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${value}`}
+                >
+                  <Cell fill="#10B981" />
+                  <Cell fill="#F59E0B" />
+                  <Cell fill="#EF4444" />
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <h3 className="font-semibold mb-4">Top Performers</h3>
+          {top.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-sm text-gray-400">No performance data yet</div>
+          ) : (
+            <div className="space-y-3">
+              {top.map((u, i) => (
+                <div key={u.userId} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ${i === 0 ? 'bg-amber-500' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-amber-700' : 'bg-blue-500'
+                      }`}>{i + 1}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{u.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{u.approvedCount} approved / {u.attendanceCount} days present</p>
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold text-amber-600 flex-shrink-0">{u.score} pts</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="bg-white p-5 rounded-xl border border-gray-200">
-        <h3 className="font-semibold mb-4">Monthly Applications</h3>
-        <div className="h-48 flex items-end gap-2">
-          {[35, 48, 52, 41, 60, 72, 68, 85, 78, 92, 88, 95].map((v, i) => (
-            <div key={i} className="flex-1 bg-blue-500 rounded-t" style={{ height: `${(v / 100) * 100}%` }} />
-          ))}
-        </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-2">
-          {['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'].map((m, i) => <span key={i}>{m}</span>)}
+          )}
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ====================================================================
 // BULK IMPORT
@@ -2459,7 +3290,7 @@ export const TeamsPage = () => {
     return users.filter(u =>
       !memberIds.includes(u._id) &&
       (u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-       u.email.toLowerCase().includes(memberSearch.toLowerCase()))
+        u.email.toLowerCase().includes(memberSearch.toLowerCase()))
     );
   };
 
@@ -2650,7 +3481,9 @@ export const TeamsPage = () => {
               </div>
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-xs text-gray-500">Chat Room</p>
-                <p className="text-sm font-semibold mt-1 text-green-600">● Active</p>
+                <p className="text-sm font-semibold mt-1 text-green-600 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span> Active
+                </p>
               </div>
             </div>
 
@@ -2858,83 +3691,133 @@ export const MyApplicationsPage = () => {
 // MY TEAMS
 // ====================================================================
 export const MyTeamsPage = () => {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState(null);
-  const teams = [
-    {
-      _id: '1', name: 'Tech Team', event: 'Hackathon 2026', chatActive: true,
-      members: [
-        { name: 'Ayush', role: 'T1', status: 'present' },
-        { name: 'Abhishek Singh', role: 'T2', status: 'present' },
-        { name: 'Sneha Patel', role: 'T1', status: 'late' },
-        { name: 'Karan Singh', role: 'T1', status: 'absent' },
-        { name: 'Anjali Verma', role: 'T2', status: 'present' },
-      ],
-    },
-    {
-      _id: '2', name: 'Media Team', event: 'Startup Pitch Day', chatActive: true,
-      members: [
-        { name: 'Mayank', role: 'T3', status: 'present' },
-        { name: 'Aditya Nair', role: 'T1', status: 'present' },
-        { name: 'Riya Kapoor', role: 'T1', status: 'present' },
-      ],
-    },
-  ];
-  const statusColor = {
-    present: 'bg-green-100 text-green-700',
-    late: 'bg-amber-100 text-amber-700',
-    absent: 'bg-red-100 text-red-700',
+  const [creatingChat, setCreatingChat] = useState(false);
+
+  const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTeams = async () => {
+    try {
+      const res = await api.get('/teams/me');
+      setTeams(res.data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchTeams();
+  }, []);
+
+  // Create or get chat room for a team
+  const createOrGetChat = async (teamId) => {
+    setCreatingChat(true);
+    try {
+      const res = await api.post(`/chat/rooms/team/${teamId}`);
+      const room = res.data.data;
+      alert(`Chat room ready: "${room.name}"\n\nOpening chat...`);
+      navigate('/chat');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create chat');
+    } finally {
+      setCreatingChat(false);
+    }
+  };
+
+  if (loading) return <SkeletonCardGrid count={3} />;
+
+  // Detail view
   if (selected) {
-    const team = teams.find(t => t._id === selected);
+    const team = teams.find((t) => t._id === selected);
+    if (!team) return null;
+
     return (
       <div className="space-y-6">
-        <button onClick={() => setSelected(null)} className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">← Back to all teams</button>
-        <div className="flex justify-between items-start">
+        <button onClick={() => setSelected(null)} className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
+          <ChevronLeft size={16} /> Back to all teams
+        </button>
+
+        <div className="flex justify-between items-start flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold">{team.name}</h1>
-            <p className="text-gray-500">{team.event}</p>
+            <p className="text-gray-500">{team.eventTitle}</p>
           </div>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 flex items-center gap-2">
-              <MessageSquare size={16} /> Open Team Chat
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => createOrGetChat(team._id)}
+              disabled={creatingChat}
+              className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 flex items-center gap-2 disabled:opacity-50"
+            >
+              <MessageSquare size={16} />
+              {creatingChat ? 'Opening...' : 'Create / Add to Chat'}
+            </button>
+            <button
+              onClick={() => navigate('/chat')}
+              className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2"
+            >
+              <MessageSquare size={16} /> Open Chat
             </button>
             <button className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2">
               <QrCode size={16} /> Generate QR
             </button>
           </div>
         </div>
+
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white p-5 rounded-xl border border-gray-200">
             <p className="text-sm text-gray-500">Total Members</p>
-            <p className="text-3xl font-bold mt-2">{team.members.length}</p>
+            <p className="text-3xl font-bold mt-2">{team.members?.length || 0}</p>
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200">
-            <p className="text-sm text-gray-500">Present Today</p>
-            <p className="text-3xl font-bold mt-2 text-green-600">{team.members.filter(m => m.status === 'present').length}</p>
+            <p className="text-sm text-gray-500">Team Lead</p>
+            <p className="text-lg font-bold mt-2">{team.leadName || team.leadId?.name || '—'}</p>
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200">
-            <p className="text-sm text-gray-500">Absent</p>
-            <p className="text-3xl font-bold mt-2 text-red-600">{team.members.filter(m => m.status === 'absent').length}</p>
+            <p className="text-sm text-gray-500">Chat Status</p>
+            <p className="text-lg font-bold mt-2 text-green-600">Active</p>
           </div>
         </div>
+
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-200">
+            <h3 className="font-semibold">Members ({team.members?.length || 0})</h3>
+          </div>
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Member</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Attendance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {team.members.map((m, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium">{m.name}</td>
+              {team.members?.map((m) => (
+                <tr key={m._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${m.role === 'T3' ? 'bg-purple-100 text-purple-700' : m.role === 'T2' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{m.role}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                        {m.name.charAt(0)}
+                      </div>
+                      <span className="text-sm font-medium">{m.name}</span>
+                      {m._id === (team.leadId?._id || team.leadId) && (
+                        <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium">
+                          LEAD
+                        </span>
+                      )}
+                    </div>
                   </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{m.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[m.status]}`}>{m.status}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${m.role === 'T3_EXECUTIVE' ? 'bg-purple-100 text-purple-700' :
+                        m.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                          'bg-green-100 text-green-700'
+                      }`}>
+                      {m.role.replace('_', ' ')}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -2944,27 +3827,40 @@ export const MyTeamsPage = () => {
       </div>
     );
   }
+
+  // Grid view
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">My Teams</h1>
-        <p className="text-gray-500">Teams you are leading as T3 Executive</p>
+        <p className="text-gray-500">Teams you lead as T3 Executive</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {teams.map((t) => (
-          <div key={t._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition cursor-pointer" onClick={() => setSelected(t._id)}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-lg">{t.name}</h3>
-              {t.chatActive && <MessageSquare className="w-4 h-4 text-green-500" />}
+
+      {teams.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <UsersRound className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No teams yet</h3>
+          <p className="text-gray-500">Ask Admin to assign you as a team lead</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {teams.map((t) => (
+            <div key={t._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition cursor-pointer" onClick={() => setSelected(t._id)}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-lg">{t.name}</h3>
+                <MessageSquare className="w-4 h-4 text-green-500" />
+              </div>
+              <p className="text-sm text-gray-500 mb-4">{t.eventTitle}</p>
+              <div className="flex justify-between text-sm pt-3 border-t border-gray-100">
+                <span className="text-gray-500 flex items-center gap-1">
+                  <Users size={14} /> {t.members?.length || 0} members
+                </span>
+                <span className="text-blue-500 font-medium text-xs">View Details</span>
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mb-4">{t.event}</p>
-            <div className="flex justify-between text-sm pt-3 border-t border-gray-100">
-              <span className="text-gray-500 flex items-center gap-1"><Users size={14} /> {t.members.length} members</span>
-              <span className="text-blue-500 font-medium text-xs">View Details →</span>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -2976,13 +3872,18 @@ export const T3DashboardEnhanced = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [myEvents, setMyEvents] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get('/events/me');
-        setMyEvents(res.data.data);
+        const [eventsRes, statsRes] = await Promise.all([
+          api.get('/events/me'),
+          api.get('/stats/t3'),
+        ]);
+        setMyEvents(eventsRes.data.data);
+        setStats(statsRes.data.data);
       } catch (err) {
         console.error(err);
       } finally {
@@ -2991,30 +3892,41 @@ export const T3DashboardEnhanced = () => {
     })();
   }, []);
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Hi {user.name.split(' ')[0]}!</h1>
+        <h1 className="text-2xl font-bold">Hi {user.name.split(' ')[0]}</h1>
         <p className="text-gray-500">Your events and pending tasks</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="My Events" value={myEvents.length} />
-        <KPI label="As Head" value={myEvents.filter(e => e.headId?._id === user._id).length} />
-        <KPI label="Applications" value="12" change="New" />
-        <KPI label="Avg Rating" value="4.7" />
+        <KPI label="My Events" value={stats.myEvents} />
+        <KPI label="As Head" value={stats.eventsAsHead} />
+        <KPI label="Pending Apps" value={stats.pendingApps} />
+        <KPI label="Present Today" value={stats.attendanceToday} />
       </div>
 
-      {/* EVENTS I'M ASSIGNED TO */}
+      {/* Events list */}
       <div className="bg-white p-5 rounded-xl border border-gray-200">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-semibold text-lg">My Events</h3>
-          <button onClick={() => navigate('/t3/events')} className="text-xs text-purple-500 hover:underline">View All →</button>
+          <button onClick={() => navigate('/t3/teams')} className="text-xs text-purple-500 hover:underline">
+            View Teams
+          </button>
         </div>
 
-        {loading ? (
-          <SkeletonCardGrid count={2} />
-        ) : myEvents.length === 0 ? (
+        {myEvents.length === 0 ? (
           <div className="text-center py-8">
             <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-2" />
             <p className="text-sm text-gray-500">No events assigned to you yet</p>
@@ -3022,21 +3934,26 @@ export const T3DashboardEnhanced = () => {
         ) : (
           <div className="space-y-3">
             {myEvents.map((ev) => {
-              const isHead = ev.headId?._id === user._id;
+              const isHead = ev.headId?._id === user._id || ev.headId === user._id;
               return (
-                <div key={ev._id} className={`border rounded-lg p-4 hover:bg-purple-50 transition cursor-pointer ${isHead ? 'border-purple-200 bg-purple-50/30' : 'border-gray-200'}`}
-                  onClick={() => navigate(`/t3/events/${ev._id}`)}>
+                <div
+                  key={ev._id}
+                  className={`border rounded-lg p-4 hover:bg-purple-50 transition cursor-pointer ${isHead ? 'border-purple-200 bg-purple-50/30' : 'border-gray-200'}`}
+                  onClick={() => navigate(`/t3/events/${ev._id}`)}
+                >
                   <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold">{ev.title}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold truncate">{ev.title}</p>
                         {isHead && (
-                          <span className="text-[10px] px-2 py-0.5 bg-purple-500 text-white rounded-full font-semibold">HEAD</span>
+                          <span className="text-[10px] px-2 py-0.5 bg-purple-500 text-white rounded-full font-semibold">
+                            HEAD
+                          </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">{ev.date} · {ev.location}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{ev.date} / {ev.location}</p>
                     </div>
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium flex-shrink-0">
                       {ev.memberCount || 0} members
                     </span>
                   </div>
@@ -3056,43 +3973,52 @@ export const T3DashboardEnhanced = () => {
 export const T2DashboardEnhanced = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const todayShift = {
-    team: 'Tech Team',
-    event: 'Hackathon 2026',
-    time: '9:00 AM - 1:00 PM',
-    location: 'Booth 3, Main Auditorium',
-    role: 'Shift Coordinator',
-  };
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/stats/t2');
+        setStats(res.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Hey {user.name.split(' ')[0]}!</h1>
-        <p className="text-gray-500">Here's your schedule and activity</p>
+        <h1 className="text-2xl font-bold">Hey {user.name.split(' ')[0]}</h1>
+        <p className="text-gray-500">Here's your activity</p>
       </div>
-      <div className="bg-white rounded-xl border-l-4 border-l-blue-500 border border-gray-200 p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="text-sm font-semibold text-blue-600 mb-2 flex items-center gap-2"><Bell size={14} /> TODAY'S SHIFT</p>
-            <h3 className="text-xl font-bold mb-2">{todayShift.team} — {todayShift.event}</h3>
-            <p className="text-sm text-gray-600 flex items-center gap-2 mb-1"><Timer size={14} /> {todayShift.time}</p>
-            <p className="text-sm text-gray-600 flex items-center gap-2 mb-1"><MapPin size={14} /> {todayShift.location}</p>
-          </div>
-          <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium">Coordinator</span>
-        </div>
-        <div className="flex gap-3 pt-4 border-t border-gray-100">
-          <button onClick={() => navigate('/t1/checkin')} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 flex items-center gap-2">
-            <CheckCircle size={16} /> Check In
-          </button>
-          <button onClick={() => navigate('/chat')} className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2">
-            <MessageSquare size={16} /> Team Chat
-          </button>
-        </div>
-      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="My Shifts" value="4" />
-        <KPI label="Applications" value="3" />
-        <KPI label="Approved" value="2" />
-        <KPI label="Certificates" value="2" />
+        <KPI label="My Applications" value={stats.myApplications} />
+        <KPI label="Approved" value={stats.approved} />
+        <KPI label="My Teams" value={stats.myTeams} />
+        <KPI label="Days Attended" value={stats.attendanceDays} />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPI label="Pending" value={stats.pending} />
+        <KPI label="Rejected" value={stats.rejected} />
+        <KPI label="Certificates" value={stats.certificates} />
+        <div></div>
       </div>
     </div>
   );
@@ -3280,7 +4206,9 @@ export const EventDetailPage = () => {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Event not found</p>
-        <button onClick={() => navigate(-1)} className="mt-4 text-blue-500 hover:underline">← Back</button>
+        <button onClick={() => navigate(-1)} className="mt-4 text-blue-500 hover:underline flex items-center gap-1 mx-auto">
+          <ChevronLeft size={16} /> Back
+        </button>
       </div>
     );
   }
@@ -3288,7 +4216,7 @@ export const EventDetailPage = () => {
   return (
     <div className="space-y-6">
       <button onClick={() => navigate(-1)} className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
-        ← Back to Events
+        <ChevronLeft size={16} /> Back to Events
       </button>
 
       {/* Hero banner */}
@@ -3454,11 +4382,10 @@ export const EventDetailPage = () => {
                       <p className="text-sm font-medium truncate">{u.name}</p>
                       <p className="text-xs text-gray-500 truncate">{u.email}</p>
                     </div>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0 ${
-                      u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
-                      u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
-                      'bg-purple-100 text-purple-700'
-                    }`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0 ${u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
+                        u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                          'bg-purple-100 text-purple-700'
+                      }`}>
                       {u.role.replace('_', ' ')}
                     </span>
                   </div>
@@ -3628,3 +4555,469 @@ export const ProfilePage = () => {
     </div>
   );
 };
+
+
+export const LandingPage = () => {
+  const navigate = useNavigate();
+
+  const features = [
+    { icon: Users, title: 'Role-Based Dashboards', desc: 'Separate interfaces for Super Admin, Admin, T3 Executives, T2 Associates, and T1 Volunteers.' },
+    { icon: Calendar, title: 'Event Management', desc: 'Create events, assign Event Heads, and manage teams with auto-created chat rooms.' },
+    { icon: MessageSquare, title: 'Real-Time Chat', desc: 'Instant team communication with Socket.io. Messages delivered live across all members.' },
+    { icon: QrCode, title: 'QR Check-In', desc: 'Fast attendance via QR codes. Verified check-in/check-out tracking for every shift.' },
+    { icon: Bell, title: 'Live Notifications', desc: 'Get notified instantly when you are added to teams, approved for shifts, or assigned roles.' },
+    { icon: BarChart3, title: 'Analytics Dashboard', desc: 'Track participation, approval rates, team performance, and top performers in real time.' },
+  ];
+
+  const stats = [
+    { value: '5', label: 'Role Tiers' },
+    { value: '30+', label: 'Screens' },
+    { value: 'Real-time', label: 'Notifications' },
+    { value: '100%', label: 'Secure JWT Auth' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-white">
+      <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-xl font-bold text-gray-900">TBI</span>
+          </div>
+          <div className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-sm text-gray-600 hover:text-gray-900">Features</a>
+            <a href="#how" className="text-sm text-gray-600 hover:text-gray-900">How It Works</a>
+            <a href="#stats" className="text-sm text-gray-600 hover:text-gray-900">Impact</a>
+          </div>
+          <button onClick={() => navigate('/login')} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition">
+            Sign In
+          </button>
+        </div>
+      </nav>
+
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-white">
+        <div className="max-w-7xl mx-auto px-6 py-20 md:py-32">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium mb-6">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                Workforce Management Platform
+              </div>
+              <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                Manage events.<br />Lead teams.<br /><span className="text-blue-500">Track impact.</span>
+              </h1>
+              <p className="text-lg text-gray-600 mb-8 max-w-lg">
+                A unified platform for TBI student engagement and event workforce management. Replace spreadsheets and WhatsApp groups with a single source of truth.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={() => navigate('/login')} className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 inline-flex items-center gap-2 shadow-lg shadow-blue-500/20">
+                  Get Started
+                  <ChevronRight size={18} />
+                </button>
+                <a href="#features" className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-white">
+                  See Features
+                </a>
+              </div>
+            </div>
+            <div className="relative">
+              <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-amber-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                  <div className="ml-3 text-xs text-gray-400">TBI Workforce Platform</div>
+                </div>
+                <div className="space-y-3">
+                  <div className="h-8 bg-blue-500 rounded-lg w-1/2" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="h-16 bg-blue-50 rounded-lg" />
+                    <div className="h-16 bg-green-50 rounded-lg" />
+                    <div className="h-16 bg-purple-50 rounded-lg" />
+                  </div>
+                  <div className="h-32 bg-gray-50 rounded-lg" />
+                  <div className="flex gap-2">
+                    <div className="h-10 bg-blue-500 rounded-lg flex-1" />
+                    <div className="h-10 bg-gray-200 rounded-lg w-24" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="stats" className="bg-gray-900 text-white">
+        <div className="max-w-7xl mx-auto px-6 py-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            {stats.map((s) => (
+              <div key={s.label}>
+                <div className="text-3xl md:text-4xl font-bold mb-2">{s.value}</div>
+                <div className="text-sm text-gray-400">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="features" className="py-20 md:py-28 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-4">Everything you need to run events</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">Built for real-world workforce management, from onboarding to certificates.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((f, i) => (
+              <div key={i} className="p-6 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition">
+                <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center mb-4">
+                  <f.icon className="w-6 h-6 text-blue-500" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="how" className="py-20 md:py-28 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-4">How it works</h2>
+            <p className="text-lg text-gray-600">Four steps from signup to certificate</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[
+              { num: '01', title: 'Admin Creates', desc: 'Set up events and assign Event Heads' },
+              { num: '02', title: 'T3 Leads', desc: 'Event Head builds teams and adds members' },
+              { num: '03', title: 'Members Work', desc: 'Team members check in via QR and coordinate in chat' },
+              { num: '04', title: 'Track & Certify', desc: 'Analytics track performance, certificates issued externally' },
+            ].map((s, i) => (
+              <div key={i}>
+                <div className="text-5xl font-bold text-blue-100 mb-3">{s.num}</div>
+                <h3 className="text-lg font-semibold mb-2">{s.title}</h3>
+                <p className="text-sm text-gray-600">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 md:py-28 bg-gradient-to-br from-blue-500 to-indigo-600">
+        <div className="max-w-4xl mx-auto px-6 text-center text-white">
+          <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to modernize your event workflow?</h2>
+          <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">Join TBI Admins, Team Leads, and Volunteers using a single platform.</p>
+          <button onClick={() => navigate('/login')} className="px-8 py-4 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 inline-flex items-center gap-2">
+            Sign In to Platform
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </section>
+
+      <footer className="bg-gray-900 text-gray-400 py-10">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              <span className="text-white font-bold">TBI</span>
+              <span className="text-sm">Workforce Platform</span>
+            </div>
+            <p className="text-sm">Built for Technology Business Incubators</p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+
+export const ChangePasswordPage = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const checks = {
+    length: newPassword.length >= 8,
+    upper: /[A-Z]/.test(newPassword),
+    lower: /[a-z]/.test(newPassword),
+    number: /[0-9]/.test(newPassword),
+    special: /[^A-Za-z0-9]/.test(newPassword),
+    match: newPassword && newPassword === confirm,
+  };
+  const allValid = Object.values(checks).every(Boolean);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!allValid) return setError('Please complete all requirements');
+    setLoading(true);
+    try {
+      await api.post('/auth/change-password', { oldPassword, newPassword });
+      alert('Password changed successfully. Please login again.');
+      logout();
+      navigate('/login', { replace: true });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <AlertTriangle className="w-6 h-6 text-amber-600" />
+            </div>
+            <h1 className="text-2xl font-bold">Password Change Required</h1>
+            <p className="text-gray-500 mt-2 text-sm">
+              You must set a new password before continuing.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium mb-2">Current Password</label>
+              <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)}
+                placeholder="Your temp password"
+                className="w-full h-12 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">New Password</label>
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Strong password"
+                className="w-full h-12 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Confirm New Password</label>
+              <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Repeat new password"
+                className="w-full h-12 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" required />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {[
+                { key: 'length', label: '8+ characters' },
+                { key: 'upper', label: '1 uppercase' },
+                { key: 'lower', label: '1 lowercase' },
+                { key: 'number', label: '1 number' },
+                { key: 'special', label: '1 special char' },
+                { key: 'match', label: 'Passwords match' },
+              ].map((c) => (
+                <div key={c.key} className={`flex items-center gap-1.5 ${checks[c.key] ? 'text-green-600' : 'text-gray-400'}`}>
+                  {checks[c.key] ? <CheckCircle size={14} /> : <X size={14} />}
+                  <span>{c.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>}
+
+            <button type="submit" disabled={loading || !allValid}
+              className="w-full h-12 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-lg transition">
+              {loading ? 'Updating...' : 'Change Password & Continue'}
+            </button>
+
+            <button type="button" onClick={() => { logout(); navigate('/login'); }}
+              className="w-full text-center text-sm text-gray-500 hover:text-gray-700">
+              Cancel and logout
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// ====================================================================
+// PREFERENCES PAGE — Notification settings
+// ====================================================================
+export const PreferencesPage = () => {
+  const [prefs, setPrefs] = useState(null);
+  const [original, setOriginal] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/preferences/me');
+        setPrefs(res.data.data);
+        setOriginal(res.data.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const toggle = (key) => {
+    if (key.includes('.')) {
+      const [parent, child] = key.split('.');
+      setPrefs((p) => ({
+        ...p,
+        [parent]: { ...p[parent], [child]: !p[parent][child] },
+      }));
+    } else {
+      setPrefs((p) => ({ ...p, [key]: !p[key] }));
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await api.patch('/preferences/me', prefs);
+      setPrefs(res.data.data);
+      setOriginal(res.data.data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasChanges = JSON.stringify(prefs) !== JSON.stringify(original);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-3xl">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-96 rounded-xl" />
+      </div>
+    );
+  }
+
+  const categories = [
+    { key: 'application', label: 'Applications', desc: 'When your applications are approved, rejected, or waitlisted' },
+    { key: 'event', label: 'Events', desc: 'New events published, event updates, team changes' },
+    { key: 'chat', label: 'Chat Rooms', desc: 'When you are added to a new chat room' },
+    { key: 'attendance', label: 'Attendance', desc: 'Check-in confirmations and reminders' },
+    { key: 'system', label: 'System', desc: 'Role changes, account updates, admin actions' },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <h1 className="text-2xl font-bold">Notification Preferences</h1>
+        <p className="text-gray-500">Control how and when you receive notifications</p>
+      </div>
+
+      {/* Master channels */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 className="font-semibold mb-5">Delivery Channels</h3>
+
+        <div className="space-y-4">
+          {/* In-App */}
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-sm font-medium">In-App Notifications</p>
+              <p className="text-xs text-gray-500">Show notifications in the bell icon</p>
+            </div>
+            <ToggleSwitch
+              checked={prefs.inApp}
+              onChange={() => toggle('inApp')}
+            />
+          </div>
+
+          {/* Email */}
+          <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-4">
+            <div>
+              <p className="text-sm font-medium">Email Notifications</p>
+              <p className="text-xs text-gray-500">Receive notifications via email</p>
+            </div>
+            <ToggleSwitch
+              checked={prefs.email}
+              onChange={() => toggle('email')}
+            />
+          </div>
+
+          {/* SMS */}
+          <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-4">
+            <div>
+              <p className="text-sm font-medium">SMS Notifications</p>
+              <p className="text-xs text-gray-500">Receive critical alerts via SMS</p>
+            </div>
+            <ToggleSwitch
+              checked={prefs.sms}
+              onChange={() => toggle('sms')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 className="font-semibold mb-2">Notification Types</h3>
+        <p className="text-sm text-gray-500 mb-5">Choose which types of notifications you want to receive</p>
+
+        <div className="space-y-3">
+          {categories.map((c) => (
+            <div key={c.key} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+              <div>
+                <p className="text-sm font-medium">{c.label}</p>
+                <p className="text-xs text-gray-500">{c.desc}</p>
+              </div>
+              <ToggleSwitch
+                checked={prefs.categories[c.key]}
+                onChange={() => toggle(`categories.${c.key}`)}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Save */}
+      <div className="flex items-center gap-3 sticky bottom-4">
+        <button
+          onClick={handleSave}
+          disabled={!hasChanges || saving}
+          className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Saving...' : 'Save Preferences'}
+        </button>
+        {hasChanges && (
+          <button
+            onClick={() => setPrefs(original)}
+            className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50"
+          >
+            Reset
+          </button>
+        )}
+        {saved && (
+          <span className="text-sm text-green-600 flex items-center gap-1">
+            <CheckCircle size={16} /> Saved
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ====================================================================
+// TOGGLE SWITCH — Reusable toggle component
+// ====================================================================
+export const ToggleSwitch = ({ checked, onChange }) => (
+  <button
+    type="button"
+    onClick={onChange}
+    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+      checked ? 'bg-blue-500' : 'bg-gray-300'
+    }`}
+  >
+    <span
+      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+        checked ? 'translate-x-6' : 'translate-x-1'
+      }`}
+    />
+  </button>
+);

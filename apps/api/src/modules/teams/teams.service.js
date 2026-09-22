@@ -160,3 +160,82 @@ exports.deleteTeam = async (id) => {
   await Team.findByIdAndDelete(id);
   return team;
 };
+
+// Get all unique members from teams where user is lead or member
+exports.getMyTeamMembers = async (userId) => {
+  const Team = require('./teams.model');
+  const User = require('../admin/admin.model');
+
+  // Find all teams where user is lead OR member
+  const teams = await Team.find({
+    $or: [{ leadId: userId }, { members: userId }],
+  }).select('members leadId');
+
+  // Collect unique member IDs
+  const memberIds = new Set();
+  for (const team of teams) {
+    if (team.leadId) memberIds.add(team.leadId.toString());
+    for (const m of team.members) memberIds.add(m.toString());
+  }
+
+  // Remove self
+  memberIds.delete(userId.toString());
+
+  if (memberIds.size === 0) return [];
+
+  // Fetch user details
+  const users = await User.find({ _id: { $in: Array.from(memberIds) }, isActive: true })
+    .select('name email role')
+    .sort({ name: 1 });
+
+  return users;
+};
+
+// Get all unique members from events where user is head or member
+exports.getMyEventMembers = async (userId) => {
+  const Event = require('../events/events.model');
+  const User = require('../admin/admin.model');
+
+  const events = await Event.find({
+    $or: [{ headId: userId }, { members: userId }],
+  }).select('members headId');
+
+  const memberIds = new Set();
+  for (const ev of events) {
+    if (ev.headId) memberIds.add(ev.headId.toString());
+    for (const m of ev.members) memberIds.add(m.toString());
+  }
+
+  memberIds.delete(userId.toString());
+
+  if (memberIds.size === 0) return [];
+
+  return await User.find({ _id: { $in: Array.from(memberIds) }, isActive: true })
+    .select('name email role')
+    .sort({ name: 1 });
+};
+
+// Get team members from a specific team
+exports.getTeamMembers = async (teamId, userId) => {
+  const Team = require('./teams.model');
+  const User = require('../admin/admin.model');
+
+  const team = await Team.findById(teamId).select('members leadId');
+  if (!team) throw new Error('Team not found');
+
+  // Check if requester is a member
+  const isMember = team.members.some((m) => m.toString() === userId) ||
+    (team.leadId && team.leadId.toString() === userId);
+  if (!isMember) throw new Error('You are not a member of this team');
+
+  const memberIds = new Set(team.members.map((m) => m.toString()));
+  if (team.leadId) memberIds.add(team.leadId.toString());
+  memberIds.delete(userId.toString());
+
+  if (memberIds.size === 0) return [];
+
+  return await User.find({ _id: { $in: Array.from(memberIds) }, isActive: true })
+    .select('name email role')
+    .sort({ name: 1 });
+};
+
