@@ -104,6 +104,60 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
   };
 };
 
+// REACTIVATE — restore revoked access with new temp password
+exports.reactivateUser = async (id, adminId) => {
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+
+  if (user.role === 'SUPER_ADMIN') {
+    throw new Error('Cannot reactivate via this action');
+  }
+
+  if (user.isActive) {
+    throw new Error(`${user.name}'s account is already active`);
+  }
+
+  // Generate new temp password (old one was reset at revoke time)
+  const tempPassword = generateDefaultPassword();
+  user.password = await bcrypt.hash(tempPassword, 12);
+  user.isActive = true;
+  user.mustChangePassword = true;  // Force password change on next login
+  await user.save();
+
+  // Send welcome email with new credentials
+  sendWelcomeEmail({
+    to: user.email,
+    name: user.name,
+    role: user.role,
+    tempPassword,
+    loginUrl: LOGIN_URL,
+  }).catch((err) => console.error('Reactivate email failed:', err.message));
+
+  // Audit log
+  try {
+    const AuditLog = require('../../models/AuditLog.model');
+    await AuditLog.create({
+      action: 'ACCESS_REACTIVATED',
+      performedBy: adminId,
+      targetUser: user._id,
+      targetName: user.name,
+      reason: 'Admin reactivated account',
+      resource: `/api/v1/admin/users/${id}/reactivate`,
+      method: 'POST',
+    });
+  } catch (e) {
+    console.error('Audit log failed:', e.message);
+  }
+
+  return {
+    userId: user._id,
+    name: user.name,
+    email: user.email,
+    tempPassword,
+    reactivatedAt: new Date(),
+  };
+};
+
 exports.deleteUser = async (id) => {
   const user = await User.findByIdAndDelete(id);
   if (!user) throw new Error('User not found');

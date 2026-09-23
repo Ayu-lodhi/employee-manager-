@@ -4,12 +4,12 @@ import { AuthProvider, useAuth, ROLES, ProtectedRoute, SocketProvider } from './
 import {
   Login, LandingPage, SuperAdminDashboard, AdminDashboard,
   T3DashboardEnhanced, T2DashboardEnhanced, T1Dashboard,
-  UserManagement, BulkImportPage, EventsPage, ApplicationsPage, MyApplicationsPage,
+  UserManagement, AddUserPage, BulkImportPage, EventsPage, ApplicationsPage, MyApplicationsPage,
   AttendancePage, CertificatesPage, TeamsPage, MyTeamsPage, MyShiftsPage,
   AdminManagementPage, AuditLogsPage, SessionsPage, AnalyticsPage,
   Chat, NotificationsPage, ReviewsPage, QRCheckIn, Placeholder,
   EventDetailPage, ProfilePage, MyReviewsPage,
-  ChangePasswordPage, PreferencesPage
+  ChangePasswordPage, PreferencesPage, AnnouncementsPage
 } from './pages';
 
 const RootRedirect = () => {
@@ -42,14 +42,12 @@ function App() {
             {/* Admin */}
             <Route path="/admin" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><UserManagement /></ProtectedRoute>} />
-            <Route path="/admin/users/new" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><UserManagement /></ProtectedRoute>} />
+            <Route path="/admin/users/new" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><AddUserPage /></ProtectedRoute>} />
             <Route path="/admin/users/bulk" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><BulkImportPage /></ProtectedRoute>} />
             <Route path="/admin/analytics" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><AnalyticsPage /></ProtectedRoute>} />
             <Route path="/admin/events" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><EventsPage /></ProtectedRoute>} />
             <Route path="/admin/events/:id" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><EventDetailPage /></ProtectedRoute>} />
             <Route path="/admin/teams" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><TeamsPage /></ProtectedRoute>} />
-            <Route path="/admin/shifts" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><Placeholder title="Shifts" /></ProtectedRoute>} />
-            <Route path="/admin/certificates" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><CertificatesPage /></ProtectedRoute>} />
 
             {/* T3 */}
             <Route path="/t3" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><T3DashboardEnhanced /></ProtectedRoute>} />
@@ -58,6 +56,7 @@ function App() {
             <Route path="/t3/applications" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><ApplicationsPage /></ProtectedRoute>} />
             <Route path="/t3/attendance" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><AttendancePage /></ProtectedRoute>} />
             <Route path="/t3/reviews" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><ReviewsPage /></ProtectedRoute>} />
+            <Route path="/t3/certificates" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><CertificatesPage /></ProtectedRoute>} />
 
             {/* T2 */}
             <Route path="/t2" element={<ProtectedRoute roles={['T2_ASSOCIATE']}><T2DashboardEnhanced /></ProtectedRoute>} />
@@ -77,6 +76,7 @@ function App() {
 
             {/* Shared */}
             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+            <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/preferences" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />

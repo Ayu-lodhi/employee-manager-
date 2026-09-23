@@ -33,6 +33,8 @@ const userSchema = new mongoose.Schema({
       chat: { type: Boolean, default: true },
       attendance: { type: Boolean, default: true },
       system: { type: Boolean, default: true },
+      announcement: { type: Boolean, default: true },
+      review: { type: Boolean, default: true },
     },
   },
 

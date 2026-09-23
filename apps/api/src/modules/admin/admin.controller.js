@@ -90,3 +90,18 @@ exports.setPassword = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
+
+// REACTIVATE — Super Admin only
+exports.reactivateUser = async (req, res) => {
+  try {
+    const result = await adminService.reactivateUser(req.params.id, req.user.sub);
+    res.status(200).json({
+      success: true,
+      message: `${result.name}'s access has been reactivated. New credentials emailed.`,
+      data: result,
+      tempPassword: result.tempPassword,
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

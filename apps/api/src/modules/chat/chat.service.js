@@ -221,17 +221,20 @@ class ChatService {
     const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(requester.role);
     if (!isCreator && !isAdmin) throw new Error('Only the room creator or Admin can delete this room');
 
-    // Delete all messages in this room
+    // Delete all messages
     await Message.deleteMany({ roomId });
 
     // Delete the room
     await ChatRoom.findByIdAndDelete(roomId);
 
-    // Notify remaining members
-    for (const memberId of room.members) {
-      if (memberId.toString() !== requester.sub) {
-        await notify(memberId, 'chat', 'Chat Room Deleted', `The room "${room.name}" has been deleted.`);
-      }
+    // Only notify the creator (not all members) — T1/T2 shouldn't get this
+    if (room.createdBy.toString() !== requester.sub) {
+      await notify(
+        room.createdBy,
+        'chat',
+        'Chat Room Deleted',
+        `Your room "${room.name}" has been deleted by an administrator.`
+      );
     }
 
     return { deletedRoomId: roomId, deletedMessages: true };

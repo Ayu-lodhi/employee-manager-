@@ -144,9 +144,9 @@ const MENUS = {
     },
     {
       section: 'OPERATIONS', items: [
-        { icon: Calendar, label: 'Events', to: '/admin/events', badge: 5 },
+        { icon: Calendar, label: 'Events', to: '/admin/events' },
         { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
-        { icon: Award, label: 'Certificates', to: '/admin/certificates', badge: 12 },
+        { icon: Bell, label: 'Announcements', to: '/announcements' },
       ]
     },
     {
@@ -172,7 +172,7 @@ const MENUS = {
     { section: 'OPERATIONS', items: [
       { icon: Calendar, label: 'Events', to: '/admin/events' },
       { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
-      { icon: Award, label: 'Certificates', to: '/admin/certificates' },
+      { icon: Bell, label: 'Announcements', to: '/announcements' },
     ]},
     { section: 'ACCOUNT', items: [
       { icon: UserIcon, label: 'My Profile', to: '/profile' },
@@ -180,26 +180,22 @@ const MENUS = {
     ]},
   ],
   T3_EXECUTIVE: [
-    {
-      section: 'MY WORKSPACE', items: [
-        { icon: LayoutDashboard, label: 'Dashboard', to: '/t3' },
-        { icon: UsersRound, label: 'My Teams', to: '/t3/teams', badge: 3 },
-        { icon: FileText, label: 'Applications', to: '/t3/applications', badge: 12 },
-        { icon: CheckCircle, label: 'Attendance', to: '/t3/attendance' },
-      ]
-    },
-    {
-      section: 'COMMUNICATION', items: [
-        { icon: MessageSquare, label: 'Team Chats', to: '/chat', badge: 2 },
-        { icon: Star, label: 'Submit Review', to: '/t3/reviews' },
-      ]
-    },
-    {
-      section: 'ACCOUNT', items: [
-        { icon: UserIcon, label: 'My Profile', to: '/profile' },
-        { icon: Settings, label: 'Preferences', to: '/preferences' },
-      ]
-    },
+    { section: 'MY WORKSPACE', items: [
+      { icon: LayoutDashboard, label: 'Dashboard', to: '/t3' },
+      { icon: UsersRound, label: 'My Teams', to: '/t3/teams' },
+      { icon: FileText, label: 'Applications', to: '/t3/applications' },
+      { icon: CheckCircle, label: 'Attendance', to: '/t3/attendance' },
+    ]},
+    { section: 'COMMUNICATION', items: [
+      { icon: MessageSquare, label: 'Team Chats', to: '/chat' },
+      { icon: Bell, label: 'Announcements', to: '/announcements' },
+      { icon: Star, label: 'Submit Review', to: '/t3/reviews' },
+    ]},
+    { section: 'ACHIEVEMENTS', items: [
+      { icon: Award, label: 'Certificates', to: '/t3/certificates' },
+      { icon: UserIcon, label: 'My Profile', to: '/profile' },
+      { icon: Settings, label: 'Preferences', to: '/preferences' },
+    ]},
   ],
   T2_ASSOCIATE: [
     {
@@ -213,6 +209,7 @@ const MENUS = {
     {
       section: 'COMMUNICATION', items: [
         { icon: MessageSquare, label: 'Team Chats', to: '/chat', badge: 2 },
+        { icon: Bell, label: 'Announcements', to: '/announcements' },
       ]
     },
     {
@@ -882,7 +879,8 @@ export const T1Dashboard = () => {
 // ====================================================================
 export const UserManagement = () => {
   const { user: currentUser } = useAuth();
-  const canManageAccess = currentUser?.role === 'SUPER_ADMIN';
+  const canManageAccess = currentUser.role === 'SUPER_ADMIN';
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -893,23 +891,26 @@ export const UserManagement = () => {
   const [revokeReason, setRevokeReason] = useState('');
   const [revokeNotes, setRevokeNotes] = useState('');
   const [revoking, setRevoking] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  // Fetch users from backend
+  // Fetch users
+  const fetchUsers = async () => {
+    try {
+      const res = await api.get('/admin/users');
+      setUsers(res.data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const res = await api.get('/admin/users');
-        setUsers(res.data.data);
-      } catch (err) {
-        console.error('Failed to load users:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchUsers();
   }, []);
 
-  // Create user via API
+  // Add user
   const addUser = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -918,9 +919,7 @@ export const UserManagement = () => {
       setUsers([res.data.data, ...users]);
       setModal(false);
       setForm({ name: '', email: '', phone: '', role: 'T1_VOLUNTEER' });
-      if (res.data.tempPassword) {
-        alert(`User created!\n\nTemporary password: ${res.data.tempPassword}\n\n(In production, this is sent via email + SMS.)`);
-      }
+      alert(`User created!\n\nAn email with login credentials has been sent to ${res.data.data.email}.`);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to create user');
     } finally {
@@ -928,7 +927,57 @@ export const UserManagement = () => {
     }
   };
 
-  // Revoke access via API
+  // Reset password (Super Admin only)
+  const handleResetPassword = async (u) => {
+    if (!canManageAccess) return;
+    if (!confirm(`Send a new temporary password to ${u.name}?\n\nTheir current password will become invalid.`)) return;
+    try {
+      const res = await api.post(`/admin/users/${u._id}/reset-password`);
+      const { tempPassword, emailSent } = res.data;
+      if (emailSent) {
+        alert(`Password reset!\n\nEmail sent to: ${u.email}\n\nBackup temp password:\n${tempPassword}\n\nOne-time use only.`);
+      } else {
+        alert(`Password reset. Email failed.\n\nShare manually:\n${tempPassword}`);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to reset password');
+    }
+  };
+
+  // Reactivate user
+  const handleReactivate = async (u) => {
+    if (!confirm(`Reactivate ${u.name}'s account?\n\nA new temporary password will be generated and emailed.`)) return;
+    try {
+      const res = await api.post(`/admin/users/${u._id}/reactivate`);
+      setUsers(users.map((x) => x._id === u._id ? { ...x, isActive: true } : x));
+      const { tempPassword, emailSent } = res.data;
+      if (emailSent !== false) {
+        alert(`Account reactivated!\n\nNew credentials emailed to ${u.email}\n\nBackup password:\n${tempPassword}`);
+      } else {
+        alert(`Account reactivated. Share password manually:\n\n${tempPassword}`);
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to reactivate');
+    }
+  };
+
+  // Delete user
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/admin/users/${deleteModal._id}`);
+      setUsers(users.filter((u) => u._id !== deleteModal._id));
+      setDeleteModal(null);
+      alert(`${deleteModal.name} has been permanently deleted.`);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete user');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Revoke user (Super Admin only)
   const revokeUser = async (e) => {
     e.preventDefault();
     if (!revokeReason) {
@@ -953,23 +1002,7 @@ export const UserManagement = () => {
     }
   };
 
-  const handleResetPassword = async (u) => {
-    if (!confirm(`Send a new temporary password to ${u.name}?\n\nTheir current password will become invalid.`)) return;
-    try {
-      const res = await api.post(`/admin/users/${u._id}/reset-password`);
-      const { tempPassword, emailSent } = res.data;
-
-      if (emailSent) {
-        alert(`Password reset!\n\nEmail sent to: ${u.email}\n\nTemp password (also shown here for backup):\n${tempPassword}\n\nThis password is one-time use only.`);
-      } else {
-        alert(`Password reset but email failed to send.\n\nShare this manually with ${u.name}:\n\n${tempPassword}`);
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to reset password');
-    }
-  };
-
-  const filteredUsers = users.filter(u =>
+  const filteredUsers = users.filter((u) =>
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -988,24 +1021,39 @@ export const UserManagement = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">User Management</h1>
-          <p className="text-gray-500">Manage all users and their roles</p>
+          <p className="text-gray-500">
+            {canManageAccess
+              ? 'Full control over user accounts'
+              : 'View and create users. Contact Super Admin for access changes.'}
+          </p>
         </div>
-        <button onClick={() => setModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">+ Add User</button>
+        <button onClick={() => setModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">
+          + Add User
+        </button>
       </div>
 
       {/* Search */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex items-center gap-3">
           <Search className="w-5 h-5 text-gray-400" />
-          <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by name or email..." className="flex-1 bg-transparent border-none outline-none text-sm" />
-          {searchTerm && <button onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>}
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by name or email..."
+            className="flex-1 bg-transparent border-none outline-none text-sm"
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm('')} className="text-gray-400 hover:text-gray-600">
+              <X size={16} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Users table */}
       {loading ? (
-        <SkeletonTable rows={4} cols={4} />
+        <SkeletonTable rows={4} cols={5} />
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-left">
@@ -1014,24 +1062,56 @@ export const UserManagement = () => {
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredUsers.map((u) => (
-                <tr key={u._id} className="hover:bg-gray-50">
+                <tr key={u._id} className={`hover:bg-gray-50 ${!u.isActive ? 'opacity-60' : ''}`}>
                   <td className="px-6 py-4 text-sm font-medium">{u.name}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{u.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${roleColor[u.role]}`}>{roleLabel[u.role]}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${roleColor[u.role]}`}>
+                      {roleLabel[u.role]}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {u.isActive ? (
+                      <span className="text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-200 text-gray-600">
+                        Revoked
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    {canManageAccess ? (
+                    {!canManageAccess ? (
+                      <span className="text-xs text-gray-400 italic">View only</span>
+                    ) : !u.isActive ? (
+                      // Revoked user — show Reactivate + Delete
+                      <div className="flex gap-3 flex-wrap">
+                        <button
+                          onClick={() => handleReactivate(u)}
+                          className="text-green-600 hover:underline text-xs font-medium"
+                        >
+                          Reactivate
+                        </button>
+                        <button
+                          onClick={() => setDeleteModal(u)}
+                          className="text-red-600 hover:underline text-xs font-medium"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ) : (
+                      // Active user — show Reset + Revoke
                       <div className="flex gap-3 flex-wrap">
                         <button
                           onClick={() => handleResetPassword(u)}
                           className="text-amber-600 hover:underline text-xs font-medium"
-                          title="Send reset password email"
                         >
                           Send Reset Password
                         </button>
@@ -1042,14 +1122,16 @@ export const UserManagement = () => {
                           Revoke
                         </button>
                       </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
                     )}
                   </td>
                 </tr>
               ))}
               {filteredUsers.length === 0 && (
-                <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">No users match your search</td></tr>
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    No users match your search
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -1089,7 +1171,7 @@ export const UserManagement = () => {
               </div>
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start gap-2">
                 <Info size={14} className="mt-0.5 flex-shrink-0" />
-                <span>A default password will be generated and shown after creation.</span>
+                <span>Login credentials will be emailed to the user automatically.</span>
               </div>
               <div className="flex gap-3 justify-end">
                 <button type="button" onClick={() => setModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
@@ -1167,6 +1249,57 @@ export const UserManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteModal(null)} />
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Permanently Delete User</h3>
+                <p className="text-xs text-gray-500 truncate">{deleteModal.email}</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
+              <p className="text-sm text-red-800 font-medium mb-2">This action is permanent and cannot be undone:</p>
+              <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+                <li>User account will be permanently deleted</li>
+                <li>All their applications and attendance records</li>
+                <li>Reviews they submitted or received</li>
+                <li>Their chat history and messages</li>
+                <li>Audit logs will retain this deletion action</li>
+              </ul>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+              <p className="text-xs text-amber-800">
+                <strong>Tip:</strong> If you only want to restrict access temporarily, use "Revoke" instead.
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteModal(null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2444,9 +2577,11 @@ export const AttendancePage = () => {
 };
 
 // ====================================================================
-// CERTIFICATES — Redirects to external certificate portal
+// CERTIFICATES PAGE — For T1/T2/T3 only
+// Redirects to external certificate portal
 // ====================================================================
 export const CertificatesPage = () => {
+  // Replace with your real certificate portal URL
   const EXTERNAL_CERT_URL = 'https://certificates.tbi.example.com';
 
   const handleRedirect = () => {
@@ -2456,8 +2591,8 @@ export const CertificatesPage = () => {
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Certificates</h1>
-        <p className="text-gray-500">Access your certificates on the external portal</p>
+        <h1 className="text-2xl font-bold">My Certificates</h1>
+        <p className="text-gray-500">Access your earned certificates on the external portal</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
@@ -2466,7 +2601,8 @@ export const CertificatesPage = () => {
         </div>
         <h2 className="text-xl font-bold mb-2">Certificate Portal</h2>
         <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
-          Your event certificates are hosted on a dedicated portal. Click below to access, download, and verify certificates.
+          Your event certificates are hosted on a dedicated portal. Click below to access,
+          download, and verify your earned certificates.
         </p>
         <button
           onClick={handleRedirect}
@@ -4839,6 +4975,7 @@ export const ChangePasswordPage = () => {
 // PREFERENCES PAGE — Notification settings
 // ====================================================================
 export const PreferencesPage = () => {
+  const { user } = useAuth();
   const [prefs, setPrefs] = useState(null);
   const [original, setOriginal] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -4849,8 +4986,12 @@ export const PreferencesPage = () => {
     (async () => {
       try {
         const res = await api.get('/preferences/me');
-        setPrefs(res.data.data);
-        setOriginal(res.data.data);
+        // Ensure new categories have defaults
+        const data = res.data.data;
+        if (!data.categories.announcement) data.categories.announcement = true;
+        if (!data.categories.review) data.categories.review = true;
+        setPrefs(data);
+        setOriginal(JSON.parse(JSON.stringify(data)));
       } catch (err) {
         console.error(err);
       } finally {
@@ -4876,7 +5017,7 @@ export const PreferencesPage = () => {
     try {
       const res = await api.patch('/preferences/me', prefs);
       setPrefs(res.data.data);
-      setOriginal(res.data.data);
+      setOriginal(JSON.parse(JSON.stringify(res.data.data)));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -4897,13 +5038,56 @@ export const PreferencesPage = () => {
     );
   }
 
-  const categories = [
-    { key: 'application', label: 'Applications', desc: 'When your applications are approved, rejected, or waitlisted' },
-    { key: 'event', label: 'Events', desc: 'New events published, event updates, team changes' },
-    { key: 'chat', label: 'Chat Rooms', desc: 'When you are added to a new chat room' },
-    { key: 'attendance', label: 'Attendance', desc: 'Check-in confirmations and reminders' },
-    { key: 'system', label: 'System', desc: 'Role changes, account updates, admin actions' },
-  ];
+  if (!prefs || !prefs.categories) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Unable to Load Preferences</h2>
+          <button onClick={() => window.location.reload()} className="mt-4 px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ROLE-BASED CATEGORIES
+  const getCategoriesForRole = (role) => {
+    if (role === 'T1_VOLUNTEER' || role === 'T2_ASSOCIATE') {
+      return [
+        { key: 'application', label: 'My Applications', desc: 'When your applications are approved, rejected, or waitlisted' },
+        { key: 'event', label: 'Events', desc: 'New events published and event updates' },
+        { key: 'chat', label: 'Chat Rooms', desc: 'When you are added to a chat room' },
+        { key: 'attendance', label: 'Attendance', desc: 'Check-in confirmations and reminders' },
+        { key: 'announcement', label: 'Announcements', desc: 'Important messages from leads and admins' },
+        { key: 'system', label: 'System', desc: 'Role changes and account updates' },
+      ];
+    }
+
+    if (role === 'T3_EXECUTIVE') {
+      return [
+        { key: 'application', label: 'Team Applications', desc: 'New applicants to your teams' },
+        { key: 'event', label: 'My Events', desc: 'Updates on events you lead or manage' },
+        { key: 'chat', label: 'Team Chats', desc: 'Activity in team chat rooms' },
+        { key: 'attendance', label: 'Team Attendance', desc: 'Team check-in activity' },
+        { key: 'review', label: 'Reviews', desc: 'When you receive or submit reviews' },
+        { key: 'announcement', label: 'Announcements', desc: 'Broadcasts from admins' },
+        { key: 'system', label: 'System', desc: 'Role changes and account updates' },
+      ];
+    }
+
+    // Admin / Super Admin
+    return [
+      { key: 'application', label: 'Applications', desc: 'Application submissions and approvals' },
+      { key: 'event', label: 'Events', desc: 'Event creation, updates, and closures' },
+      { key: 'chat', label: 'Chat Activity', desc: 'Chat room creation and deletions' },
+      { key: 'announcement', label: 'Announcements', desc: 'Broadcasts and team messages' },
+      { key: 'system', label: 'System & Security', desc: 'User provisioning, role changes, revocations' },
+    ];
+  };
+
+  const categories = getCategoriesForRole(user.role);
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -4915,60 +5099,48 @@ export const PreferencesPage = () => {
       {/* Master channels */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="font-semibold mb-5">Delivery Channels</h3>
-
         <div className="space-y-4">
-          {/* In-App */}
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="text-sm font-medium">In-App Notifications</p>
               <p className="text-xs text-gray-500">Show notifications in the bell icon</p>
             </div>
-            <ToggleSwitch
-              checked={prefs.inApp}
-              onChange={() => toggle('inApp')}
-            />
+            <ToggleSwitch checked={prefs.inApp} onChange={() => toggle('inApp')} />
           </div>
-
-          {/* Email */}
           <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-4">
             <div>
               <p className="text-sm font-medium">Email Notifications</p>
               <p className="text-xs text-gray-500">Receive notifications via email</p>
             </div>
-            <ToggleSwitch
-              checked={prefs.email}
-              onChange={() => toggle('email')}
-            />
+            <ToggleSwitch checked={prefs.email} onChange={() => toggle('email')} />
           </div>
-
-          {/* SMS */}
           <div className="flex items-center justify-between py-2 border-t border-gray-100 pt-4">
             <div>
               <p className="text-sm font-medium">SMS Notifications</p>
               <p className="text-xs text-gray-500">Receive critical alerts via SMS</p>
             </div>
-            <ToggleSwitch
-              checked={prefs.sms}
-              onChange={() => toggle('sms')}
-            />
+            <ToggleSwitch checked={prefs.sms} onChange={() => toggle('sms')} />
           </div>
         </div>
       </div>
 
-      {/* Categories */}
+      {/* Role-based categories */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="font-semibold mb-2">Notification Types</h3>
-        <p className="text-sm text-gray-500 mb-5">Choose which types of notifications you want to receive</p>
-
+        <p className="text-sm text-gray-500 mb-5">
+          Categories available for your role: <span className="font-medium text-gray-700">
+            {user.role.replace('_', ' ')}
+          </span>
+        </p>
         <div className="space-y-3">
           {categories.map((c) => (
             <div key={c.key} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-              <div>
+              <div className="flex-1 pr-4">
                 <p className="text-sm font-medium">{c.label}</p>
                 <p className="text-xs text-gray-500">{c.desc}</p>
               </div>
               <ToggleSwitch
-                checked={prefs.categories[c.key]}
+                checked={prefs.categories[c.key] !== false}
                 onChange={() => toggle(`categories.${c.key}`)}
               />
             </div>
@@ -4976,20 +5148,16 @@ export const PreferencesPage = () => {
         </div>
       </div>
 
-      {/* Save */}
       <div className="flex items-center gap-3 sticky bottom-4">
         <button
           onClick={handleSave}
           disabled={!hasChanges || saving}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Preferences'}
         </button>
         {hasChanges && (
-          <button
-            onClick={() => setPrefs(original)}
-            className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50"
-          >
+          <button onClick={() => setPrefs(JSON.parse(JSON.stringify(original)))} className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">
             Reset
           </button>
         )}
@@ -5020,4 +5188,429 @@ export const ToggleSwitch = ({ checked, onChange }) => (
       }`}
     />
   </button>
-);
+);
+
+
+// ====================================================================
+// ADD USER PAGE — Dedicated page for creating new users
+// ====================================================================
+export const AddUserPage = () => {
+  const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const canCreateAdmin = currentUser.role === 'SUPER_ADMIN';
+
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'T1_VOLUNTEER',
+  });
+  const [saving, setSaving] = useState(false);
+  const [created, setCreated] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await api.post('/admin/users', form);
+      setCreated({
+        name: res.data.data.name,
+        email: res.data.data.email,
+        role: res.data.data.role,
+      });
+      setForm({ name: '', email: '', phone: '', role: 'T1_VOLUNTEER' });
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const roleOptions = [
+    { value: 'T1_VOLUNTEER', label: 'T1 Volunteer', desc: 'Event helper, applies to shifts', icon: 'T1', color: 'bg-green-100 text-green-700 border-green-300' },
+    { value: 'T2_ASSOCIATE', label: 'T2 Associate', desc: 'Team coordinator, assists T1s', icon: 'T2', color: 'bg-blue-100 text-blue-700 border-blue-300' },
+    { value: 'T3_EXECUTIVE', label: 'T3 Executive', desc: 'Senior lead, manages teams', icon: 'T3', color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  ];
+
+  if (created) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2">User Created Successfully</h2>
+          <p className="text-gray-500 mb-6">
+            An email with login credentials has been sent to <strong>{created.email}</strong>
+          </p>
+
+          <div className="bg-gray-50 rounded-lg p-4 text-left mb-6 max-w-md mx-auto">
+            <div className="flex justify-between py-1.5 border-b border-gray-200">
+              <span className="text-xs text-gray-500">Name</span>
+              <span className="text-sm font-medium">{created.name}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-gray-200">
+              <span className="text-xs text-gray-500">Email</span>
+              <span className="text-sm font-medium">{created.email}</span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-xs text-gray-500">Role</span>
+              <span className="text-sm font-medium">{created.role.replace('_', ' ')}</span>
+            </div>
+          </div>
+
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => setCreated(null)}
+              className="px-5 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
+            >
+              + Add Another User
+            </button>
+            <button
+              onClick={() => navigate('/admin/users')}
+              className="px-5 py-2.5 border border-gray-300 rounded-lg font-medium hover:bg-gray-50"
+            >
+              View All Users
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <button
+          onClick={() => navigate('/admin/users')}
+          className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1 mb-4"
+        >
+          <ChevronLeft size={16} /> Back to Users
+        </button>
+        <h1 className="text-2xl font-bold">Add New User</h1>
+        <p className="text-gray-500">Create a new account and send credentials via email</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Full Name *</label>
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Arjun Mehta"
+              className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Email Address *</label>
+              <input
+                required
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="arjun@tbi.org"
+                className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Phone (optional)</label>
+              <input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="+91 98765 43210"
+                className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Assign Role *</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {roleOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, role: opt.value })}
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    form.role === opt.value
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500/20'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-bold ${opt.color} mb-2`}>
+                    {opt.icon}
+                  </span>
+                  <p className="text-sm font-semibold">{opt.label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">What happens next?</p>
+              <ul className="text-xs space-y-0.5 list-disc list-inside">
+                <li>User account is created with a random temporary password</li>
+                <li>Credentials are emailed to the user automatically</li>
+                <li>User must set a new password on first login (one-time use)</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex gap-3 justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => navigate('/admin/users')}
+              className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50"
+            >
+              {saving ? 'Creating User...' : 'Create User & Send Credentials'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ====================================================================
+// ANNOUNCEMENTS PAGE
+// Admin/SA can broadcast to ALL. T3/T2 can broadcast to their teams.
+// ====================================================================
+export const AnnouncementsPage = () => {
+  const { user } = useAuth();
+  const [announcements, setAnnouncements] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({ title: '', message: '', target: 'ALL', targetTeamId: '' });
+  const [saving, setSaving] = useState(false);
+
+  const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+  const isT3 = user.role === 'T3_EXECUTIVE';
+  const isT2 = user.role === 'T2_ASSOCIATE';
+  const canCreate = isAdmin || isT3 || isT2;
+
+  const fetchData = async () => {
+    try {
+      const [annRes, teamsRes] = await Promise.all([
+        api.get('/announcements'),
+        (isT3 || isT2) ? api.get('/teams/me') : Promise.resolve({ data: { data: [] } }),
+      ]);
+      setAnnouncements(annRes.data.data);
+      setTeams(teamsRes.data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { ...form };
+      if (payload.target !== 'TEAM') delete payload.targetTeamId;
+      if (!payload.targetTeamId) delete payload.targetTeamId;
+
+      await api.post('/announcements', payload);
+      setModal(false);
+      setForm({ title: '', message: '', target: 'ALL', targetTeamId: '' });
+      await fetchData();
+      alert('Announcement sent');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to send');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this announcement?')) return;
+    try {
+      await api.delete(`/announcements/${id}`);
+      setAnnouncements(announcements.filter((a) => a._id !== id));
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed');
+    }
+  };
+
+  const targetLabel = (ann) => {
+    if (ann.target === 'ALL') return 'Everyone';
+    if (ann.target === 'TEAM') return `Team: ${ann.targetTeamName}`;
+    if (ann.target === 'EVENT') return `Event: ${ann.targetEventTitle}`;
+    return ann.target;
+  };
+
+  if (loading) return <SkeletonTable rows={4} cols={3} />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Announcements</h1>
+          <p className="text-gray-500">
+            {isAdmin
+              ? 'Broadcast messages to everyone'
+              : 'Send messages to your team'}
+          </p>
+        </div>
+        {canCreate && (
+          <button
+            onClick={() => setModal(true)}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 flex items-center gap-2"
+          >
+            <Plus size={16} /> New Announcement
+          </button>
+        )}
+      </div>
+
+      {announcements.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No announcements yet</h3>
+          {canCreate && (
+            <button onClick={() => setModal(true)} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
+              Send First Announcement
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {announcements.map((a) => (
+            <div key={a._id} className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <h3 className="font-semibold">{a.title}</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                      {targetLabel(a)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    By {a.createdByName} ({a.createdByRole.replace('_', ' ')}) / {new Date(a.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                {(a.createdBy === user._id || isAdmin) && (
+                  <button onClick={() => handleDelete(a._id)} className="text-red-500 hover:underline text-xs flex-shrink-0 ml-2">
+                    Delete
+                  </button>
+                )}
+              </div>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{a.message}</p>
+              <p className="text-xs text-gray-400 mt-3">
+                Sent to {a.recipientCount} {a.recipientCount === 1 ? 'person' : 'people'}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setModal(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-semibold">New Announcement</h3>
+              <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Title *</label>
+                <input
+                  required
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="e.g. Shift schedule updated"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Message *</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={form.message}
+                  onChange={(e) => setForm({ ...form, message: e.target.value })}
+                  placeholder="Type your message..."
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500"
+                />
+              </div>
+
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Send to</label>
+                  <select
+                    value={form.target}
+                    onChange={(e) => setForm({ ...form, target: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none"
+                  >
+                    <option value="ALL">Everyone on the platform</option>
+                  </select>
+                </div>
+              )}
+
+              {(isT3 || isT2) && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Send to Team *</label>
+                  <select
+                    required
+                    value={form.targetTeamId}
+                    onChange={(e) => setForm({ ...form, target: 'TEAM', targetTeamId: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none"
+                  >
+                    <option value="">Select a team...</option>
+                    {teams.map((t) => (
+                      <option key={t._id} value={t._id}>
+                        {t.name} {t.eventTitle ? `- ${t.eventTitle}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start gap-2">
+                <Info size={14} className="mt-0.5 flex-shrink-0" />
+                <span>Recipients will get an instant in-app notification.</span>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {saving ? 'Sending...' : 'Send Announcement'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
