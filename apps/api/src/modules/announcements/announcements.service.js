@@ -2,9 +2,10 @@ const Announcement = require('./announcements.model');
 const User = require('../admin/admin.model');
 const Team = require('../teams/teams.model');
 const Event = require('../events/events.model');
-const { notify, notifyAll } = require('../notifications/notifications.service');
+const { notify } = require('../notifications/notifications.service');
 
 class AnnouncementService {
+
   // Create + broadcast announcement
   async create(data, requester) {
     const { title, message, target, targetTeamId, targetEventId } = data;
@@ -16,7 +17,6 @@ class AnnouncementService {
     const isT3 = requester.role === 'T3_EXECUTIVE';
     const isT2 = requester.role === 'T2_ASSOCIATE';
 
-    // Permission: Admin/SA can send ALL. T3 can send to TEAM/EVENT. T2 can send to TEAM only.
     if (!isAdmin && !isT3 && !isT2) {
       throw new Error('You do not have permission to create announcements');
     }
@@ -26,18 +26,21 @@ class AnnouncementService {
     let eventTitle = '';
     let recipientIds = [];
 
+    // TARGET: ALL USERS (Admin/SA only)
     if (announcementTarget === 'ALL') {
       if (!isAdmin) throw new Error('Only Admins can broadcast to everyone');
-      // All active users except creator
       const users = await User.find({ _id: { $ne: requester.sub }, isActive: true }).select('_id');
       recipientIds = users.map((u) => u._id.toString());
-    } else if (announcementTarget === 'TEAM') {
-      if (!targetTeamId) throw new Error('Team is required for team announcements');
+    }
+
+    // TARGET: TEAM (T3/T2/Admin)
+    else if (announcementTarget === 'TEAM') {
+      if (!targetTeamId) throw new Error('Please select a team');
 
       const team = await Team.findById(targetTeamId);
       if (!team) throw new Error('Team not found');
 
-      // Permission check: T3/T2 must be a member of the team
+      // If T3/T2, they must be a member of the team
       if (isT3 || isT2) {
         const isMember =
           team.members.some((m) => m.toString() === requester.sub) ||
@@ -46,13 +49,15 @@ class AnnouncementService {
       }
 
       teamName = team.name;
-      // All team members except creator
       const memberIds = [...team.members.map((m) => m.toString())];
       if (team.leadId) memberIds.push(team.leadId.toString());
       recipientIds = memberIds.filter((id) => id !== requester.sub);
-    } else if (announcementTarget === 'EVENT') {
-      if (!isAdmin) throw new Error('Only Admins can broadcast to full events');
-      if (!targetEventId) throw new Error('Event is required');
+    }
+
+    // TARGET: EVENT (Admin/SA only)
+    else if (announcementTarget === 'EVENT') {
+      if (!isAdmin) throw new Error('Only Admins can broadcast to events');
+      if (!targetEventId) throw new Error('Please select an event');
 
       const event = await Event.findById(targetEventId);
       if (!event) throw new Error('Event not found');
@@ -61,7 +66,6 @@ class AnnouncementService {
       recipientIds = event.members.map((m) => m.toString()).filter((id) => id !== requester.sub);
     }
 
-    // Create announcement
     const announcement = await Announcement.create({
       title: title.trim(),
       message: message.trim(),
@@ -76,19 +80,24 @@ class AnnouncementService {
       recipientCount: recipientIds.length,
     });
 
-    // Send real-time notifications to recipients
+    // Send real-time notifications
     for (const userId of recipientIds) {
-      await notify(userId, 'announcement', title, message);
+      await notify(userId, 'announcement', `Announcement: ${title}`, message);
     }
 
     return announcement;
   }
 
-  // List announcements relevant to a user
+  // List announcements for a user
   async getMyAnnouncements(user) {
     const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
     const isT3 = user.role === 'T3_EXECUTIVE';
     const isT2 = user.role === 'T2_ASSOCIATE';
+
+    // Admin sees all
+    if (isAdmin) {
+      return await Announcement.find().sort({ createdAt: -1 }).limit(100);
+    }
 
     const filters = [];
 
@@ -101,12 +110,9 @@ class AnnouncementService {
         $or: [{ members: user.sub }, { leadId: user.sub }],
       }).select('_id');
       const teamIds = teams.map((t) => t._id);
-      filters.push({ target: 'TEAM', targetTeamId: { $in: teamIds } });
-    }
-
-    // Admin sees everything
-    if (isAdmin) {
-      return await Announcement.find().sort({ createdAt: -1 }).limit(100);
+      if (teamIds.length > 0) {
+        filters.push({ target: 'TEAM', targetTeamId: { $in: teamIds } });
+      }
     }
 
     return await Announcement.find({
@@ -117,7 +123,6 @@ class AnnouncementService {
       .limit(50);
   }
 
-  // Delete announcement (creator or admin)
   async delete(id, requester) {
     const ann = await Announcement.findById(id);
     if (!ann) throw new Error('Announcement not found');

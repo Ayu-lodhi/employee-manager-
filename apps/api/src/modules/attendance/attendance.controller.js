@@ -1,71 +1,102 @@
-const attService = require('./attendance.service');
+const service = require('./attendance.service');
 
-exports.checkIn = async (req, res) => {
+exports.markAttendance = async (req, res) => {
   try {
-    const record = await attService.checkIn(req.user.sub, req.user.name, req.body);
-    res.status(201).json({ success: true, message: 'Checked in', data: record });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
-
-exports.checkOut = async (req, res) => {
-  try {
-    const record = await attService.checkOut(req.user.sub, req.body.teamName);
-    res.status(200).json({ success: true, message: 'Checked out', data: record });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
-
-exports.manualMark = async (req, res) => {
-  try {
-    const record = await attService.manualMark(req.body, req.user);
+    const record = await service.markAttendance(req.body, req.user);
     res.status(200).json({ success: true, message: 'Attendance marked', data: record });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
-exports.getByTeam = async (req, res) => {
+exports.selfCheckIn = async (req, res) => {
   try {
-    const { teamName } = req.query;
-    const { date } = req.query;
-    if (!teamName) return res.status(400).json({ success: false, message: 'teamName required' });
-    const records = await attService.getByTeamAndDate(teamName, date);
-    res.json({ success: true, data: records });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const record = await service.selfCheckIn(req.user, req.body);
+    res.status(201).json({ success: true, message: 'Checked in', data: record });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
-exports.getMyAttendance = async (req, res) => {
+exports.selfCheckOut = async (req, res) => {
   try {
-    const records = await attService.getMyAttendance(req.user.sub);
-    res.json({ success: true, data: records });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const record = await service.selfCheckOut(req.user, req.body);
+    res.status(200).json({ success: true, message: 'Checked out', data: record });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
-exports.getTodayStatus = async (req, res) => {
+exports.getTeamAttendance = async (req, res) => {
   try {
-    const { teamName } = req.query;
-    const record = await attService.getTodayStatus(req.user.sub, teamName);
-    res.json({ success: true, data: record });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const { teamId, date } = req.query;
+    if (!teamId) return res.status(400).json({ success: false, message: 'teamId required' });
+    const data = await service.getTeamAttendance(teamId, date);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
 exports.getTeamStats = async (req, res) => {
   try {
-    const { teamName } = req.query;
-    const { date } = req.query;
-    if (!teamName) return res.status(400).json({ success: false, message: 'teamName required' });
-    const stats = await attService.getTeamStats(teamName, date);
-    res.json({ success: true, data: stats });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const { teamId, date } = req.query;
+    if (!teamId) return res.status(400).json({ success: false, message: 'teamId required' });
+    const data = await service.getTeamAttendanceStats(teamId, date);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getTeamHistory = async (req, res) => {
+  try {
+    const { teamId, days } = req.query;
+    if (!teamId) return res.status(400).json({ success: false, message: 'teamId required' });
+    const data = await service.getTeamAttendanceHistory(teamId, parseInt(days) || 7);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getMyStats = async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const data = await service.getMyAttendanceStats(req.user.sub, days);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getMyAttendance = async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const records = await service.getMyAttendance(req.user.sub, days);
+    res.json({ success: true, data: records });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getTodayStatus = async (req, res) => {
+  try {
+    const { teamId } = req.query;
+    const record = await service.getTodayStatus(req.user.sub, teamId);
+    res.json({ success: true, data: record || null });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.downloadSheet = async (req, res) => {
+  try {
+    const { teamId, from, to } = req.query;
+    if (!teamId) return res.status(400).json({ success: false, message: 'teamId required' });
+    const data = await service.getAttendanceSheet(teamId, from, to);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };

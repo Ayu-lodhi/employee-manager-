@@ -19,12 +19,14 @@ exports.getTeamById = async (id) => {
 };
 
 exports.getMyTeams = async (userId) => {
-  return await Team.find({
+  const teams = await Team.find({
     $or: [{ leadId: userId }, { members: userId }],
   })
     .populate('members', 'name email role')
     .populate('leadId', 'name email role')
     .sort({ createdAt: -1 });
+
+  return teams;
 };
 
 exports.createTeam = async (data) => {

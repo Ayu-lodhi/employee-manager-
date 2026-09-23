@@ -463,7 +463,10 @@ export const Layout = ({ children }) => (
     <Sidebar />
     <div className="flex-1 flex flex-col overflow-hidden">
       <Topbar />
-      <main className="flex-1 overflow-y-auto p-6 bg-gray-50">{children}</main>
+      <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+        {children}
+      </main>
+      <AnnouncementPopup />
     </div>
   </div>
 );
@@ -478,6 +481,55 @@ export const KPI = ({ label, value, change }) => (
     {change && <p className="text-xs text-green-500 mt-1">+{change}</p>}
   </div>
 );
+
+// ====================================================================
+// ANNOUNCEMENT BANNER — Shows on dashboards when there are new announcements
+// ====================================================================
+export const AnnouncementBanner = () => {
+  const navigate = useNavigate();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await api.get('/announcements');
+        const recent = (res.data.data || []).filter((a) => {
+          const created = new Date(a.createdAt).getTime();
+          const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          return created > weekAgo;
+        });
+        setCount(recent.length);
+      } catch (err) {
+        // Silent
+      }
+    };
+    fetchCount();
+  }, []);
+
+  if (count === 0) return null;
+
+  return (
+    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-4 flex items-center justify-between text-white">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+          <Bell className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="font-semibold text-sm">
+            {count} new announcement{count > 1 ? 's' : ''} this week
+          </p>
+          <p className="text-xs opacity-90">Check what's happening on the platform</p>
+        </div>
+      </div>
+      <button
+        onClick={() => navigate('/announcements')}
+        className="px-4 py-2 bg-white text-indigo-600 rounded-lg font-medium text-sm hover:bg-indigo-50 whitespace-nowrap"
+      >
+        View All
+      </button>
+    </div>
+  );
+};
 
 export const Placeholder = ({ title }) => (
   <div className="flex flex-col items-center justify-center h-96 text-center">
@@ -566,6 +618,7 @@ export const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <AnnouncementBanner />
       <div>
         <h1 className="text-2xl font-bold">Good morning, {user.name.split(' ')[0]}</h1>
         <p className="text-gray-500">Here's what's happening today.</p>
@@ -733,6 +786,7 @@ export const SuperAdminDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <AnnouncementBanner />
       <div>
         <h1 className="text-2xl font-bold">Welcome, {user.name}</h1>
         <p className="text-gray-500">Full system overview and admin actions.</p>
@@ -801,6 +855,19 @@ export const T1Dashboard = () => {
     })();
   }, []);
 
+  const [myAttendance, setMyAttendance] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/attendance/my-stats?days=30');
+        setMyAttendance(res.data.data);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, []);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -812,6 +879,7 @@ export const T1Dashboard = () => {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      <AnnouncementBanner />
       <div>
         <h1 className="text-2xl font-bold">Hi {user.name.split(' ')[0]}</h1>
         <p className="text-gray-500">
@@ -855,6 +923,42 @@ export const T1Dashboard = () => {
           >
             Check In Now
           </button>
+        </div>
+      )}
+
+      {/* Personal Attendance Card */}
+      {myAttendance && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-semibold">My Attendance (30 Days)</h3>
+            <button onClick={() => navigate('/t1/checkin')} className="text-xs text-blue-500 hover:underline">
+              View →
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-2xl font-bold text-blue-600">{myAttendance.percentage}%</p>
+              <p className="text-xs text-gray-500 mt-0.5">Attendance Rate</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-purple-600">{myAttendance.totalHours}h</p>
+              <p className="text-xs text-gray-500 mt-0.5">Total Hours</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100 text-center">
+            <div>
+              <p className="text-lg font-bold text-green-600">{myAttendance.present}</p>
+              <p className="text-[10px] text-gray-500 uppercase">Present</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-amber-600">{myAttendance.late}</p>
+              <p className="text-[10px] text-gray-500 uppercase">Late</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-red-600">{myAttendance.absent}</p>
+              <p className="text-[10px] text-gray-500 uppercase">Absent</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1809,23 +1913,23 @@ export const Chat = () => {
 // QR CHECK-IN — T1/T2 self check-in/check-out
 // ====================================================================
 export const QRCheckIn = () => {
-  const { user } = useAuth();
-  const [teamName, setTeamName] = useState('Tech Team');
+  const [teams, setTeams] = useState([]);
+  const [selectedTeamId, setSelectedTeamId] = useState('');
   const [todayRecord, setTodayRecord] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [qrCode, setQrCode] = useState('');
-  const [history, setHistory] = useState([]);
 
-  // Fetch today's status + history
-  const fetchData = async () => {
+  const loadData = async () => {
     try {
-      const [todayRes, historyRes] = await Promise.all([
-        api.get(`/attendance/today?teamName=${teamName}`),
-        api.get('/attendance/me'),
-      ]);
-      setTodayRecord(todayRes.data.data);
-      setHistory(historyRes.data.data);
+      const teamRes = await api.get('/teams/me');
+      const teamList = teamRes.data.data;
+      setTeams(teamList);
+      if (teamList.length > 0 && !selectedTeamId) {
+        setSelectedTeamId(teamList[0]._id);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -1833,148 +1937,185 @@ export const QRCheckIn = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [teamName]);
+  const loadTeamData = async () => {
+    if (!selectedTeamId) return;
+    try {
+      const [todayRes, statsRes, histRes] = await Promise.all([
+        api.get(`/attendance/today?teamId=${selectedTeamId}`),
+        api.get('/attendance/my-stats?days=30'),
+        api.get('/attendance/me?days=14'),
+      ]);
+      setTodayRecord(todayRes.data.data);
+      setStats(statsRes.data.data);
+      setHistory(histRes.data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  // Check-in
+  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadTeamData(); }, [selectedTeamId]);
+
   const handleCheckIn = async () => {
+    if (!selectedTeamId) return alert('Select a team first');
     setProcessing(true);
     try {
-      const res = await api.post('/attendance/check-in', {
-        teamName,
-        method: qrCode ? 'qr' : 'self',
-      });
+      const res = await api.post('/attendance/check-in', { teamId: selectedTeamId });
       setTodayRecord(res.data.data);
-      setQrCode('');
+      await loadTeamData();
       alert(`Checked in at ${new Date(res.data.data.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-      fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Check-in failed');
+      alert(err.response?.data?.message || 'Failed');
     } finally {
       setProcessing(false);
     }
   };
 
-  // Check-out
   const handleCheckOut = async () => {
+    if (!selectedTeamId) return;
     setProcessing(true);
     try {
-      const res = await api.post('/attendance/check-out', { teamName });
+      const res = await api.post('/attendance/check-out', { teamId: selectedTeamId });
       setTodayRecord(res.data.data);
-      alert(`Checked out. Duration: ${res.data.data.durationMinutes} minutes`);
-      fetchData();
+      await loadTeamData();
+      alert(`Checked out. Duration: ${res.data.data.durationMinutes} min`);
     } catch (err) {
-      alert(err.response?.data?.message || 'Check-out failed');
+      alert(err.response?.data?.message || 'Failed');
     } finally {
       setProcessing(false);
     }
   };
-
-  const formatTime = (d) => d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
   if (loading) return <SkeletonCardGrid count={2} />;
+
+  if (teams.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <UsersRound className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold mb-2">No teams yet</h2>
+          <p className="text-sm text-gray-500">You need to be added to a team before you can check in.</p>
+        </div>
+      </div>
+    );
+  }
 
   const hasCheckedIn = !!todayRecord?.checkInTime;
   const hasCheckedOut = !!todayRecord?.checkOutTime;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Check-In — {teamName}</h1>
-        <p className="text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        <h1 className="text-2xl font-bold">My Attendance</h1>
+        <p className="text-gray-500">Check in for your shift and track your attendance</p>
       </div>
 
-      {/* Team selector */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <label className="block text-sm font-medium mb-2">Select Team</label>
-        <select value={teamName} onChange={(e) => setTeamName(e.target.value)}
-          className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none">
-          <option value="Tech Team">Tech Team</option>
-          <option value="Media Team">Media Team</option>
-          <option value="Logistics">Logistics</option>
-        </select>
-      </div>
-
-      {/* Status card */}
-      {hasCheckedIn ? (
-        <div className="bg-white rounded-xl border-l-4 border-l-green-500 border border-gray-200 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold">Checked In</h3>
-              <p className="text-sm text-gray-500">at {formatTime(todayRecord.checkInTime)}</p>
-            </div>
-          </div>
-
-          {hasCheckedOut ? (
-            <div className="bg-blue-50 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Shift complete!</strong> You worked for {todayRecord.durationMinutes} minutes.
-              </p>
-              <p className="text-xs text-blue-600 mt-1">Checked out at {formatTime(todayRecord.checkOutTime)}</p>
-            </div>
-          ) : (
-            <button onClick={handleCheckOut} disabled={processing}
-              className="w-full h-12 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-medium rounded-lg flex items-center justify-center gap-2">
-              <LogOut size={18} /> {processing ? 'Processing...' : 'Check Out'}
-            </button>
-          )}
+      {/* Team Selector */}
+      {teams.length > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Select Team</label>
+          <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
+            {teams.map((t) => (<option key={t._id} value={t._id}>{t.name}{t.eventTitle ? ` — ${t.eventTitle}` : ''}</option>))}
+          </select>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <QrCode className="w-8 h-8 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-bold mb-1">Ready to Check In?</h3>
-            <p className="text-sm text-gray-500">Enter the QR code shown by your Team Lead or click "Check In"</p>
-          </div>
+      )}
 
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">QR Code (optional)</label>
-              <input value={qrCode} onChange={(e) => setQrCode(e.target.value.toUpperCase())}
-                placeholder="e.g. TBI-A3B7K9"
-                className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500 font-mono text-center tracking-wider" />
-            </div>
-            <button onClick={handleCheckIn} disabled={processing}
-              className="w-full h-12 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-medium rounded-lg flex items-center justify-center gap-2">
-              <CheckCircle size={18} /> {processing ? 'Checking in...' : 'Check In Now'}
-            </button>
+      {/* Personal Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500">My Attendance Rate</p>
+            <p className="text-3xl font-bold mt-1 text-blue-600">{stats.percentage}%</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500">Present Days</p>
+            <p className="text-3xl font-bold mt-1 text-green-600">{stats.present}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500">Late Days</p>
+            <p className="text-3xl font-bold mt-1 text-amber-600">{stats.late}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500">Total Hours</p>
+            <p className="text-3xl font-bold mt-1 text-purple-600">{stats.totalHours}h</p>
           </div>
         </div>
       )}
+
+      {/* Today's Status */}
+      <div className="bg-white rounded-xl border-l-4 border-l-green-500 border border-gray-200 p-6">
+        <p className="text-sm font-semibold text-green-600 mb-3">TODAY'S STATUS</p>
+        {!hasCheckedIn ? (
+          <>
+            <h3 className="text-xl font-bold mb-3">Ready to check in?</h3>
+            <p className="text-sm text-gray-600 mb-5">Enter your team code or click check-in below.</p>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Team Code (optional)</label>
+              <input value={qrCode} onChange={(e) => setQrCode(e.target.value.toUpperCase())}
+                placeholder="e.g. TBI-ABC123"
+                className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500 font-mono text-center tracking-wider" />
+            </div>
+            <button onClick={handleCheckIn} disabled={processing}
+              className="px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 flex items-center gap-2">
+              <CheckCircle size={18} /> {processing ? 'Checking in...' : 'Check In Now'}
+            </button>
+          </>
+        ) : hasCheckedOut ? (
+          <>
+            <h3 className="text-xl font-bold mb-2 text-green-600">Shift Complete</h3>
+            <p className="text-sm text-gray-600">
+              You worked {todayRecord.durationMinutes} minutes today.
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              In: {new Date(todayRecord.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {' '} / Out: {new Date(todayRecord.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </>
+        ) : (
+          <>
+            <h3 className="text-xl font-bold mb-2 text-green-600">Checked In</h3>
+            <p className="text-sm text-gray-600 mb-5">
+              at {new Date(todayRecord.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <button onClick={handleCheckOut} disabled={processing}
+              className="px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 disabled:opacity-50 flex items-center gap-2">
+              <LogOut size={18} /> {processing ? 'Processing...' : 'Check Out'}
+            </button>
+          </>
+        )}
+      </div>
 
       {/* History */}
       {history.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-200">
-            <h3 className="font-semibold">Recent Attendance</h3>
+            <h3 className="font-semibold">Recent Attendance (Last 14 Days)</h3>
           </div>
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">Team</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">In</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">Out</th>
-                <th className="px-4 py-2 text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Team</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check In</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check Out</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Duration</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {history.slice(0, 10).map((h) => (
-                <tr key={h._id}>
-                  <td className="px-4 py-3 text-sm">{h.date}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{h.teamName}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{formatTime(h.checkInTime)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{formatTime(h.checkOutTime)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${h.status === 'present' ? 'bg-green-100 text-green-700' :
-                        h.status === 'late' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-                      }`}>{h.status}</span>
+              {history.map((h) => (
+                <tr key={h._id} className="hover:bg-gray-50">
+                  <td className="px-6 py-3 text-sm">{h.date}</td>
+                  <td className="px-6 py-3 text-sm text-gray-600">{h.teamName}</td>
+                  <td className="px-6 py-3 text-sm text-gray-500">{h.checkInTime ? new Date(h.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-500">{h.checkOutTime ? new Date(h.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-500">{h.durationMinutes ? `${h.durationMinutes}m` : '—'}</td>
+                  <td className="px-6 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      h.status === 'present' ? 'bg-green-100 text-green-700' :
+                      h.status === 'late' ? 'bg-amber-100 text-amber-700' :
+                      h.status === 'absent' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                    }`}>{h.status.replace('_', ' ')}</span>
                   </td>
                 </tr>
               ))}
@@ -2363,210 +2504,335 @@ export const ApplicationsPage = () => {
 // ATTENDANCE — T3 view: Generate QR, mark manually, view stats
 // ====================================================================
 export const AttendancePage = () => {
-  const [teamName, setTeamName] = useState('Tech Team');
-  const [records, setRecords] = useState([]);
-  const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 });
+  const { user } = useAuth();
+  const [teams, setTeams] = useState([]);
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [roster, setRoster] = useState([]);
+  const [teamInfo, setTeamInfo] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [qrToken, setQrToken] = useState('');
-  const [qrExpiry, setQrExpiry] = useState(0);
-  const [manualModal, setManualModal] = useState(false);
-  const [form, setForm] = useState({ studentName: '', status: 'present', notes: '' });
+  const [manualModal, setManualModal] = useState(null);
+  const [manualForm, setManualForm] = useState({ status: 'present', notes: '' });
+  const [downloading, setDownloading] = useState(false);
 
-  const date = new Date().toISOString().split('T')[0];
+  // Load T3's teams
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/teams/me');
+        const list = res.data.data;
+        setTeams(list);
+        if (list.length > 0) setSelectedTeamId(list[0]._id);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  // Fetch team attendance
-  const fetchAttendance = async () => {
-    setLoading(true);
+  // Load team data when team or date changes
+  const loadTeamData = async () => {
+    if (!selectedTeamId) return;
     try {
-      const [recRes, statRes] = await Promise.all([
-        api.get(`/attendance/team?teamName=${teamName}&date=${date}`),
-        api.get(`/attendance/team/stats?teamName=${teamName}&date=${date}`),
+      const [attRes, statsRes, histRes] = await Promise.all([
+        api.get(`/attendance/team?teamId=${selectedTeamId}&date=${selectedDate}`),
+        api.get(`/attendance/team/stats?teamId=${selectedTeamId}&date=${selectedDate}`),
+        api.get(`/attendance/team/history?teamId=${selectedTeamId}&days=7`),
       ]);
-      setRecords(recRes.data.data);
-      setStats(statRes.data.data);
+      setRoster(attRes.data.data.roster);
+      setTeamInfo(attRes.data.data.team);
+      setStats(statsRes.data.data);
+      setHistory(histRes.data.data.history);
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAttendance();
-  }, [teamName]);
-
-  // QR token generator (session-based)
-  const generateQR = () => {
-    const token = 'TBI-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    setQrToken(token);
-    setQrExpiry(300); // 5 min in seconds
-    setShowQR(true);
-
-    // Countdown
-    const timer = setInterval(() => {
-      setQrExpiry(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setShowQR(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
+    loadTeamData();
+  }, [selectedTeamId, selectedDate]);
 
   // Manual mark
   const submitManual = async (e) => {
     e.preventDefault();
+    if (!manualModal) return;
+    setSaving(true);
     try {
-      await api.post('/attendance/manual', {
-        studentName: form.studentName,
-        teamName,
-        status: form.status,
-        notes: form.notes,
-        date,
+      await api.post('/attendance/mark', {
+        studentId: manualModal.studentId,
+        teamId: selectedTeamId,
+        date: selectedDate,
+        status: manualForm.status,
+        notes: manualForm.notes,
       });
-      setManualModal(false);
-      setForm({ studentName: '', status: 'present', notes: '' });
-      fetchAttendance();
+      setManualModal(null);
+      setManualForm({ status: 'present', notes: '' });
+      await loadTeamData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to mark attendance');
+      alert(err.response?.data?.message || 'Failed to mark');
+    } finally {
+      setSaving(false);
     }
   };
+
+  // Download CSV
+  const downloadCSV = async () => {
+    setDownloading(true);
+    try {
+      const res = await api.get(`/attendance/download?teamId=${selectedTeamId}`);
+      const { csv, filename } = res.data.data;
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to download');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Generate QR token (frontend-only demo — students enter it manually)
+  const generateQRToken = () => `TBI-${Math.random().toString(36).substring(2, 8).toUpperCase()}-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
 
   const statusColor = {
     present: 'bg-green-100 text-green-700',
     late: 'bg-amber-100 text-amber-700',
     absent: 'bg-red-100 text-red-700',
+    on_leave: 'bg-blue-100 text-blue-700',
+    not_marked: 'bg-gray-100 text-gray-500',
   };
 
-  const formatTime = (d) => d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  if (loading) return <SkeletonTable rows={5} cols={5} />;
+
+  if (teams.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Attendance</h1>
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <UsersRound className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No teams assigned to you</h3>
+          <p className="text-sm text-gray-500">Ask an Admin to make you a Team Lead first.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold">Attendance</h1>
-          <p className="text-gray-500">{teamName} / {date}</p>
+          <p className="text-gray-500">Mark attendance and track team presence</p>
         </div>
-        <div className="flex gap-3">
-          <select value={teamName} onChange={(e) => setTeamName(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none">
-            <option value="Tech Team">Tech Team</option>
-            <option value="Media Team">Media Team</option>
-            <option value="Logistics">Logistics</option>
-          </select>
-          <button onClick={generateQR} className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 flex items-center gap-2">
-            <QrCode size={16} /> Generate QR
+        <div className="flex gap-2">
+          <button onClick={() => setShowQR(!showQR)} className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2 text-sm">
+            <QrCode size={16} /> {showQR ? 'Hide QR' : 'Generate QR'}
           </button>
-          <button onClick={() => setManualModal(true)} className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2">
-            <UserPlus size={16} /> Mark Manual
+          <button onClick={downloadCSV} disabled={downloading} className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm">
+            <Upload size={16} className="rotate-180" /> {downloading ? 'Downloading...' : 'Download CSV'}
           </button>
+        </div>
+      </div>
+
+      {/* Team + Date Selector */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Team</label>
+            <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
+              {teams.map((t) => (
+                <option key={t._id} value={t._id}>{t.name}{t.eventTitle ? ` — ${t.eventTitle}` : ''}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Date</label>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+          </div>
         </div>
       </div>
 
       {/* QR Display */}
       {showQR && (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 flex flex-col items-center">
-          <div className="w-64 h-64 bg-gray-100 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-purple-300 relative">
-            <QrCode className="w-32 h-32 text-purple-500" />
-            <p className="absolute bottom-3 text-xs font-mono font-bold text-purple-600">{qrToken}</p>
+        <div className="bg-white rounded-xl border border-purple-200 p-6 flex flex-col items-center">
+          <div className="w-48 h-48 bg-purple-50 border-2 border-dashed border-purple-300 rounded-lg flex items-center justify-center mb-4">
+            <QrCode className="w-24 h-24 text-purple-500" />
           </div>
-          <p className="text-sm text-gray-500 mt-4">Students scan this QR or enter the code</p>
-          <p className="text-xs text-amber-600 mt-1">Expires in {Math.floor(qrExpiry / 60)}:{String(qrExpiry % 60).padStart(2, '0')}</p>
+          <p className="text-xs text-gray-500 mb-2">Students can check-in with this code:</p>
+          <p className="text-lg font-mono font-bold text-purple-700 tracking-wider bg-purple-50 px-4 py-2 rounded-lg">
+            {generateQRToken()}
+          </p>
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-500">Total</p>
-          <p className="text-3xl font-bold mt-2">{stats.total}</p>
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500">Attendance Rate</p>
+            <p className="text-3xl font-bold mt-1 text-blue-600">{stats.percentage}%</p>
+            <p className="text-xs text-gray-400 mt-1">{stats.attended} of {stats.totalMembers} present</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500">Present</p>
+            <p className="text-3xl font-bold mt-1 text-green-600">{stats.present}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500">Late</p>
+            <p className="text-3xl font-bold mt-1 text-amber-600">{stats.late}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs text-gray-500">Absent</p>
+            <p className="text-3xl font-bold mt-1 text-red-600">{stats.absent}</p>
+          </div>
         </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-500">Present</p>
-          <p className="text-3xl font-bold mt-2 text-green-600">{stats.present}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-500">Late</p>
-          <p className="text-3xl font-bold mt-2 text-amber-600">{stats.late}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-500">Absent</p>
-          <p className="text-3xl font-bold mt-2 text-red-600">{stats.absent}</p>
-        </div>
-      </div>
+      )}
 
-      {/* Records table */}
-      {loading ? (
-        <SkeletonTable rows={5} cols={5} />
-      ) : records.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <CheckCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No attendance records</h3>
-          <p className="text-gray-500">Students haven't checked in yet</p>
+      {/* 7-Day History Chart */}
+      {history.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="font-semibold mb-4">Last 7 Days — Attendance %</h3>
+          <div className="flex items-end gap-2 h-32">
+            {history.map((d) => (
+              <div key={d.date} className="flex-1 flex flex-col items-center justify-end">
+                <div
+                  className={`w-full rounded-t transition-all ${d.percentage >= 75 ? 'bg-green-500' : d.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                  style={{ height: `${Math.max(d.percentage, 3)}%` }}
+                  title={`${d.date}: ${d.percentage}%`}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-xs text-gray-500 mt-2">
+            {history.map((d) => (
+              <span key={d.date}>{new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check In</th>
-                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check Out</th>
-                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Method</th>
+      )}
+
+      {/* Roster Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="font-semibold">Team Roster — {teamInfo?.name}</h3>
+          <p className="text-xs text-gray-500">{roster.length} members</p>
+        </div>
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Member</th>
+              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check In</th>
+              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Method</th>
+              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {roster.map((r) => (
+              <tr key={r.studentId} className="hover:bg-gray-50">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                      {r.studentName.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{r.studentName}</p>
+                      <p className="text-xs text-gray-500">{r.studentEmail}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[r.status]}`}>
+                    {r.status.replace('_', ' ')}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                </td>
+                <td className="px-6 py-4 text-xs text-gray-400 uppercase">{r.method || '—'}</td>
+                <td className="px-6 py-4">
+                  <button
+                    onClick={() => { setManualModal(r); setManualForm({ status: r.status === 'not_marked' ? 'present' : r.status, notes: '' }); }}
+                    className="text-xs text-blue-600 hover:underline font-medium"
+                  >
+                    {r.status === 'not_marked' ? 'Mark' : 'Update'}
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {records.map((r) => (
-                <tr key={r._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium">{r.studentName}</td>
-                  <td className="px-6 py-4">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[r.status]}`}>{r.status}</span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{formatTime(r.checkInTime)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{formatTime(r.checkOutTime)}</td>
-                  <td className="px-6 py-4 text-xs text-gray-400 uppercase">{r.method}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+            {roster.length === 0 && (
+              <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">No members in this team yet</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* Manual Mark Modal */}
       {manualModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setManualModal(false)} />
+          <div className="absolute inset-0 bg-black/50" onClick={() => setManualModal(null)} />
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
-            <h3 className="text-lg font-semibold mb-5">Mark Attendance — {teamName}</h3>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                {manualModal.studentName.charAt(0)}
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Mark Attendance</h3>
+                <p className="text-xs text-gray-500">{manualModal.studentName}</p>
+              </div>
+            </div>
+
             <form onSubmit={submitManual} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5">Student Name</label>
-                <input required value={form.studentName} onChange={(e) => setForm({ ...form, studentName: e.target.value })}
-                  placeholder="Enter student name"
-                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+                <label className="block text-sm font-medium mb-2">Status</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'present', label: 'Present', color: 'green' },
+                    { value: 'late', label: 'Late', color: 'amber' },
+                    { value: 'absent', label: 'Absent', color: 'red' },
+                    { value: 'on_leave', label: 'On Leave', color: 'blue' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, status: opt.value })}
+                      className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
+                        manualForm.status === opt.value
+                          ? `border-${opt.color}-500 bg-${opt.color}-50`
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Status</label>
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
-                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none">
-                  <option value="present">Present</option>
-                  <option value="late">Late</option>
-                  <option value="absent">Absent</option>
-                </select>
-              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1.5">Notes (optional)</label>
-                <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                <textarea rows={2} value={manualForm.notes} onChange={(e) => setManualForm({ ...manualForm, notes: e.target.value })}
                   placeholder="Reason, etc."
-                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500" />
               </div>
+
               <div className="flex gap-3 justify-end">
-                <button type="button" onClick={() => setManualModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">Mark</button>
+                <button type="button" onClick={() => setManualModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </form>
           </div>
@@ -2684,8 +2950,13 @@ export const NotificationsPage = () => {
     if (type === 'chat') return <MessageSquare className="w-5 h-5 text-green-500" />;
     if (type === 'certificate') return <Award className="w-5 h-5 text-amber-500" />;
     if (type === 'attendance') return <CheckCircle className="w-5 h-5 text-purple-500" />;
+    if (type === 'announcement') return <Bell className="w-5 h-5 text-indigo-600" />;
+    if (type === 'event') return <Calendar className="w-5 h-5 text-cyan-500" />;
+    if (type === 'review') return <Star className="w-5 h-5 text-yellow-500" />;
     return <Bell className="w-5 h-5 text-gray-500" />;
   };
+
+  const isAnnouncement = (type) => type === 'announcement';
 
   if (loading) return <div className="space-y-6"><Skeleton className="h-8 w-48" /><SkeletonTable rows={5} cols={2} /></div>;
 
@@ -2718,27 +2989,51 @@ export const NotificationsPage = () => {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {filtered.map((n, i) => (
-            <div
-              key={n._id}
-              onClick={() => !n.isRead && markRead(n._id)}
-              className={`p-4 flex gap-4 items-start cursor-pointer ${i > 0 ? 'border-t border-gray-100' : ''} ${!n.isRead ? 'bg-blue-50/30 hover:bg-blue-50/50' : 'hover:bg-gray-50'}`}
-            >
-              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                {iconFor(n.type)}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className={`text-sm ${n.isRead ? 'font-normal' : 'font-semibold'}`}>{n.title}</p>
-                  {!n.isRead && <span className="w-2 h-2 rounded-full bg-blue-500" />}
+          {filtered.map((n, i) => {
+            const isAnn = isAnnouncement(n.type);
+            return (
+              <div
+                key={n._id}
+                onClick={() => !n.isRead && markRead(n._id)}
+                className={`p-4 flex gap-4 items-start cursor-pointer transition ${
+                  i > 0 ? 'border-t border-gray-100' : ''
+                } ${
+                  isAnn
+                    ? !n.isRead
+                      ? 'bg-indigo-50 border-l-4 border-l-indigo-500 hover:bg-indigo-100'
+                      : 'bg-indigo-50/30 border-l-4 border-l-indigo-200 hover:bg-indigo-50/60'
+                    : !n.isRead
+                      ? 'bg-blue-50/30 hover:bg-blue-50/50'
+                      : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  isAnn ? 'bg-indigo-100' : 'bg-gray-100'
+                }`}>
+                  {iconFor(n.type)}
                 </div>
-                <p className="text-sm text-gray-600 mt-0.5">{n.message}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {new Date(n.createdAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className={`text-sm ${n.isRead ? 'font-normal' : 'font-semibold'} ${isAnn ? 'text-indigo-900' : ''}`}>
+                      {n.title}
+                    </p>
+                    {isAnn && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                        ANNOUNCEMENT
+                      </span>
+                    )}
+                    {!n.isRead && <span className={`w-2 h-2 rounded-full ${isAnn ? 'bg-indigo-500' : 'bg-blue-500'}`} />}
+                  </div>
+                  <p className={`text-sm mt-0.5 ${isAnn ? 'text-indigo-800' : 'text-gray-600'}`}>
+                    {n.message}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(n.createdAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -4028,6 +4323,30 @@ export const T3DashboardEnhanced = () => {
     })();
   }, []);
 
+  const [teamAttendance, setTeamAttendance] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const teamsRes = await api.get('/teams/me');
+        const list = teamsRes.data.data;
+        const withStats = await Promise.all(
+          list.map(async (t) => {
+            try {
+              const s = await api.get(`/attendance/team/stats?teamId=${t._id}`);
+              return { ...t, stats: s.data.data };
+            } catch {
+              return { ...t, stats: null };
+            }
+          })
+        );
+        setTeamAttendance(withStats);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, []);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -4041,6 +4360,7 @@ export const T3DashboardEnhanced = () => {
 
   return (
     <div className="space-y-6">
+      <AnnouncementBanner />
       <div>
         <h1 className="text-2xl font-bold">Hi {user.name.split(' ')[0]}</h1>
         <p className="text-gray-500">Your events and pending tasks</p>
@@ -4052,6 +4372,44 @@ export const T3DashboardEnhanced = () => {
         <KPI label="Pending Apps" value={stats.pendingApps} />
         <KPI label="Present Today" value={stats.attendanceToday} />
       </div>
+
+      {/* Team Attendance Percentages */}
+      {teamAttendance.length > 0 && (
+        <div className="bg-white p-5 rounded-xl border border-gray-200">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-lg">Team Attendance Today</h3>
+            <button onClick={() => navigate('/t3/attendance')} className="text-xs text-purple-500 hover:underline">
+              Manage →
+            </button>
+          </div>
+          <div className="space-y-3">
+            {teamAttendance.map((t) => {
+              const pct = t.stats?.percentage || 0;
+              return (
+                <div key={t._id}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium">{t.name}</span>
+                    <span className={`font-medium ${pct >= 75 ? 'text-green-600' : pct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {pct}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${pct >= 75 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  {t.stats && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {t.stats.attended} / {t.stats.totalMembers} present today
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Events list */}
       <div className="bg-white p-5 rounded-xl border border-gray-200">
@@ -4125,6 +4483,19 @@ export const T2DashboardEnhanced = () => {
     })();
   }, []);
 
+  const [myAttendance, setMyAttendance] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/attendance/my-stats?days=30');
+        setMyAttendance(res.data.data);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, []);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -4138,6 +4509,7 @@ export const T2DashboardEnhanced = () => {
 
   return (
     <div className="space-y-6">
+      <AnnouncementBanner />
       <div>
         <h1 className="text-2xl font-bold">Hey {user.name.split(' ')[0]}</h1>
         <p className="text-gray-500">Here's your activity</p>
@@ -4156,6 +4528,42 @@ export const T2DashboardEnhanced = () => {
         <KPI label="Certificates" value={stats.certificates} />
         <div></div>
       </div>
+
+      {/* Personal Attendance Card */}
+      {myAttendance && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-semibold">My Attendance (30 Days)</h3>
+            <button onClick={() => navigate('/t1/checkin')} className="text-xs text-blue-500 hover:underline">
+              View →
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-2xl font-bold text-blue-600">{myAttendance.percentage}%</p>
+              <p className="text-xs text-gray-500 mt-0.5">Attendance Rate</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-purple-600">{myAttendance.totalHours}h</p>
+              <p className="text-xs text-gray-500 mt-0.5">Total Hours</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100 text-center">
+            <div>
+              <p className="text-lg font-bold text-green-600">{myAttendance.present}</p>
+              <p className="text-[10px] text-gray-500 uppercase">Present</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-amber-600">{myAttendance.late}</p>
+              <p className="text-[10px] text-gray-500 uppercase">Late</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-red-600">{myAttendance.absent}</p>
+              <p className="text-[10px] text-gray-500 uppercase">Absent</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -5393,50 +5801,76 @@ export const AnnouncementsPage = () => {
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ title: '', message: '', target: 'ALL', targetTeamId: '' });
+  const [form, setForm] = useState({ title: '', message: '', target: 'ALL', targetTeamId: '', targetEventId: '' });
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
   const isT3 = user.role === 'T3_EXECUTIVE';
   const isT2 = user.role === 'T2_ASSOCIATE';
   const canCreate = isAdmin || isT3 || isT2;
 
-  const fetchData = async () => {
+  // Load announcements + teams + events
+  const fetchAll = async () => {
     try {
-      const [annRes, teamsRes] = await Promise.all([
+      const [annRes, teamsRes, eventsRes] = await Promise.all([
         api.get('/announcements'),
-        (isT3 || isT2) ? api.get('/teams/me') : Promise.resolve({ data: { data: [] } }),
+        (isT3 || isT2) ? api.get('/teams/me') : api.get('/teams'),
+        (isT3 || isT2) ? api.get('/events/me') : api.get('/events'),
       ]);
       setAnnouncements(annRes.data.data);
       setTeams(teamsRes.data.data);
+      setEvents(eventsRes.data.data);
     } catch (err) {
-      console.error(err);
+      console.error('Load failed:', err);
+      setLoadError(err.response?.data?.message || err.message);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchAll();
   }, []);
+
+  // Default target based on role
+  useEffect(() => {
+    if (isT3 || isT2) {
+      setForm((f) => ({ ...f, target: 'TEAM' }));
+    } else if (isAdmin) {
+      setForm((f) => ({ ...f, target: 'ALL' }));
+    }
+  }, [user.role]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const payload = { ...form };
-      if (payload.target !== 'TEAM') delete payload.targetTeamId;
-      if (!payload.targetTeamId) delete payload.targetTeamId;
+      const payload = {
+        title: form.title.trim(),
+        message: form.message.trim(),
+        target: form.target,
+      };
+
+      if (form.target === 'TEAM') {
+        if (!form.targetTeamId) throw new Error('Please select a team');
+        payload.targetTeamId = form.targetTeamId;
+      }
+      if (form.target === 'EVENT') {
+        if (!form.targetEventId) throw new Error('Please select an event');
+        payload.targetEventId = form.targetEventId;
+      }
 
       await api.post('/announcements', payload);
       setModal(false);
-      setForm({ title: '', message: '', target: 'ALL', targetTeamId: '' });
-      await fetchData();
-      alert('Announcement sent');
+      setForm({ title: '', message: '', target: isAdmin ? 'ALL' : 'TEAM', targetTeamId: '', targetEventId: '' });
+      await fetchAll();
+      alert('Announcement sent successfully');
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to send');
+      alert(err.response?.data?.message || err.message || 'Failed to send');
     } finally {
       setSaving(false);
     }
@@ -5454,8 +5888,8 @@ export const AnnouncementsPage = () => {
 
   const targetLabel = (ann) => {
     if (ann.target === 'ALL') return 'Everyone';
-    if (ann.target === 'TEAM') return `Team: ${ann.targetTeamName}`;
-    if (ann.target === 'EVENT') return `Event: ${ann.targetEventTitle}`;
+    if (ann.target === 'TEAM') return `Team: ${ann.targetTeamName || 'Unknown'}`;
+    if (ann.target === 'EVENT') return `Event: ${ann.targetEventTitle || 'Unknown'}`;
     return ann.target;
   };
 
@@ -5467,9 +5901,8 @@ export const AnnouncementsPage = () => {
         <div>
           <h1 className="text-2xl font-bold">Announcements</h1>
           <p className="text-gray-500">
-            {isAdmin
-              ? 'Broadcast messages to everyone'
-              : 'Send messages to your team'}
+            {isAdmin ? 'Broadcast messages to everyone or specific events' :
+             'Send messages to your team'}
           </p>
         </div>
         {canCreate && (
@@ -5481,6 +5914,12 @@ export const AnnouncementsPage = () => {
           </button>
         )}
       </div>
+
+      {loadError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+          Failed to load: {loadError}
+        </div>
+      )}
 
       {announcements.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
@@ -5558,27 +5997,73 @@ export const AnnouncementsPage = () => {
                 />
               </div>
 
+              {/* ADMIN / SUPER ADMIN TARGET OPTIONS */}
               {isAdmin && (
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Send to</label>
-                  <select
-                    value={form.target}
-                    onChange={(e) => setForm({ ...form, target: e.target.value })}
-                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none"
-                  >
-                    <option value="ALL">Everyone on the platform</option>
-                  </select>
+                  <label className="block text-sm font-medium mb-1.5">Send To *</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, target: 'ALL', targetTeamId: '', targetEventId: '' })}
+                      className={`p-4 rounded-lg border-2 text-left transition ${
+                        form.target === 'ALL'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Users className="w-5 h-5 text-blue-500 mb-2" />
+                      <p className="text-sm font-semibold">Everyone</p>
+                      <p className="text-xs text-gray-500 mt-0.5">All active users</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, target: 'EVENT', targetTeamId: '', targetEventId: '' })}
+                      className={`p-4 rounded-lg border-2 text-left transition ${
+                        form.target === 'EVENT'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Calendar className="w-5 h-5 text-purple-500 mb-2" />
+                      <p className="text-sm font-semibold">Specific Event</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Event members only</p>
+                    </button>
+                  </div>
                 </div>
               )}
 
+              {/* EVENT SELECTOR (when target = EVENT) */}
+              {isAdmin && form.target === 'EVENT' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Select Event *</label>
+                  <select
+                    required
+                    value={form.targetEventId}
+                    onChange={(e) => setForm({ ...form, targetEventId: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+                  >
+                    <option value="">Choose an event...</option>
+                    {events.map((ev) => (
+                      <option key={ev._id} value={ev._id}>
+                        {ev.title} {ev.date ? `(${ev.date})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {events.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">No events available yet</p>
+                  )}
+                </div>
+              )}
+
+              {/* TEAM SELECTOR (for T3/T2) */}
               {(isT3 || isT2) && (
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Send to Team *</label>
+                  <label className="block text-sm font-medium mb-1.5">Send To Team *</label>
                   <select
                     required
                     value={form.targetTeamId}
                     onChange={(e) => setForm({ ...form, target: 'TEAM', targetTeamId: e.target.value })}
-                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none"
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
                   >
                     <option value="">Select a team...</option>
                     {teams.map((t) => (
@@ -5587,6 +6072,11 @@ export const AnnouncementsPage = () => {
                       </option>
                     ))}
                   </select>
+                  {teams.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      You aren't part of any team yet. Ask your Admin to add you to a team.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -5611,6 +6101,155 @@ export const AnnouncementsPage = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+
+// ====================================================================
+// ANNOUNCEMENT POPUP — Shows unread announcements on login
+// ====================================================================
+export const AnnouncementPopup = () => {
+  const { user } = useAuth();
+  const [announcements, setAnnouncements] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const checkKey = `announcements_shown_${user._id}_${new Date().toDateString()}`;
+    const alreadyShown = sessionStorage.getItem(checkKey);
+    if (alreadyShown) return;
+
+    const fetchUnread = async () => {
+      try {
+        const res = await api.get('/announcements');
+        const list = res.data.data || [];
+        // Show only last 24 hours of announcements
+        const recent = list.filter((a) => {
+          const created = new Date(a.createdAt).getTime();
+          const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+          return created > dayAgo;
+        }).slice(0, 5);
+
+        if (recent.length > 0) {
+          setAnnouncements(recent);
+          setCurrentIndex(0);
+          setVisible(true);
+          sessionStorage.setItem(checkKey, 'true');
+        }
+      } catch (err) {
+        // Silent fail — don't block the app
+      }
+    };
+
+    // Small delay so the app can load
+    setTimeout(fetchUnread, 800);
+  }, [user]);
+
+  if (!visible || announcements.length === 0) return null;
+
+  const current = announcements[currentIndex];
+  const isLast = currentIndex === announcements.length - 1;
+
+  const handleNext = () => {
+    if (isLast) {
+      setVisible(false);
+    } else {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
+
+  const handleDismiss = () => setVisible(false);
+
+  const targetLabel = (a) => {
+    if (a.target === 'ALL') return 'Everyone';
+    if (a.target === 'TEAM') return `Team: ${a.targetTeamName || ''}`;
+    if (a.target === 'EVENT') return `Event: ${a.targetEventTitle || ''}`;
+    return a.target;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleDismiss} />
+
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 text-white">
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <Bell className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider opacity-90 font-medium">
+                  {announcements.length > 1 ? `Announcement ${currentIndex + 1} of ${announcements.length}` : 'Announcement'}
+                </p>
+                <p className="font-semibold text-lg">You have new updates</p>
+              </div>
+            </div>
+            <button onClick={handleDismiss} className="text-white/70 hover:text-white">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="inline-block text-xs bg-white/20 px-2 py-1 rounded-full font-medium">
+            {targetLabel(current)}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-3">{current.title}</h3>
+
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line mb-5">
+            {current.message}
+          </p>
+
+          <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+            <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
+              <UserIcon className="w-4 h-4 text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-900">{current.createdByName}</p>
+              <p className="text-[11px] text-gray-500">
+                {current.createdByRole.replace('_', ' ')} / {new Date(current.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-6 flex items-center justify-between gap-3">
+          {/* Dots indicator */}
+          {announcements.length > 1 && (
+            <div className="flex gap-1.5">
+              {announcements.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === currentIndex ? 'w-6 bg-blue-500' : 'w-1.5 bg-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 ml-auto">
+            <button
+              onClick={handleDismiss}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
+            >
+              Dismiss
+            </button>
+            <button
+              onClick={handleNext}
+              className="px-5 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 text-sm"
+            >
+              {isLast ? 'Got it' : 'Next'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
