@@ -63,3 +63,9 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - **What**: `rules.md` Section 0 now states an explicit session-start rule — Antigravity must read `memory.md` first at the start of every session/task, before repo or other docs. All 7 markdown docs (`prd`, `architecture`, `rules`, `phases`, `designe`, `memory`, `CHANGELOG-decisions`) converted to `.docx` via pandoc for distribution.
 - **Reason**: Makes the “read `memory.md` first” behavior an unambiguous trigger tied to session start, not just a general principle; `.docx` requested for sharing outside the repo.
 - **Where**: `docs/rules.md` (Section 0), all `docs/*.docx`
+
+### [2026-09-30] Attendance upsert error handling & stale index fallback
+- **What**: Wrapped attendance upsert in try/catch with fallback to plain update on E11000 duplicate key error.
+- **Reason**: Gracefully recovers from race conditions or duplicate key collisions from stale indexes during attendance marking without failing the operation.
+- **Where**: `apps/api/src/modules/attendance/attendance.service.js`
+

@@ -9,7 +9,8 @@ import {
   AdminManagementPage, AuditLogsPage, SessionsPage, AnalyticsPage,
   Chat, NotificationsPage, ReviewsPage, QRCheckIn, Placeholder,
   EventDetailPage, ProfilePage, MyReviewsPage,
-  ChangePasswordPage, PreferencesPage, AnnouncementsPage
+  ChangePasswordPage, PreferencesPage, AnnouncementsPage,
+  TimesheetPage
 } from './pages';
 
 const RootRedirect = () => {
@@ -80,6 +81,8 @@ function App() {
             <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/preferences" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />
+            <Route path="/timesheets" element={<ProtectedRoute><TimesheetPage /></ProtectedRoute>} />
+
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

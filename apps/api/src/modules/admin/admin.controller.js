@@ -52,7 +52,7 @@ exports.revokeUser = async (req, res) => {
 
 exports.deleteUser = async (req, res) => {
   try {
-    await adminService.deleteUser(req.params.id);
+    await adminService.deleteUser(req.params.id, req.user.sub);
     res.status(200).json({ success: true, message: 'User deleted' });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -63,15 +63,17 @@ exports.deleteUser = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { user, tempPassword, emailSent } = await adminService.resetPassword(req.params.id, req.user?.sub);
-    res.status(200).json({
+    const responseBody = {
       success: true,
       message: emailSent
         ? `Password reset. New credentials emailed to ${user.email}.`
         : `Password reset. Email delivery failed — share password manually.`,
       data: user,
-      tempPassword,
       emailSent,
-    });
+    };
+    // C5: Only expose tempPassword when email delivery failed
+    if (!emailSent && tempPassword) responseBody.tempPassword = tempPassword;
+    res.status(200).json(responseBody);
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
@@ -80,7 +82,7 @@ exports.resetPassword = async (req, res) => {
 exports.setPassword = async (req, res) => {
   try {
     const { newPassword } = req.body;
-    const user = await adminService.setPassword(req.params.id, newPassword);
+    const user = await adminService.setPassword(req.params.id, newPassword, req.user.sub);
     res.status(200).json({
       success: true,
       message: 'Password updated successfully.',
@@ -95,12 +97,14 @@ exports.setPassword = async (req, res) => {
 exports.reactivateUser = async (req, res) => {
   try {
     const result = await adminService.reactivateUser(req.params.id, req.user.sub);
-    res.status(200).json({
+    const responseBody = {
       success: true,
       message: `${result.name}'s access has been reactivated. New credentials emailed.`,
-      data: result,
-      tempPassword: result.tempPassword,
-    });
+      data: { userId: result.userId, name: result.name, email: result.email },
+    };
+    // C5: Only expose tempPassword if it was returned (email failed)
+    if (result.tempPassword) responseBody.tempPassword = result.tempPassword;
+    res.status(200).json(responseBody);
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }

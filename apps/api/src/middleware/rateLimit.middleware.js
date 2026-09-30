@@ -47,7 +47,8 @@ exports.createUserLimiter = (req, res, next) => {
 
   userCreateRequests.set(ip, record);
 
-  if (record.count > 30) {
+  // H7: Limit to 5 user creations per minute per IP (was 30)
+  if (record.count > 5) {
     return res.status(429).json({
       success: false,
       message: 'Too many user creation requests, please try again later.',

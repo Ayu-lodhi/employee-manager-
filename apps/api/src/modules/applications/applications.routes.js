@@ -1,13 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const appController = require('./applications.controller');
+const controller = require('./applications.controller');
 const { protect, restrictTo } = require('../auth/auth.middleware');
 
 router.use(protect);
 
-router.get('/', restrictTo('ADMIN', 'SUPER_ADMIN', 'T3_EXECUTIVE'), appController.getApplications);
-router.get('/me', appController.getMyApplications);
-router.post('/', restrictTo('T1_VOLUNTEER', 'T2_ASSOCIATE'), appController.createApplication);
-router.patch('/:id/status', restrictTo('ADMIN', 'SUPER_ADMIN', 'T3_EXECUTIVE'), appController.updateStatus);
+// Admin/T3 can see all applications
+router.get('/', restrictTo('ADMIN', 'SUPER_ADMIN', 'T3_EXECUTIVE'), controller.getApplications);
+
+// Student's own applications
+router.get('/me', controller.getMyApplications);
+
+// T1/T2 apply
+router.post('/', restrictTo('T1_VOLUNTEER', 'T2_ASSOCIATE'), controller.createApplication);
+
+// Approve/Reject/Waitlist (T3/Admin)
+router.patch('/:id/status', restrictTo('T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'), controller.updateStatus);
 
 module.exports = router;

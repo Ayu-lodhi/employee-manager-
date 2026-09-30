@@ -2,18 +2,23 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../admin/admin.model');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'tbi_super_secret_key_change_in_production';
-const JWT_EXPIRY = '7d';      // DEV: 7 days. Change to '15m' in production.
-const REFRESH_EXPIRY = '30d';
+// Fail hard at startup if JWT_SECRET is missing or too short
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error('FATAL: JWT_SECRET is missing or too short (min 32 chars). Set it in .env.');
+}
+const JWT_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
+const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 
 exports.login = async (email, password) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user) throw new Error('Invalid credentials');
   if (!user.isActive) throw new Error('Account is deactivated');
 
-  const isValid = user.password && user.password.startsWith('$2')
-    ? await bcrypt.compare(password, user.password)
-    : password === user.password;
+  if (!user.password || !user.password.startsWith('$2')) {
+    throw new Error('Invalid credentials');
+  }
+  const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) throw new Error('Invalid credentials');
 
   const accessToken = jwt.sign(
@@ -51,9 +56,10 @@ exports.changePassword = async (userId, oldPassword, newPassword) => {
   const user = await User.findById(userId).select('+password');
   if (!user) throw new Error('User not found');
 
-  const isValid = user.password && user.password.startsWith('$2')
-    ? await bcrypt.compare(oldPassword, user.password)
-    : oldPassword === user.password;
+  if (!user.password || !user.password.startsWith('$2')) {
+    throw new Error('Current password is invalid — contact support');
+  }
+  const isValid = await bcrypt.compare(oldPassword, user.password);
   if (!isValid) throw new Error('Current password is incorrect');
 
   if (!newPassword || newPassword.length < 8) {

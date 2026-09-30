@@ -1,6 +1,6 @@
 const express = require('express');
 
-const jsonParser = express.json({ limit: '10mb' });
+const jsonParser = express.json({ limit: '100kb' }); // M10: was 10mb — reduced to prevent DoS
 const urlencodedParser = express.urlencoded({ extended: true });
 
 const securityHeaders = (req, res, next) => {

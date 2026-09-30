@@ -137,7 +137,7 @@ const MENUS = {
     },
     {
       section: 'MANAGEMENT', items: [
-        { icon: Users, label: 'Users', to: '/admin/users', badge: 2 },
+        { icon: Users, label: 'Users', to: '/admin/users' },
         { icon: UserPlus, label: 'Add User', to: '/admin/users/new' },
         { icon: Upload, label: 'Bulk Import', to: '/admin/users/bulk' },
       ]
@@ -147,12 +147,13 @@ const MENUS = {
         { icon: Calendar, label: 'Events', to: '/admin/events' },
         { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
         { icon: Bell, label: 'Announcements', to: '/announcements' },
+        { icon: Clock, label: 'Timesheets', to: '/timesheets' },
       ]
     },
     {
       section: 'SYSTEM CONTROL', items: [
         { icon: UserIcon, label: 'Admins', to: '/super-admin/admins' },
-        { icon: ScrollText, label: 'Audit Logs', to: '/super-admin/audit', badge: 3 },
+        { icon: ScrollText, label: 'Audit Logs', to: '/super-admin/audit' },
         { icon: Monitor, label: 'Sessions', to: '/super-admin/sessions' },
         { icon: UserIcon, label: 'My Profile', to: '/profile' },
         { icon: Settings, label: 'Preferences', to: '/preferences' },
@@ -173,6 +174,7 @@ const MENUS = {
       { icon: Calendar, label: 'Events', to: '/admin/events' },
       { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
       { icon: Bell, label: 'Announcements', to: '/announcements' },
+      { icon: Clock, label: 'Timesheets', to: '/timesheets' },
     ]},
     { section: 'ACCOUNT', items: [
       { icon: UserIcon, label: 'My Profile', to: '/profile' },
@@ -185,6 +187,7 @@ const MENUS = {
       { icon: UsersRound, label: 'My Teams', to: '/t3/teams' },
       { icon: FileText, label: 'Applications', to: '/t3/applications' },
       { icon: CheckCircle, label: 'Attendance', to: '/t3/attendance' },
+      { icon: Clock, label: 'Timesheets', to: '/timesheets' },
     ]},
     { section: 'COMMUNICATION', items: [
       { icon: MessageSquare, label: 'Team Chats', to: '/chat' },
@@ -202,13 +205,14 @@ const MENUS = {
       section: 'MY WORKSPACE', items: [
         { icon: LayoutDashboard, label: 'Dashboard', to: '/t2' },
         { icon: Calendar, label: 'Browse Events', to: '/t2/events' },
-        { icon: FileText, label: 'My Applications', to: '/t2/applications', badge: 3 },
+        { icon: FileText, label: 'My Applications', to: '/t2/applications' },
         { icon: Clock, label: 'My Shifts', to: '/t2/shifts' },
+        { icon: Clock, label: 'Timesheets', to: '/timesheets' },
       ]
     },
     {
       section: 'COMMUNICATION', items: [
-        { icon: MessageSquare, label: 'Team Chats', to: '/chat', badge: 2 },
+        { icon: MessageSquare, label: 'Team Chats', to: '/chat' },
         { icon: Bell, label: 'Announcements', to: '/announcements' },
       ]
     },
@@ -227,6 +231,7 @@ const MENUS = {
         { icon: Calendar, label: 'Browse Events', to: '/t1/events' },
         { icon: QrCode, label: 'QR Check-In', to: '/t1/checkin' },
         { icon: Award, label: 'Certificates', to: '/t1/certificates' },
+        { icon: Clock, label: 'Timesheets', to: '/timesheets' },
       ]
     },
     {
@@ -312,16 +317,21 @@ export const Login = () => {
             </button>
           </form>
           <div className="mt-6 pt-6 border-t border-gray-100">
-            <p className="text-xs text-gray-500 mb-3 text-center">Quick Demo Login</p>
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => quickLogin('super@tbi.org', 'super123')} className="text-xs py-2 px-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 font-medium">Super Admin</button>
-              <button onClick={() => quickLogin('admin@tbi.org', 'admin123')} className="text-xs py-2 px-2 bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 font-medium">Admin</button>
-              <button onClick={() => quickLogin('mayank@tbi.org', 'mayank123')} className="text-xs py-2 px-2 bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 font-medium">T3 Exec</button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <button onClick={() => quickLogin('abhishek@tbi.org', 'abhishek123')} className="text-xs py-2 px-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium">T2 Assoc</button>
-              <button onClick={() => quickLogin('ayush@tbi.org', 'ayush123')} className="text-xs py-2 px-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 font-medium">T1 Vol</button>
-            </div>
+            {/* C1: Demo login buttons — only visible in development */}
+            {import.meta.env.VITE_DEV_MODE === 'true' && (
+              <>
+                <p className="text-xs text-gray-500 mb-3 text-center">Quick Demo Login</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => quickLogin('super@tbi.org', 'Super@123')} className="text-xs py-2 px-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 font-medium">Super Admin</button>
+                  <button onClick={() => quickLogin('admin@tbi.org', 'Admin@123')} className="text-xs py-2 px-2 bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 font-medium">Admin</button>
+                  <button onClick={() => quickLogin('mayank@tbi.org', 'Mayank@123')} className="text-xs py-2 px-2 bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 font-medium">T3 Exec</button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <button onClick={() => quickLogin('abhishek@tbi.org', 'Abhishek@123')} className="text-xs py-2 px-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium">T2 Assoc</button>
+                  <button onClick={() => quickLogin('ayush@tbi.org', 'Ayush@123')} className="text-xs py-2 px-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 font-medium">T1 Vol</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -2135,74 +2145,95 @@ export const EventsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const canCreate = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+  const canApply = user.role === 'T1_VOLUNTEER' || user.role === 'T2_ASSOCIATE';
 
   const [events, setEvents] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [myApplications, setMyApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({
-    title: '',
-    date: '',
-    location: '',
-    description: '',
-    headId: '',
-    memberIds: [],
-  });
+  const [form, setForm] = useState({ title: '', date: '', location: '', description: '', headId: '' });
   const [saving, setSaving] = useState(false);
-  const [memberSearch, setMemberSearch] = useState('');
+  const [applyModal, setApplyModal] = useState(null);  // event obj
+  const [teams, setTeams] = useState([]);
+  const [applyForm, setApplyForm] = useState({ teamId: '', role: 'Team Member', notes: '' });
+  const [applying, setApplying] = useState(false);
+  const [users, setUsers] = useState([]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [eventsRes, usersRes] = await Promise.all([
-          api.get('/events'),
-          canCreate ? api.get('/admin/users') : Promise.resolve({ data: { data: [] } }),
-        ]);
-        setEvents(eventsRes.data.data);
-        setUsers(usersRes.data.data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [canCreate]);
+  const fetchData = async () => {
+    try {
+      const promises = [api.get('/events')];
+      if (canCreate) promises.push(api.get('/admin/users'));
+      if (canApply) promises.push(api.get('/applications/me'));
 
-  const toggleMember = (userId) => {
-    setForm((f) => ({
-      ...f,
-      memberIds: f.memberIds.includes(userId)
-        ? f.memberIds.filter((id) => id !== userId)
-        : [...f.memberIds, userId],
-    }));
+      const results = await Promise.all(promises);
+      setEvents(results[0].data.data);
+      if (canCreate) setUsers(results[1].data.data);
+      if (canApply) setMyApplications(results[1].data.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  // Open apply modal → fetch teams for this event
+  const openApplyModal = async (ev) => {
+    try {
+      const teamsRes = await api.get('/teams');
+      const eventTeams = teamsRes.data.data.filter((t) => t.eventId === ev._id || t.eventTitle === ev.title);
+      setTeams(eventTeams);
+      setApplyForm({ teamId: eventTeams[0]?._id || '', role: 'Team Member', notes: '' });
+      setApplyModal(ev);
+    } catch (err) {
+      alert('Failed to load teams');
+    }
+  };
+
+  // Submit application
+  const handleApply = async (e) => {
+    e.preventDefault();
+    if (!applyForm.teamId) return alert('Please select a team');
+    setApplying(true);
+    try {
+      await api.post('/applications', applyForm);
+      setApplyModal(null);
+      await fetchData();
+      alert('Application submitted. Wait for the team lead to review.');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to apply');
+    } finally {
+      setApplying(false);
+    }
   };
 
   const addEvent = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      // Clean payload — no empty strings
       const payload = {
         title: form.title,
         date: form.date,
         location: form.location,
-        description: form.description || '',
+        description: form.description,
       };
       if (form.headId) payload.headId = form.headId;
-      if (form.memberIds.length > 0) payload.memberIds = form.memberIds;
-
       const res = await api.post('/events', payload);
       setEvents([res.data.data, ...events]);
       setModal(false);
-      setForm({ title: '', date: '', location: '', description: '', headId: '', memberIds: [] });
-      setMemberSearch('');
-      alert('Event created! Notifications sent.');
+      setForm({ title: '', date: '', location: '', description: '', headId: '' });
+      alert('Event created successfully');
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to create event');
     } finally {
       setSaving(false);
     }
   };
+
+  const hasApplied = (ev) => myApplications.some((a) => a.eventId === ev._id || a.eventTitle === ev.title);
+
+  if (loading) return <SkeletonCardGrid count={3} />;
 
   const statusColor = {
     published: 'bg-green-100 text-green-700',
@@ -2211,25 +2242,17 @@ export const EventsPage = () => {
   };
 
   const eligibleHeads = users.filter((u) =>
-    ['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(u.role) && u._id !== user._id
+    ['T3_EXECUTIVE', 'ADMIN'].includes(u.role) && u._id !== user._id
   );
-
-  const eligibleMembers = users.filter((u) =>
-    ['T1_VOLUNTEER', 'T2_ASSOCIATE', 'T3_EXECUTIVE'].includes(u.role) &&
-    u._id !== user._id &&
-    u._id !== form.headId &&
-    (u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(memberSearch.toLowerCase()))
-  );
-
-  if (loading) return <div className="space-y-6"><Skeleton className="h-8 w-48" /><SkeletonCardGrid count={3} /></div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Events</h1>
-          <p className="text-gray-500">{canCreate ? 'Create and manage events' : 'Browse events'}</p>
+          <p className="text-gray-500">
+            {canCreate ? 'Create and manage events' : 'Browse and apply to events'}
+          </p>
         </div>
         {canCreate && (
           <button onClick={() => setModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">
@@ -2245,47 +2268,108 @@ export const EventsPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.map((ev) => (
-            <div key={ev._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition">
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="font-semibold text-lg">{ev.title}</h3>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[ev.status]}`}>{ev.status}</span>
-              </div>
-              <p className="text-sm text-gray-500 flex items-center gap-1 mb-1"><Calendar size={14} /> {ev.date}</p>
-              <p className="text-sm text-gray-500 flex items-center gap-1 mb-3"><MapPin size={14} /> {ev.location}</p>
-
-              {ev.headName && (
-                <div className="flex items-center gap-2 mb-3 p-2 bg-purple-50 rounded-lg border border-purple-100">
-                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                    {ev.headName.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-purple-600 font-semibold uppercase">Event Head</p>
-                    <p className="text-xs text-purple-800 font-medium truncate">{ev.headName}</p>
-                  </div>
+          {events.map((ev) => {
+            const applied = canApply && hasApplied(ev);
+            return (
+              <div key={ev._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition">
+                <div className="flex items-start justify-between mb-3">
+                  <h3 className="font-semibold text-lg">{ev.title}</h3>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[ev.status]}`}>{ev.status}</span>
                 </div>
-              )}
 
-              <div className="flex justify-between text-xs text-gray-500 mb-3 pt-2 border-t border-gray-100">
-                <span><Users size={12} className="inline" /> {ev.memberCount || 0} members</span>
+                <p className="text-sm text-gray-500 flex items-center gap-1 mb-1"><Calendar size={14} /> {ev.date}</p>
+                <p className="text-sm text-gray-500 flex items-center gap-1 mb-3"><MapPin size={14} /> {ev.location}</p>
+
+                {ev.headName && (
+                  <div className="flex items-center gap-2 mb-3 p-2 bg-purple-50 rounded-lg">
+                    <div className="w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center text-white text-[10px] font-bold">
+                      {ev.headName.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[9px] text-purple-600 font-semibold uppercase">Event Head</p>
+                      <p className="text-xs text-purple-800 font-medium truncate">{ev.headName}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-gray-100">
+                  {canCreate ? (
+                    <button onClick={() => navigate(`/admin/events/${ev._id}`)} className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600">
+                      View Details
+                    </button>
+                  ) : applied ? (
+                    <div className="text-center py-2">
+                      <span className="text-xs text-green-600 font-medium flex items-center justify-center gap-1">
+                        <CheckCircle size={14} /> Already Applied
+                      </span>
+                    </div>
+                  ) : (
+                    <button onClick={() => openApplyModal(ev)} className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600">
+                      Apply Now
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Apply Modal */}
+      {applyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setApplyModal(null)} />
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <h3 className="text-lg font-semibold mb-1">Apply to Event</h3>
+            <p className="text-sm text-gray-500 mb-5">{applyModal.title}</p>
+
+            <form onSubmit={handleApply} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Select Team</label>
+                {teams.length === 0 ? (
+                  <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg">
+                    No teams available for this event yet.
+                  </p>
+                ) : (
+                  <select required value={applyForm.teamId} onChange={(e) => setApplyForm({ ...applyForm, teamId: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
+                    <option value="">Select a team...</option>
+                    {teams.map((t) => (<option key={t._id} value={t._id}>{t.name} — Lead: {t.leadName || 'TBD'}</option>))}
+                  </select>
+                )}
               </div>
 
-              <button
-                onClick={() => navigate(canCreate ? `/admin/events/${ev._id}` : `/t3/events/${ev._id}`)}
-                className="w-full px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600"
-              >
-                View Details
-              </button>
-            </div>
-          ))}
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Preferred Role</label>
+                <input value={applyForm.role} onChange={(e) => setApplyForm({ ...applyForm, role: e.target.value })}
+                  placeholder="e.g. Coordinator, Volunteer"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Notes (optional)</label>
+                <textarea rows={3} value={applyForm.notes} onChange={(e) => setApplyForm({ ...applyForm, notes: e.target.value })}
+                  placeholder="Why do you want to join?"
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500" />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setApplyModal(null)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" disabled={applying || teams.length === 0}
+                  className="px-5 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  {applying ? 'Submitting...' : 'Submit Application'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
       {/* Create Event Modal */}
-      {modal && (
+      {modal && canCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setModal(false)} />
-          <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-semibold">Create Event</h3>
               <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
@@ -2294,10 +2378,9 @@ export const EventsPage = () => {
               <div>
                 <label className="block text-sm font-medium mb-1.5">Event Title *</label>
                 <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="e.g. Annual Tech Fest 2026"
+                  placeholder="e.g. Hackathon 2026"
                   className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Date *</label>
@@ -2307,66 +2390,24 @@ export const EventsPage = () => {
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Location *</label>
                   <input required value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
-                    placeholder="e.g. Main Auditorium"
+                    placeholder="Main Hall"
                     className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1.5">Event Head *</label>
                 <select required value={form.headId} onChange={(e) => setForm({ ...form, headId: e.target.value })}
                   className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
                   <option value="">Select an event head...</option>
-                  {eligibleHeads.map((u) => (
-                    <option key={u._id} value={u._id}>{u.name} — {u.role.replace('_', ' ')}</option>
-                  ))}
+                  {eligibleHeads.map((u) => (<option key={u._id} value={u._id}>{u.name} — {u.role.replace('_', ' ')}</option>))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Head coordinates the entire event</p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Add Members (Optional)</label>
-                <div className="bg-gray-50 rounded-lg p-3 mb-2">
-                  <div className="flex items-center gap-2">
-                    <Search size={16} className="text-gray-400" />
-                    <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
-                      placeholder="Search users..."
-                      className="flex-1 bg-transparent border-none outline-none text-sm" />
-                  </div>
-                </div>
-                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
-                  {eligibleMembers.length === 0 ? (
-                    <p className="text-center text-gray-500 py-6 text-sm">No users available</p>
-                  ) : eligibleMembers.map((u) => (
-                    <label key={u._id} className="flex items-center justify-between p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <input type="checkbox" checked={form.memberIds.includes(u._id)}
-                          onChange={() => toggleMember(u._id)} className="w-4 h-4" />
-                        <div>
-                          <p className="text-sm font-medium">{u.name}</p>
-                          <p className="text-xs text-gray-500">{u.email}</p>
-                        </div>
-                      </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
-                          u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
-                            'bg-purple-100 text-purple-700'
-                        }`}>{u.role.replace('_', ' ')}</span>
-                    </label>
-                  ))}
-                </div>
-                {form.memberIds.length > 0 && (
-                  <p className="text-xs text-blue-600 mt-1">{form.memberIds.length} member(s) selected</p>
-                )}
-              </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1.5">Description</label>
                 <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="What's this event about?"
                   className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500" />
               </div>
-
-              <div className="flex gap-3 justify-end pt-2">
+              <div className="flex gap-3 justify-end">
                 <button type="button" onClick={() => setModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
                 <button type="submit" disabled={saving} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
                   {saving ? 'Creating...' : 'Create Event'}
@@ -3221,39 +3262,73 @@ export const AuditLogsPage = () => {
 // ADMIN MANAGEMENT
 // ====================================================================
 export const AdminManagementPage = () => {
-  const admins = [
-    { _id: '1', name: 'Rajesh Kumar', email: 'admin@tbi.org', createdBy: 'Shrey Mehra', created: '3 months ago' },
-    { _id: '2', name: 'Neha Gupta', email: 'neha@tbi.org', createdBy: 'Shrey Mehra', created: '2 months ago' },
-  ];
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/admin/users');
+        // Filter to only admin-level accounts
+        setAdmins((res.data.data || []).filter((u) =>
+          ['ADMIN', 'SUPER_ADMIN'].includes(u.role)
+        ));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <SkeletonTable rows={3} cols={4} />;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Admin Management</h1>
-        <p className="text-gray-500">Manage all system administrators</p>
+        <p className="text-gray-500">System administrators ({admins.length} total)</p>
       </div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Created By</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Created</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {admins.map((a) => (
-              <tr key={a._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium">{a.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{a.email}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{a.createdBy}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{a.created}</td>
-                <td className="px-6 py-4 text-sm"><button className="text-red-500 hover:underline">Revoke</button></td>
+        {admins.length === 0 ? (
+          <div className="p-12 text-center text-gray-400">
+            <Shield className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p>No admin accounts found</p>
+          </div>
+        ) : (
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {admins.map((a) => (
+                <tr key={a._id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm font-medium">{a.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{a.email}</td>
+                  <td className="px-6 py-4">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      a.role === 'SUPER_ADMIN' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                    }`}>{a.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      a.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                    }`}>{a.isActive ? 'Active' : 'Revoked'}</span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-400 italic text-xs">
+                    Manage via User Management
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
@@ -3477,20 +3552,37 @@ export const BulkImportPage = () => {
     handleFile(e.dataTransfer.files[0]);
   };
 
-  const handleImport = () => {
-    if (preview.length === 0) return;
+  const handleImport = async () => {
+    if (validRows.length === 0) return;
     setImporting(true);
     setProgress(0);
-    const total = preview.length;
-    let current = 0;
-    const timer = setInterval(() => {
-      current++;
-      setProgress(Math.round((current / total) * 100));
-      if (current >= total) {
-        clearInterval(timer);
-        setTimeout(() => { setImporting(false); setDone(true); }, 400);
+
+    let succeeded = 0;
+    const importErrors = [];
+
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
+      try {
+        await api.post('/admin/users', {
+          name: row.name,
+          email: row.email,
+          phone: row.phone || '',
+          role: (row.role || 'T1_VOLUNTEER').toUpperCase(),
+        });
+        succeeded++;
+      } catch (err) {
+        importErrors.push({ line: row._line, error: err.response?.data?.message || err.message });
       }
-    }, 80);
+      setProgress(Math.round(((i + 1) / validRows.length) * 100));
+    }
+
+    setImporting(false);
+    setDone(true);
+    if (importErrors.length > 0) {
+      console.warn('Import errors:', importErrors);
+    }
+    // Store results for display
+    window._lastImportResult = { succeeded, failed: importErrors.length, errors: importErrors };
   };
 
   const reset = () => {
@@ -4014,43 +4106,19 @@ export const MyShiftsPage = () => {
 // SESSIONS
 // ====================================================================
 export const SessionsPage = () => {
-  const sessions = [
-    { _id: '1', user: 'Rajesh Kumar', role: 'Admin', device: 'Chrome on Windows', ip: '192.168.1.45', lastActive: '2 min ago' },
-    { _id: '2', user: 'Mayank', role: 'T3', device: 'Safari on iPhone', ip: '10.0.0.12', lastActive: '15 min ago' },
-    { _id: '3', user: 'Shrey Mehra', role: 'Super Admin', device: 'Chrome on MacOS', ip: '192.168.1.10', lastActive: '1 hour ago' },
-  ];
-  const roleColor = { 'Admin': 'bg-orange-100 text-orange-700', 'T3': 'bg-purple-100 text-purple-700', 'T1': 'bg-green-100 text-green-700', 'Super Admin': 'bg-red-100 text-red-700' };
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Active Sessions</h1>
         <p className="text-gray-500">Monitor and manage all logged-in users</p>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">User</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Device</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">IP</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Last Active</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {sessions.map((s) => (
-              <tr key={s._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm font-medium">{s.user}</td>
-                <td className="px-6 py-4"><span className={`text-xs px-2 py-1 rounded-full font-medium ${roleColor[s.role]}`}>{s.role}</span></td>
-                <td className="px-6 py-4 text-sm text-gray-500">{s.device}</td>
-                <td className="px-6 py-4 text-sm text-gray-400 font-mono">{s.ip}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{s.lastActive}</td>
-                <td className="px-6 py-4 text-sm"><button className="text-red-500 hover:underline">Force Logout</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+        <Monitor className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold mb-2">Session Management</h3>
+        <p className="text-gray-500 max-w-md mx-auto">
+          Real-time session tracking requires a server-side session store (Redis or DB). This feature
+          is planned but not yet implemented. Users can be deactivated via the User Management page.
+        </p>
       </div>
     </div>
   );
@@ -6252,4 +6320,393 @@ export const AnnouncementPopup = () => {
       </div>
     </div>
   );
-};
+};
+
+// ====================================================================
+// TIMESHEET PAGE — Role-aware (Member submits, T3 reviews, Admin sees all)
+// ====================================================================
+export const TimesheetPage = () => {
+  const { user } = useAuth();
+  const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+  const isLead = user.role === 'T3_EXECUTIVE';
+  const isMember = ['T1_VOLUNTEER', 'T2_ASSOCIATE', 'T3_EXECUTIVE'].includes(user.role);
+
+  const [tab, setTab] = useState(isMember ? 'my' : 'all');
+  const [myTimesheets, setMyTimesheets] = useState([]);
+  const [myStats, setMyStats] = useState(null);
+  const [reviewTeams, setReviewTeams] = useState([]);
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [teamTimesheets, setTeamTimesheets] = useState([]);
+  const [allTimesheets, setAllTimesheets] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState({
+    teamId: '',
+    date: new Date().toISOString().split('T')[0],
+    startTime: '09:00',
+    endTime: '17:00',
+    breakMinutes: 30,
+    taskDescription: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const totalHoursPreview = (() => {
+    const [sh, sm] = form.startTime.split(':').map(Number);
+    const [eh, em] = form.endTime.split(':').map(Number);
+    let m = (eh * 60 + em) - (sh * 60 + sm);
+    if (m < 0) m += 1440;
+    m -= form.breakMinutes || 0;
+    return Math.max(0, Math.round((m / 60) * 100) / 100);
+  })();
+
+  const fetchMine = async () => {
+    try {
+      const [listRes, statsRes, teamsRes] = await Promise.all([
+        api.get('/timesheets/me?days=30'),
+        api.get('/timesheets/my-stats?days=30'),
+        api.get('/teams/me'),
+      ]);
+      setMyTimesheets(listRes.data.data);
+      setMyStats(statsRes.data.data);
+      setTeams(teamsRes.data.data);
+      if (teamsRes.data.data.length > 0 && !form.teamId) {
+        setForm((f) => ({ ...f, teamId: teamsRes.data.data[0]._id }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchTeam = async () => {
+    if (!selectedTeamId) return;
+    try {
+      const res = await api.get(`/timesheets/team?teamId=${selectedTeamId}`);
+      setTeamTimesheets(res.data.data);
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchAll = async () => {
+    try {
+      const res = await api.get('/timesheets/all');
+      setAllTimesheets(res.data.data);
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => {
+    (async () => {
+      if (isMember) await fetchMine();
+      if (isLead || isAdmin) {
+        try {
+          const t = await api.get('/timesheets/teams/reviewable');
+          setReviewTeams(t.data.data);
+          if (t.data.data.length > 0) setSelectedTeamId(t.data.data[0]._id);
+        } catch {}
+      }
+      if (isAdmin) await fetchAll();
+      setLoading(false);
+    })();
+  }, [user.role]);
+
+  useEffect(() => { if (tab === 'team') fetchTeam(); }, [selectedTeamId, tab]);
+  useEffect(() => { if (tab === 'all' && isAdmin) fetchAll(); }, [tab]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post('/timesheets', form);
+      setModal(false);
+      setForm({
+        teamId: teams[0]?._id || '',
+        date: new Date().toISOString().split('T')[0],
+        startTime: '09:00',
+        endTime: '17:00',
+        breakMinutes: 30,
+        taskDescription: '',
+      });
+      await fetchMine();
+      alert('Timesheet submitted');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to submit');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateStatus = async (id, status) => {
+    let rejectionReason;
+    if (status === 'rejected') {
+      rejectionReason = prompt('Reason for rejection:');
+      if (!rejectionReason) return;
+    }
+    try {
+      await api.patch(`/timesheets/${id}/status`, { status, rejectionReason });
+      if (tab === 'team') await fetchTeam();
+      if (tab === 'all') await fetchAll();
+      if (tab === 'my') await fetchMine();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed');
+    }
+  };
+
+  const deleteEntry = async (id) => {
+    if (!confirm('Delete this timesheet?')) return;
+    try {
+      await api.delete(`/timesheets/${id}`);
+      await fetchMine();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed');
+    }
+  };
+
+  const statusColor = {
+    submitted: 'bg-amber-100 text-amber-700',
+    approved: 'bg-green-100 text-green-700',
+    rejected: 'bg-red-100 text-red-700',
+    draft: 'bg-gray-100 text-gray-700',
+  };
+
+  if (loading) return <SkeletonTable rows={5} cols={6} />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Timesheets</h1>
+          <p className="text-gray-500">
+            {isMember && 'Log your working hours'}
+            {isLead && 'Review your team timesheets'}
+            {isAdmin && 'All timesheets across the platform'}
+          </p>
+        </div>
+        {isMember && (
+          <button onClick={() => setModal(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 flex items-center gap-2">
+            <Plus size={16} /> Submit Timesheet
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {isMember && (
+          <button onClick={() => setTab('my')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'my' ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}>
+            My Timesheets
+          </button>
+        )}
+        {isLead && (
+          <button onClick={() => setTab('team')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'team' ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}>
+            Team Timesheets
+          </button>
+        )}
+        {isAdmin && (
+          <button onClick={() => setTab('all')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'all' ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}>
+            All Timesheets
+          </button>
+        )}
+      </div>
+
+      {/* ============ MY TAB ============ */}
+      {tab === 'my' && isMember && (
+        <>
+          {myStats && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <KPI label="Total Hours (30d)" value={myStats.totalHours} />
+              <KPI label="Approved" value={myStats.approved} />
+              <KPI label="Pending" value={myStats.pending} />
+              <KPI label="Rejected" value={myStats.rejected} />
+            </div>
+          )}
+
+          {myTimesheets.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+              <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No timesheets yet</h3>
+              <button onClick={() => setModal(true)} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
+                Submit your first
+              </button>
+            </div>
+          ) : (
+            <TimesheetTable
+              rows={myTimesheets}
+              statusColor={statusColor}
+              onDelete={deleteEntry}
+              showUser={false}
+            />
+          )}
+        </>
+      )}
+
+      {/* ============ TEAM TAB ============ */}
+      {tab === 'team' && isLead && (
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Team</label>
+            <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
+              {reviewTeams.map((t) => (
+                <option key={t._id} value={t._id}>{t.name} — {t.eventTitle}</option>
+              ))}
+            </select>
+          </div>
+
+          {teamTimesheets.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+              <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No timesheets from this team yet</p>
+            </div>
+          ) : (
+            <TimesheetTable
+              rows={teamTimesheets}
+              statusColor={statusColor}
+              onApprove={(id) => updateStatus(id, 'approved')}
+              onReject={(id) => updateStatus(id, 'rejected')}
+              showUser={true}
+            />
+          )}
+        </>
+      )}
+
+      {/* ============ ALL TAB (Admin) ============ */}
+      {tab === 'all' && isAdmin && (
+        <>
+          {allTimesheets.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+              <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No timesheets yet</p>
+            </div>
+          ) : (
+            <TimesheetTable
+              rows={allTimesheets}
+              statusColor={statusColor}
+              onApprove={(id) => updateStatus(id, 'approved')}
+              onReject={(id) => updateStatus(id, 'rejected')}
+              showUser={true}
+            />
+          )}
+        </>
+      )}
+
+      {/* Submit Modal */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setModal(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-semibold">Submit Timesheet</h3>
+              <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Team</label>
+                <select required value={form.teamId} onChange={(e) => setForm({ ...form, teamId: e.target.value })} className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
+                  <option value="">Select a team...</option>
+                  {teams.map((t) => (<option key={t._id} value={t._id}>{t.name}{t.eventTitle ? ` — ${t.eventTitle}` : ''}</option>))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Date</label>
+                <input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Start</label>
+                  <input type="time" required value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">End</label>
+                  <input type="time" required value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Break (min)</label>
+                  <input type="number" min="0" max="480" value={form.breakMinutes} onChange={(e) => setForm({ ...form, breakMinutes: Number(e.target.value) })}
+                    className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-800">Calculated hours:</span>
+                <span className="text-lg font-bold text-blue-700">{totalHoursPreview}h</span>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Task Description *</label>
+                <textarea required rows={4} value={form.taskDescription} onChange={(e) => setForm({ ...form, taskDescription: e.target.value })}
+                  placeholder="What did you work on?"
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500" />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  {saving ? 'Submitting...' : 'Submit Timesheet'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Reusable table
+const TimesheetTable = ({ rows, statusColor, showUser, onApprove, onReject, onDelete }) => (
+  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="overflow-x-auto">
+      <table className="w-full text-left">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Date</th>
+            {showUser && <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">User</th>}
+            <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Time</th>
+            <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Hours</th>
+            <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Task</th>
+            <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
+            <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {rows.map((t) => (
+            <tr key={t._id} className="hover:bg-gray-50">
+              <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{t.date}</td>
+              {showUser && (
+                <td className="px-4 py-3">
+                  <p className="text-sm font-medium">{t.userName}</p>
+                  <p className="text-xs text-gray-500">{t.userRole?.replace('_', ' ')}</p>
+                </td>
+              )}
+              <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{t.startTime} – {t.endTime}</td>
+              <td className="px-4 py-3 text-sm font-medium text-blue-600 whitespace-nowrap">{t.totalHours}h</td>
+              <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                <p className="truncate" title={t.taskDescription}>{t.taskDescription}</p>
+              </td>
+              <td className="px-4 py-3">
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[t.status]}`}>{t.status}</span>
+              </td>
+              <td className="px-4 py-3 text-sm">
+                <div className="flex gap-2 flex-wrap">
+                  {onApprove && t.status === 'submitted' && (
+                    <>
+                      <button onClick={() => onApprove(t._id)} className="text-xs text-green-600 hover:underline font-medium">Approve</button>
+                      <button onClick={() => onReject(t._id)} className="text-xs text-red-600 hover:underline font-medium">Reject</button>
+                    </>
+                  )}
+                  {onDelete && t.status !== 'approved' && (
+                    <button onClick={() => onDelete(t._id)} className="text-xs text-red-500 hover:underline font-medium">Delete</button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+

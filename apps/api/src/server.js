@@ -13,8 +13,13 @@ const { initSocket } = require('./config/socket');
 
 const app = express();
 
+// M9: Read allowed origins from env (comma-separated) — fallback to localhost for dev
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : ['http://localhost:3000', 'http://localhost:5173'];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173'],
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(securityMiddleware);
@@ -34,6 +39,7 @@ app.use('/api/v1/super-admin', require('./modules/super-admin/superAdmin.routes'
 app.use('/api/v1/stats', require('./modules/stats/stats.routes'));
 app.use('/api/v1/preferences', require('./modules/users/preferences.routes'));
 app.use('/api/v1/announcements', require('./modules/announcements/announcements.routes'));
+app.use('/api/v1/timesheets', require('./modules/timesheets/timesheets.routes'));
 
 app.get('/', (req, res) => {
   res.json({

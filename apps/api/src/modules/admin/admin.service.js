@@ -46,7 +46,12 @@ exports.createUser = async (data) => {
 };
 
 exports.updateUser = async (id, data) => {
-  const user = await User.findByIdAndUpdate(id, data, { new: true }).select('-password');
+  // C6: Allowlist only safe profile fields — block role, isActive, mustChangePassword, password
+  const allowed = ['name', 'phone', 'skills', 'bio', 'availability'];
+  const safeData = {};
+  allowed.forEach((k) => { if (data[k] !== undefined) safeData[k] = data[k]; });
+
+  const user = await User.findByIdAndUpdate(id, safeData, { new: true }).select('-password');
   if (!user) throw new Error('User not found');
   return user;
 };
@@ -77,22 +82,6 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
   user.password = await bcrypt.hash(generateDefaultPassword(), 12);
   user.mustChangePassword = true;
   await user.save();
-
-  // 6. Create audit log entry
-  try {
-    const AuditLog = require('../../models/AuditLog.model');
-    await AuditLog.create({
-      action: 'ACCESS_REVOKED',
-      performedBy: adminId,
-      targetUser: user._id,
-      targetName: user.name,
-      reason,
-      resource: `/api/v1/admin/users/${id}/revoke`,
-      method: 'POST',
-    });
-  } catch (e) {
-    console.error('Audit log failed:', e.message);
-  }
 
   return {
     userId: user._id,
@@ -133,22 +122,6 @@ exports.reactivateUser = async (id, adminId) => {
     loginUrl: LOGIN_URL,
   }).catch((err) => console.error('Reactivate email failed:', err.message));
 
-  // Audit log
-  try {
-    const AuditLog = require('../../models/AuditLog.model');
-    await AuditLog.create({
-      action: 'ACCESS_REACTIVATED',
-      performedBy: adminId,
-      targetUser: user._id,
-      targetName: user.name,
-      reason: 'Admin reactivated account',
-      resource: `/api/v1/admin/users/${id}/reactivate`,
-      method: 'POST',
-    });
-  } catch (e) {
-    console.error('Audit log failed:', e.message);
-  }
-
   return {
     userId: user._id,
     name: user.name,
@@ -158,9 +131,13 @@ exports.reactivateUser = async (id, adminId) => {
   };
 };
 
-exports.deleteUser = async (id) => {
-  const user = await User.findByIdAndDelete(id);
+// C7: deleteUser — guard against Super Admin and self-delete
+exports.deleteUser = async (id, adminId) => {
+  const user = await User.findById(id);
   if (!user) throw new Error('User not found');
+  if (user.role === 'SUPER_ADMIN') throw new Error('Cannot delete a Super Admin account');
+  if (id.toString() === adminId?.toString()) throw new Error('You cannot delete your own account');
+  await User.findByIdAndDelete(id);
   return user;
 };
 
@@ -194,31 +171,21 @@ exports.resetPassword = async (id, adminId = null) => {
     console.error('Reset email failed:', err.message);
   }
 
-  // Audit log
-  try {
-    const AuditLog = require('../../models/AuditLog.model');
-    await AuditLog.create({
-      action: 'PASSWORD_RESET',
-      performedBy: adminId || null, // Set by controller via req.user
-      targetUser: user._id,
-      targetName: user.name,
-      reason: 'Admin-initiated password reset',
-      resource: `/api/v1/admin/users/${id}/reset-password`,
-      method: 'POST',
-    });
-  } catch (e) {
-    console.error('Audit log failed:', e.message);
-  }
-
-  return { user: user.toObject({ virtuals: false }), tempPassword, emailSent };
+  // C5: Only include tempPassword in return value when email failed (caller decides what to do)
+  return { user: user.toObject({ virtuals: false }), tempPassword: emailSent ? undefined : tempPassword, emailSent };
 };
 
-exports.setPassword = async (id, newPassword) => {
+// H6: setPassword — apply same complexity rules as changePassword, require adminId for audit
+exports.setPassword = async (id, newPassword, adminId) => {
   const user = await User.findById(id);
   if (!user) throw new Error('User not found');
-  if (!newPassword || newPassword.length < 8) {
-    throw new Error('Password must be at least 8 characters');
-  }
+  if (user.role === 'SUPER_ADMIN') throw new Error('Cannot set Super Admin password this way');
+  if (!newPassword || newPassword.length < 8) throw new Error('Password must be at least 8 characters');
+  if (!/[A-Z]/.test(newPassword)) throw new Error('Password must contain an uppercase letter');
+  if (!/[a-z]/.test(newPassword)) throw new Error('Password must contain a lowercase letter');
+  if (!/[0-9]/.test(newPassword)) throw new Error('Password must contain a number');
+  if (!/[^A-Za-z0-9]/.test(newPassword)) throw new Error('Password must contain a special character');
+
   user.password = await bcrypt.hash(newPassword, 12);
   user.mustChangePassword = false;
   await user.save();

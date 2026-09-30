@@ -1,38 +1,38 @@
-const appService = require('./applications.service');
+const service = require('./applications.service');
 
 exports.getApplications = async (req, res) => {
   try {
-    const apps = await appService.getAllApplications();
-    res.status(200).json({ success: true, data: apps });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const list = await service.getAll(req.query, req.user);
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
 exports.getMyApplications = async (req, res) => {
   try {
-    const apps = await appService.getMyApplications(req.user.sub);
-    res.status(200).json({ success: true, data: apps });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const list = await service.getMine(req.user.sub);
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
 exports.createApplication = async (req, res) => {
   try {
-    const app = await appService.createApplication(req.body, req.user);
+    const app = await service.create(req.body, req.user);
     res.status(201).json({ success: true, message: 'Application submitted', data: app });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
 exports.updateStatus = async (req, res) => {
   try {
-    const { status } = req.body;
-    const app = await appService.updateStatus(req.params.id, status, req.user.sub);
-    res.status(200).json({ success: true, message: `Application ${status}`, data: app });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    const { status, rejectionReason } = req.body;
+    const app = await service.updateStatus(req.params.id, status, req.user, rejectionReason);
+    res.json({ success: true, message: `Application ${status}`, data: app });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };

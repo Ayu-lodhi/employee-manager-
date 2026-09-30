@@ -1,8 +1,14 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'tbi_super_secret_key_change_in_production';
+const User = require('../admin/admin.model');
 
-// Verify JWT token
-exports.protect = (req, res, next) => {
+// Fail hard at startup if JWT_SECRET is missing or too short
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  throw new Error('FATAL: JWT_SECRET is missing or too short (min 32 chars). Set it in .env.');
+}
+
+// Verify JWT token + check user is still active in DB
+exports.protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, message: 'Not authenticated' });
@@ -10,7 +16,14 @@ exports.protect = (req, res, next) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+
+    // Check account is still active (catches revoked users with unexpired tokens)
+    const user = await User.findById(decoded.sub).select('isActive role name email');
+    if (!user || !user.isActive) {
+      return res.status(401).json({ success: false, message: 'Account is deactivated or not found' });
+    }
+
+    req.user = { ...decoded, name: user.name, email: user.email, role: user.role };
     next();
   } catch (err) {
     return res.status(401).json({ success: false, message: 'Invalid or expired token' });

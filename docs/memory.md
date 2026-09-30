@@ -69,6 +69,8 @@ No public signup. All accounts are created by an Admin or Super Admin.
 | 2026-09-17 | **MongoDB Atlas brought under Terraform, sharding added**: write-scaling for event-day bursts |
 | 2026-09-17 | **Scheduled pre-warm autoscaling added**: ECS task pre-warming before event start times |
 | 2026-09-17 | **Full directory tree embedded directly in architecture.md**: comprehensive annotated tree inline |
+| 2026-09-30 | **Attendance upsert error handling**: `Attendance.findOneAndUpdate` handles E11000 fallback to plain update |
+
 
 ---
 

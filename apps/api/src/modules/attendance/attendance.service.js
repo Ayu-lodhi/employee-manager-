@@ -45,28 +45,48 @@ class AttendanceService {
     if (!student) throw new Error('Student not found');
 
     // Upsert — one record per student per team per day
-    const record = await Attendance.findOneAndUpdate(
-      { studentId, teamId, date: targetDate },
-      {
-        studentId,
-        studentName: student.name,
-        studentEmail: student.email,
-        teamId,
-        teamName: team.name,
-        eventId: team.eventId || null,
-        eventTitle: team.eventTitle || '',
-        date: targetDate,
-        shiftLabel: shiftLabel || 'Full Day',
-        status,
-        method: 'manual',
-        markedBy: marker.sub,
-        markedByName: marker.name || '',
-        notes: notes || '',
-        checkInTime: status === 'absent' ? null : (new Date()),
-        checkOutTime: null,
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+    let record;
+    try {
+      record = await Attendance.findOneAndUpdate(
+        { studentId, teamId, date: targetDate },
+        {
+          studentId,
+          studentName: student.name,
+          studentEmail: student.email,
+          teamId,
+          teamName: team.name,
+          eventId: team.eventId || null,
+          eventTitle: team.eventTitle || '',
+          date: targetDate,
+          shiftLabel: shiftLabel || 'Full Day',
+          status,
+          method: 'manual',
+          markedBy: marker.sub,
+          markedByName: marker.name || '',
+          notes: notes || '',
+          checkInTime: status === 'absent' ? null : new Date(),
+          checkOutTime: null,
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
+    } catch (err) {
+      // Duplicate key from stale index — fall back to plain update
+      if (err.code === 11000) {
+        record = await Attendance.findOneAndUpdate(
+          { studentId, teamId, date: targetDate },
+          {
+            status,
+            notes: notes || '',
+            markedBy: marker.sub,
+            markedByName: marker.name || '',
+            method: 'manual',
+          },
+          { new: true }
+        );
+      } else {
+        throw err;
+      }
+    }
 
     return record;
   }

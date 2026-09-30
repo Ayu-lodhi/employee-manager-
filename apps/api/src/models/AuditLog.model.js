@@ -6,9 +6,9 @@ const auditLogSchema = new mongoose.Schema({
   performedByName: { type: String, default: '' },
   targetId: { type: mongoose.Schema.Types.ObjectId },
   targetType: { type: String, default: '' },
+  ipAddress: { type: String, default: null },  // H3: capture requester IP
   details: { type: mongoose.Schema.Types.Mixed, default: {} },
   timestamp: { type: Date, default: Date.now },
-  createdAt: { type: Date, default: Date.now },
 });
 
 module.exports = mongoose.model('AuditLog', auditLogSchema);
