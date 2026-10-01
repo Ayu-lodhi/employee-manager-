@@ -16,6 +16,10 @@
  * @property {number} attempts Attempts in the current five-minute window
  * @property {Date} windowStartedAt
  *
+ * @typedef {Object} UserPasswordState
+ * @property {boolean} mustChangePassword
+ * @property {Date|null} passwordChangeStartedAt Server only; first temporary login, null before use
+ *
  * @typedef {Object} AccessGrant
  * @property {string} permission
  * @property {string} grantedBy

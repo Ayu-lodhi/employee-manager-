@@ -34,7 +34,11 @@ Enroll new privileged accounts after provisioning them and before their first lo
 `POST /api/v1/auth/login` returns `{ mfaRequired: true, challengeToken }` after a
 privileged user's password is checked. The challenge expires in five minutes and
 has no access or refresh authority. Submit it with a six-digit `code` to
-`POST /api/v1/auth/mfa/verify`. Only successful TOTP verification issues a session.
+`POST /api/v1/auth/mfa/verify`. Successful TOTP verification issues a session only after mandatory password
+replacement is complete. Accounts with a temporary password instead receive a
+restricted password-change token; see `../database/password-replacement.md`.
+Temporary-password login is consumed once, and MFA plus replacement must complete
+within five minutes of that login.
 
 TOTP uses SHA-1, six digits, a 30-second period, and one step of clock tolerance.
 Five attempts per account per five-minute window are reserved atomically in MongoDB;

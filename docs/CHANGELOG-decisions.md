@@ -94,3 +94,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Require the selected student to be a current team member or lead before the attendance upsert or duplicate-key fallback; add HTTP regression coverage.
 - Reason: Confirmed that a lead could write attendance for unrelated users, affecting personal history and statistics. Existing self check-in establishes member/lead eligibility; administrators have no membership exception. Fix authorized by the security investigation request; authorization changes require human review before merge.
 - Where: `apps/api/src/modules/attendance/attendance.service.js`, `apps/api/src/modules/attendance/__tests__/attendance.test.js`, `memory.md`.
+
+### [2026-10-01] Enforce mandatory password replacement
+- What: Consume temporary login atomically; issue only bounded password-change credentials until replacement; enforce the state on HTTP and Socket.io authentication and route the UI into replacement.
+- Reason: Confirmed security investigation authorized this fix. Existing MFA/purpose controls did not enforce mandatory replacement or one-time temporary login. Authentication changes require human review before merge.
+- Where: apps/api/src/modules/auth/, apps/api/src/modules/admin/admin.model.js and admin.service.js, apps/api/src/config/__tests__/socket.test.js, apps/web/src/pages.jsx and lib/api.js, packages/shared-types/index.js, docs/database/password-replacement.md, docs/security/mfa-policy.md.

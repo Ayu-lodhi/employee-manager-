@@ -64,7 +64,7 @@ test('MFA login and mounted-route regression tests with MongoDB', { skip: !datab
     const email = `${randomUUID()}@example.test`;
     const enrollment = mfaService.createEnrollment(email);
     const secret = new URL(enrollment.otpauthUrl).searchParams.get('secret');
-    const user = await User.create({ name: 'Synthetic fixture', email, password: hash, role,
+    const user = await User.create({ name: 'Synthetic fixture', email, password: hash, role, mustChangePassword: false,
       ...(enrolled ? { mfa: enrollment.mfa } : {}) });
     return { user, secret, enrollment, code: () => generateSync({ secret }) };
   }

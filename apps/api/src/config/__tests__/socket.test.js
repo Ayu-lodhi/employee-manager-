@@ -77,6 +77,16 @@ test('chat socket authorization and delivery', async (t) => {
     verified.socket.disconnect(true);
     account.role = ROLES.T1_VOLUNTEER;
   });
+  await t.test('socket handshake rejects mandatory replacement accounts and replacement tokens', async () => {
+    const account = accounts.get(memberId);
+    account.mustChangePassword = true;
+    account.passwordChangeStartedAt = new Date();
+    for (const purpose of ['access', 'password-change']) {
+      await assert.rejects(connect(memberId, tokens.sign(account, purpose, '5m')), /Invalid or expired token/);
+    }
+    account.mustChangePassword = false;
+    account.passwordChangeStartedAt = null;
+  });
   const member = await connect(memberId);
   const other = await connect(otherId);
   const join = (client, id = roomId) => client.socket.listeners('chat:join')[0](id);
