@@ -3,7 +3,7 @@ const Team = require('../teams/teams.model');
 const User = require('../admin/admin.model');
 const { notify } = require('../notifications/notifications.service');
 const { AuthorizationError, ValidationError } = require('../../core/errors/typedErrors');
-const { PRIVILEGED_ROLES } = require('../../../../../packages/shared-constants/roles.js');
+const PRIVILEGED_ROLES = ['SUPER_ADMIN', 'ADMIN'];
 
 const calcHours = (startTime, endTime, breakMinutes) => {
   if (!startTime || !endTime) return 0;

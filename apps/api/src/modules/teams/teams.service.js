@@ -3,7 +3,14 @@ const User = require('../admin/admin.model');
 const Event = require('../events/events.model');
 const { notify } = require('../notifications/notifications.service');
 const { AuthorizationError, ValidationError } = require('../../core/errors/typedErrors');
-const { PRIVILEGED_ROLES, ROLES } = require('../../../../../packages/shared-constants/roles.js');
+const ROLES = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  ADMIN: 'ADMIN',
+  T3_EXECUTIVE: 'T3_EXECUTIVE',
+  T2_ASSOCIATE: 'T2_ASSOCIATE',
+  T1_VOLUNTEER: 'T1_VOLUNTEER'
+};
+const PRIVILEGED_ROLES = [ROLES.SUPER_ADMIN, ROLES.ADMIN];
 
 const requireMembershipManager = (team, requester) => {
   const isAdmin = !!requester?.sub && PRIVILEGED_ROLES.includes(requester.role);
