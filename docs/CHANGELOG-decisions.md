@@ -104,3 +104,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Pass the authenticated requester into membership services, require team leadership or administrative authority, and validate membership and protected team/event roles before cascade writes.
 - Reason: Confirmed unrelated T3 callers could mutate teams, user assignments and event rosters. The security investigation authorizes this fix; human review is required before merge. Preserve the mounted role gate and shared role constants without introducing a broader RBAC migration.
 - Where: apps/api/src/modules/teams/teams.controller.js, teams.service.js, __tests__/teams.test.js; memory.md.
+
+### [2026-10-01] Restrict event updates to literal editable fields
+- What: Validate event PATCH data against an explicit field/type allowlist at the repository boundary; the active base repository rejects pipeline/operator input and constructs `$set` updates. Add HTTP and repository regression coverage.
+- Reason: Confirmed an authenticated administrator could pass a `$function` pipeline through Mongoose validation to database IO. The security investigation authorizes this fix. Preserve the editor fields (including clearing an unselected head) and lifecycle status; membership, derived counters and audit fields are not generic edits.
+- Where: `apps/api/src/core/BaseRepository.js`, `apps/api/src/modules/events/events.repository.js`, `events.validator.js`, `__tests__/events.test.js`, `memory.md`. The common-JS base repository currently has only the event repository as a consumer; the separate scaffold in `core/database/` is unaffected.

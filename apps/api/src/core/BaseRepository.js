@@ -5,6 +5,8 @@
 // operations, ensuring consistent data access patterns across modules.
 // ====================================================================
 
+const { ValidationError } = require('./errors/typedErrors');
+
 class BaseRepository {
   /**
    * @param {mongoose.Model} model - The Mongoose model to operate on
@@ -57,10 +59,14 @@ class BaseRepository {
   }
 
   /**
-   * Update by ID
+   * Update literal fields by ID. Callers must validate their allowed fields.
    */
   async updateById(id, data, populate) {
-    let query = this.model.findByIdAndUpdate(id, data, {
+    if (!data || Object.getPrototypeOf(data) !== Object.prototype ||
+        Object.keys(data).some((key) => key.startsWith('$') || key.includes('.'))) {
+      throw new ValidationError('Update must be a plain object of literal fields');
+    }
+    let query = this.model.findByIdAndUpdate(id, { $set: data }, {
       new: true,
       runValidators: true,
     });

@@ -1,5 +1,6 @@
 const BaseRepository = require('../../core/BaseRepository');
 const Event = require('./events.model');
+const { validateEventUpdate } = require('./events.validator');
 
 // INHERITANCE — extends BaseRepository
 class EventRepository extends BaseRepository {
@@ -26,7 +27,7 @@ class EventRepository extends BaseRepository {
   }
 
   async updateById(id, data) {
-    return await super.updateById(id, data, [
+    return await super.updateById(id, validateEventUpdate(data), [
       { path: 'headId', select: 'name email role' },
       { path: 'members', select: 'name email role' },
     ]);

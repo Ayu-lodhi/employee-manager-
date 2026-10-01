@@ -135,3 +135,12 @@ preserves the direct event restriction on adding T3 executives. The mounted role
 gate remains in place; permission middleware and the team repository are unused
 scaffolds in this flow. The security investigation authorizes this fix; human
 review is required before merge.
+
+## Event update security — 2026-10-01
+
+Event updates validate a nonempty object containing only literal editor fields
+(title, date, location, description, headId) and lifecycle status. Validation runs
+at the event repository boundary, including service aliases. The active common-JS
+base repository (currently used only by events) rejects pipelines/operator keys
+and constructs `$set`; Mongoose `runValidators` alone does not stop pipelines.
+The security investigation authorizes this fix, with HTTP regression coverage.
