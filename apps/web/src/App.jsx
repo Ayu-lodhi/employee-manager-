@@ -16,7 +16,7 @@ import {
 const RootRedirect = () => {
   const { user, initializing } = useAuth();
   if (initializing) return null;
-  if (!user) return <Navigate to="/landing" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   return <Navigate to={ROLES[user.role].route} replace />;
 };
 
