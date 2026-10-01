@@ -1,5 +1,7 @@
-import app from '../../api/src/server.js';
+import { createRequire } from 'node:module';
 import mongoose from 'mongoose';
+const require = createRequire(import.meta.url);
+const app = require('../../api/src/server.js');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ayushlodhi88_db_user:9IzJqRATQYl1hERt@ac-gkiqwag-shard-00-00.wiv7fca.mongodb.net:27017,ac-gkiqwag-shard-00-01.wiv7fca.mongodb.net:27017,ac-gkiqwag-shard-00-02.wiv7fca.mongodb.net:27017/tbi_db?ssl=true&replicaSet=atlas-6g5sz6-shard-0&authSource=admin&appName=Cluster0';
 
