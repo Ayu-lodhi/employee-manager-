@@ -59,6 +59,7 @@ No public signup. All accounts are created by an Admin or Super Admin.
 
 | Date | Decision |
 |---|---|
+| 2026-10-01 | **JWT purpose enforcement**: Login marks access/refresh tokens; active HTTP and socket authentication require access purpose. Tokens without purpose require re-login; no refresh endpoint exists. |
 | 2026-09-17 | **RBAC: permission-based, not simple role-string**: role-default grants + per-user `ACCESS_GRANT` overrides |
 | 2026-09-17 | **Dropped redundant tier field from auth logic**: single `role` field; `tiers.js` is display-label only |
 | 2026-09-17 | **Geofenced attendance deferred to v2**: browser geolocation unreliable for web v1 |
@@ -100,3 +101,7 @@ Existing privileged users require trusted operator enrollment using
 See `docs/security/mfa-policy.md` for deployment, encryption-key, and recovery limits.
 All existing tokens require a fresh login. Authentication changes require human
 review before merge; corresponding regression tests belong in `__tests__/`.
+
+The MFA branch incorporates main's token-purpose fix (PR #4). Both regression
+suites are retained; ordinary-user token-purpose tests use a nonprivileged fixture,
+and MFA tests continue to cover administrative access after TOTP verification.

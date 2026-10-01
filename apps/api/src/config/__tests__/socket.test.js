@@ -88,6 +88,13 @@ test('chat socket authorization and delivery', async (t) => {
     assert.equal(other.socket.userId, otherId);
   });
 
+  await t.test('rejects refresh, legacy and unknown-purpose tokens at the handshake', async () => {
+    for (const purpose of ['refresh', undefined, 'unknown']) {
+      const token = jwt.sign({ sub: memberId, purpose }, secret, { expiresIn: '7d' });
+      await assert.rejects(connect(memberId, token), /Invalid or expired token/);
+    }
+  });
+
   await t.test('rejects a nonmember whom HTTP reads also reject', async () => {
     await assert.rejects(chatService.getMessages(roomId, otherId), /not a member/);
     await join(other);
