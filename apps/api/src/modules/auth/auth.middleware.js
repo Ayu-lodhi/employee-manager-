@@ -16,6 +16,9 @@ exports.protect = async (req, res, next) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.purpose !== 'access') {
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    }
 
     // Check account is still active (catches revoked users with unexpired tokens)
     const user = await User.findById(decoded.sub).select('isActive role name email');
