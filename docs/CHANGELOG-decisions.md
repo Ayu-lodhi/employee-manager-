@@ -104,3 +104,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Pass the authenticated requester into membership services, require team leadership or administrative authority, and validate membership and protected team/event roles before cascade writes.
 - Reason: Confirmed unrelated T3 callers could mutate teams, user assignments and event rosters. The security investigation authorizes this fix; human review is required before merge. Preserve the mounted role gate and shared role constants without introducing a broader RBAC migration.
 - Where: apps/api/src/modules/teams/teams.controller.js, teams.service.js, __tests__/teams.test.js; memory.md.
+
+### [2026-10-01] Require TLS for SMTP delivery
+- **What**: Require STARTTLS for configured and Ethereal SMTP transports, retaining default certificate verification and failing delivery if TLS cannot be established.
+- **Reason**: Security investigation confirmed plaintext SMTP authentication when STARTTLS was omitted; temporary account passwords use the same transport. Fix authorized by the investigation request.
+- **Where**: `apps/api/src/services/email.service.js`, `apps/api/src/services/__tests__/email.test.js`, `memory.md`

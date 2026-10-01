@@ -22,6 +22,7 @@ const initTransporter = async () => {
       host: process.env.EMAIL_HOST,
       port: parseInt(process.env.EMAIL_PORT) || 587,
       secure: false,
+      requireTLS: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -35,6 +36,7 @@ const initTransporter = async () => {
       host: 'smtp.ethereal.email',
       port: 587,
       secure: false,
+      requireTLS: true,
       auth: {
         user: testAccount.user,
         pass: testAccount.pass,
