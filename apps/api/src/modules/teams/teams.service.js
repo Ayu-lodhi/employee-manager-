@@ -2,6 +2,17 @@ const Team = require('./teams.model');
 const User = require('../admin/admin.model');
 const Event = require('../events/events.model');
 const { notify } = require('../notifications/notifications.service');
+const { AuthorizationError, ValidationError } = require('../../core/errors/typedErrors');
+const { PRIVILEGED_ROLES, ROLES } = require('../../../../../packages/shared-constants/roles.js');
+
+const requireMembershipManager = (team, requester) => {
+  const isAdmin = !!requester?.sub && PRIVILEGED_ROLES.includes(requester.role);
+  const isLead = !!requester?.sub && team.leadId?.toString() === requester.sub;
+  if (!isAdmin && !isLead) {
+    throw new AuthorizationError('Only the team lead or admin can manage members');
+  }
+  return isAdmin;
+};
 
 exports.getAllTeams = async () => {
   return await Team.find()
@@ -58,15 +69,23 @@ exports.createTeam = async (data) => {
     .populate('leadId', 'name email role');
 };
 
-exports.addMember = async (teamId, userId) => {
+exports.addMember = async (teamId, userId, requester) => {
   const team = await Team.findById(teamId);
   if (!team) throw new Error('Team not found');
+  const isAdmin = requireMembershipManager(team, requester);
 
   const user = await User.findById(userId).select('name email role');
   if (!user) throw new Error('User not found');
+  userId = user._id.toString();
 
   if (team.members.some((m) => m.toString() === userId)) {
     throw new Error(`${user.name} is already in this team`);
+  }
+
+  const event = team.eventId ? await Event.findById(team.eventId) : null;
+  const addToEvent = event && !event.members.some((m) => m.toString() === userId);
+  if (addToEvent && !isAdmin && user.role === ROLES.T3_EXECUTIVE) {
+    throw new AuthorizationError('Only Admin can add T3. You can add T2 or T1.');
   }
 
   team.members.push(userId);
@@ -76,13 +95,10 @@ exports.addMember = async (teamId, userId) => {
   await User.findByIdAndUpdate(userId, { teamId: team._id });
 
   // If team belongs to an event, also add to event.members
-  if (team.eventId) {
-    const event = await Event.findById(team.eventId);
-    if (event && !event.members.some((m) => m.toString() === userId)) {
-      event.members.push(userId);
-      event.memberCount = event.members.length;
-      await event.save();
-    }
+  if (addToEvent) {
+    event.members.push(userId);
+    event.memberCount = event.members.length;
+    await event.save();
   }
 
   await notify(userId, 'system', 'Added to Team', `You've been added to "${team.name}".`);
@@ -94,19 +110,22 @@ exports.addMember = async (teamId, userId) => {
 };
 
 // REMOVE MEMBER — with cascade to event
-exports.removeMember = async (teamId, userId) => {
+exports.removeMember = async (teamId, userId, requester) => {
   const team = await Team.findById(teamId);
   if (!team) throw new Error('Team not found');
+  requireMembershipManager(team, requester);
 
   const user = await User.findById(userId).select('name');
-  const userName = user?.name || 'Member';
+  userId = user?._id.toString() || userId.toLowerCase();
+  if (!team.members.some((m) => m.toString() === userId)) {
+    throw new ValidationError('User is not a member of this team');
+  }
+  if (team.leadId?.toString() === userId) {
+    throw new ValidationError('Cannot remove the Team Lead');
+  }
 
-  // Remove from team
-  team.members = team.members.filter((m) => m.toString() !== userId);
-  team.memberCount = team.members.length;
-  await team.save();
-
-  // Cascade: If team belongs to an event, check if user is in ANY OTHER team of that event
+  // Validate the entire cascade before any write or notification.
+  let eventToRemoveFrom = null;
   if (team.eventId) {
     const otherTeams = await Team.find({
       eventId: team.eventId,
@@ -114,21 +133,28 @@ exports.removeMember = async (teamId, userId) => {
       members: userId,
     });
 
-    // If user not in any other team → remove from event too
     if (otherTeams.length === 0) {
-      const event = await Event.findById(team.eventId);
-      if (event) {
-        event.members = event.members.filter((m) => m.toString() !== userId);
-        event.memberCount = event.members.length;
-        await event.save();
-
-        // Notify
-        await notify(userId, 'system', 'Removed from Event', `You've been removed from "${event.title}" along with team "${team.name}".`);
+      eventToRemoveFrom = await Event.findById(team.eventId);
+      if (eventToRemoveFrom?.headId?.toString() === userId) {
+        throw new ValidationError('Cannot remove the Event Head');
       }
-    } else {
-      // Still in other teams — only notify about team removal
-      await notify(userId, 'system', 'Removed from Team', `You've been removed from team "${team.name}".`);
     }
+  }
+
+  team.members = team.members.filter((m) => m.toString() !== userId);
+  team.memberCount = team.members.length;
+  await team.save();
+
+  if (eventToRemoveFrom) {
+    const event = eventToRemoveFrom;
+    event.members = event.members.filter((m) => m.toString() !== userId);
+    event.memberCount = event.members.length;
+    await event.save();
+
+    await notify(userId, 'system', 'Removed from Event', `You've been removed from "${event.title}" along with team "${team.name}".`);
+  } else if (team.eventId) {
+    // The event roster is unchanged — only notify about team removal.
+    await notify(userId, 'system', 'Removed from Team', `You've been removed from team "${team.name}".`);
   }
 
   return await Team.findById(teamId)

@@ -99,3 +99,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Consume temporary login atomically; issue only bounded password-change credentials until replacement; enforce the state on HTTP and Socket.io authentication and route the UI into replacement.
 - Reason: Confirmed security investigation authorized this fix. Existing MFA/purpose controls did not enforce mandatory replacement or one-time temporary login. Authentication changes require human review before merge.
 - Where: apps/api/src/modules/auth/, apps/api/src/modules/admin/admin.model.js and admin.service.js, apps/api/src/config/__tests__/socket.test.js, apps/web/src/pages.jsx and lib/api.js, packages/shared-types/index.js, docs/database/password-replacement.md, docs/security/mfa-policy.md.
+
+### [2026-10-01] Scope team membership mutations to their manager
+- What: Pass the authenticated requester into membership services, require team leadership or administrative authority, and validate membership and protected team/event roles before cascade writes.
+- Reason: Confirmed unrelated T3 callers could mutate teams, user assignments and event rosters. The security investigation authorizes this fix; human review is required before merge. Preserve the mounted role gate and shared role constants without introducing a broader RBAC migration.
+- Where: apps/api/src/modules/teams/teams.controller.js, teams.service.js, __tests__/teams.test.js; memory.md.

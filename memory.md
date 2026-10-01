@@ -125,3 +125,13 @@ Replacement must finish within five minutes of login; abandoned/expired flows
 require an administrative reset. The UI holds the restricted token in memory.
 See `docs/database/password-replacement.md`. Existing sessions require fresh
 login. Security investigation authorized the fix; human review is required before merge.
+
+## Team membership authorization — 2026-10-01
+
+Membership controllers pass the authenticated requester to services, which require
+team leadership or administrative authority before side effects. Removal requires
+current membership and preserves team leads and event heads. Cascaded addition
+preserves the direct event restriction on adding T3 executives. The mounted role
+gate remains in place; permission middleware and the team repository are unused
+scaffolds in this flow. The security investigation authorizes this fix; human
+review is required before merge.
