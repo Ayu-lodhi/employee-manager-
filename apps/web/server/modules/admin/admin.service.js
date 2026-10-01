@@ -1,0 +1,197 @@
+const bcrypt = require('bcryptjs');
+const User = require('./admin.model');
+const { sendWelcomeEmail, sendPasswordResetEmail } = require('../../services/email.service');
+
+const generateDefaultPassword = () => {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let pass = 'TBI@';
+  for (let i = 0; i < 6; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  pass += Math.floor(Math.random() * 90 + 10);
+  return pass;
+};
+
+const LOGIN_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+exports.getAllUsers = async () => {
+  return await User.find().select('-password').sort({ createdAt: -1 });
+};
+
+exports.createUser = async (data) => {
+  const existing = await User.findOne({ email: data.email.toLowerCase() });
+  if (existing) throw new Error('Email already exists');
+
+  const tempPassword = generateDefaultPassword();
+  const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+  const user = await User.create({
+    name: data.name,
+    email: data.email.toLowerCase(),
+    phone: data.phone || '',
+    role: data.role || 'T1_VOLUNTEER',
+    password: hashedPassword,
+    mustChangePassword: true,
+    isActive: true,
+  });
+
+  // Send welcome email (fire and forget)
+  sendWelcomeEmail({
+    to: user.email,
+    name: user.name,
+    role: user.role,
+    tempPassword,
+    loginUrl: LOGIN_URL,
+  }).catch((err) => console.error('Welcome email failed:', err.message));
+
+  return { user: user.toObject({ virtuals: false }), tempPassword };
+};
+
+exports.updateUser = async (id, data) => {
+  // C6: Allowlist only safe profile fields — block role, isActive, mustChangePassword, password
+  const allowed = ['name', 'phone', 'skills', 'bio', 'availability'];
+  const safeData = {};
+  allowed.forEach((k) => { if (data[k] !== undefined) safeData[k] = data[k]; });
+
+  const user = await User.findByIdAndUpdate(id, safeData, { new: true }).select('-password');
+  if (!user) throw new Error('User not found');
+  return user;
+};
+
+// REVOKE — full implementation
+exports.revokeUser = async (id, reason, notes, adminId) => {
+  // 1. Find user
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+
+  // 2. Prevent revoking Super Admin
+  if (user.role === 'SUPER_ADMIN') {
+    throw new Error('Cannot revoke a Super Admin account');
+  }
+
+  // 3. Prevent self-revoke
+  if (user._id.toString() === adminId.toString()) {
+    throw new Error('You cannot revoke your own account');
+  }
+
+  // 4. Prevent revoking already-inactive
+  if (!user.isActive) {
+    throw new Error(`${user.name}'s account is already inactive`);
+  }
+
+  // 5. Deactivate + reset password to prevent re-login
+  user.isActive = false;
+  user.passwordChangeStartedAt = null;
+  user.password = await bcrypt.hash(generateDefaultPassword(), 12);
+  user.mustChangePassword = true;
+  await user.save();
+
+  return {
+    userId: user._id,
+    name: user.name,
+    email: user.email,
+    reason,
+    notes,
+    revokedAt: new Date(),
+  };
+};
+
+// REACTIVATE — restore revoked access with new temp password
+exports.reactivateUser = async (id, adminId) => {
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+
+  if (user.role === 'SUPER_ADMIN') {
+    throw new Error('Cannot reactivate via this action');
+  }
+
+  if (user.isActive) {
+    throw new Error(`${user.name}'s account is already active`);
+  }
+
+  // Generate new temp password (old one was reset at revoke time)
+  const tempPassword = generateDefaultPassword();
+  user.passwordChangeStartedAt = null;
+  user.password = await bcrypt.hash(tempPassword, 12);
+  user.isActive = true;
+  user.mustChangePassword = true;  // Force password change on next login
+  await user.save();
+
+  // Send welcome email with new credentials
+  sendWelcomeEmail({
+    to: user.email,
+    name: user.name,
+    role: user.role,
+    tempPassword,
+    loginUrl: LOGIN_URL,
+  }).catch((err) => console.error('Reactivate email failed:', err.message));
+
+  return {
+    userId: user._id,
+    name: user.name,
+    email: user.email,
+    tempPassword,
+    reactivatedAt: new Date(),
+  };
+};
+
+// C7: deleteUser — guard against Super Admin and self-delete
+exports.deleteUser = async (id, adminId) => {
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+  if (user.role === 'SUPER_ADMIN') throw new Error('Cannot delete a Super Admin account');
+  if (id.toString() === adminId?.toString()) throw new Error('You cannot delete your own account');
+  await User.findByIdAndDelete(id);
+  return user;
+};
+
+// RESET PASSWORD — new temp password + email with one-time use
+exports.resetPassword = async (id, adminId = null) => {
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+
+  // Prevent resetting Super Admin
+  if (user.role === 'SUPER_ADMIN') {
+    throw new Error('Cannot reset Super Admin password this way');
+  }
+
+  // Generate new temp password
+  const tempPassword = generateDefaultPassword();
+  user.passwordChangeStartedAt = null;
+  user.password = await bcrypt.hash(tempPassword, 12);
+  user.mustChangePassword = true;  // force change on next login
+  await user.save();
+
+  // Email the temp password
+  let emailSent = false;
+  try {
+    const result = await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      tempPassword,
+      loginUrl: LOGIN_URL,
+    });
+    emailSent = result.success;
+  } catch (err) {
+    console.error('Reset email failed:', err.message);
+  }
+
+  // C5: Only include tempPassword in return value when email failed (caller decides what to do)
+  return { user: user.toObject({ virtuals: false }), tempPassword: emailSent ? undefined : tempPassword, emailSent };
+};
+
+// H6: setPassword — apply same complexity rules as changePassword, require adminId for audit
+exports.setPassword = async (id, newPassword, adminId) => {
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+  if (user.role === 'SUPER_ADMIN') throw new Error('Cannot set Super Admin password this way');
+  if (!newPassword || newPassword.length < 8) throw new Error('Password must be at least 8 characters');
+  if (!/[A-Z]/.test(newPassword)) throw new Error('Password must contain an uppercase letter');
+  if (!/[a-z]/.test(newPassword)) throw new Error('Password must contain a lowercase letter');
+  if (!/[0-9]/.test(newPassword)) throw new Error('Password must contain a number');
+  if (!/[^A-Za-z0-9]/.test(newPassword)) throw new Error('Password must contain a special character');
+
+  user.passwordChangeStartedAt = null;
+  user.password = await bcrypt.hash(newPassword, 12);
+  user.mustChangePassword = false;
+  await user.save();
+  return { user: user.toObject({ virtuals: false }) };
+};

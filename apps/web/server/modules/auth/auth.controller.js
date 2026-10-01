@@ -1,0 +1,56 @@
+const authService = require('./auth.service');
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required',
+      });
+    }
+
+    const result = await authService.login(email, password);
+
+    res.status(200).json({
+      success: true,
+      message: result.mfaRequired ? 'MFA verification required'
+        : result.mustChangePassword ? 'Password replacement required' : 'Login successful',
+      data: result,
+    });
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+exports.getMe = async (req, res) => {
+  try {
+    const user = await authService.getUserById(req.user.sub);
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    res.status(404).json({ success: false, message: error.message });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    await authService.changePassword(req.user, oldPassword, newPassword);
+    res.status(200).json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.verifyMfa = async (req, res) => {
+  try {
+    const { challengeToken, code } = req.body;
+    const result = await authService.verifyMfa(challengeToken, code);
+    res.status(200).json({ success: true, message: 'Login successful', data: result });
+  } catch (error) {
+    res.status(401).json({ success: false, message: error.message });
+  }
+};

@@ -282,7 +282,12 @@ export const Login = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server error (${res.status}): Please check backend logs`);
+      }
       if (!data.success) throw new Error(data.message || 'Login failed');
       login(data.data.user, data.data.accessToken);
       navigate(ROLES[data.data.user.role].route);

@@ -1,0 +1,61 @@
+const mongoose = require('mongoose');
+
+const mfaSchema = new mongoose.Schema({
+  secret: { type: String, required: true }, // AES-256-GCM encrypted TOTP secret
+  version: { type: String, required: true },
+  lastStep: { type: Number, default: -1 },
+  attempts: { type: Number, default: 0 },
+  windowStartedAt: { type: Date, default: Date.now },
+}, { _id: false });
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true, lowercase: true },
+  phone: { type: String, default: '' },
+  password: { type: String, required: true },
+  role: {
+    type: String,
+    enum: ['SUPER_ADMIN', 'ADMIN', 'T3_EXECUTIVE', 'T2_ASSOCIATE', 'T1_VOLUNTEER'],
+    default: 'T1_VOLUNTEER',
+  },
+  isActive: { type: Boolean, default: true },
+  mfa: { type: mfaSchema, select: false },
+  mustChangePassword: { type: Boolean, default: true },
+  // Set atomically on first temporary-password login; reset only with new credentials.
+  passwordChangeStartedAt: { type: Date, default: null, select: false },
+  teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
+
+  // Profile fields
+  skills: { type: String, default: '' },
+  availability: { type: String, default: '' },
+  bio: { type: String, default: '' },
+
+  // NOTIFICATION PREFERENCES
+  notificationPrefs: {
+    // Master channel toggles
+    email: { type: Boolean, default: true },
+    sms: { type: Boolean, default: false },
+    inApp: { type: Boolean, default: true },
+
+    // Per-category toggles (which types of notifications to receive)
+    categories: {
+      application: { type: Boolean, default: true },
+      event: { type: Boolean, default: true },
+      chat: { type: Boolean, default: true },
+      attendance: { type: Boolean, default: true },
+      system: { type: Boolean, default: true },
+      announcement: { type: Boolean, default: true },
+      review: { type: Boolean, default: true },
+    },
+  },
+
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+userSchema.pre('save', function (next) {
+  this.updatedAt = new Date();
+  next();
+});
+
+module.exports = mongoose.model('User', userSchema);
