@@ -17,8 +17,8 @@ export const api = {
     }
     return { data };
   },
-  post: async (url, body, credential) => {
-    const token = credential ?? localStorage.getItem('tbi_token');
+  post: async (url, body) => {
+    const token = localStorage.getItem('tbi_token');
     const res = await fetch(`${API_BASE}${url}`, {
       method: 'POST',
       headers: {

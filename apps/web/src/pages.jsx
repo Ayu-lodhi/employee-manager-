@@ -76,7 +76,6 @@ export const SocketProvider = ({ children }) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
-  const [passwordChangeToken, setPasswordChangeToken] = useState('');
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -102,19 +101,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    setPasswordChangeToken('');
     setUser(null);
     localStorage.removeItem('tbi_user');
     localStorage.removeItem('tbi_token');
   };
 
-  const beginPasswordChange = (token) => {
-    logout();
-    setPasswordChangeToken(token);
-  };
-
   return (
-    <AuthContext.Provider value={{ user, login, logout, initializing, passwordChangeToken, beginPasswordChange }}>
+    <AuthContext.Provider value={{ user, login, logout, initializing }}>
       {children}
     </AuthContext.Provider>
   );
@@ -168,44 +161,58 @@ const MENUS = {
     },
   ],
   ADMIN: [
-    { section: 'OVERVIEW', items: [
-      { icon: LayoutDashboard, label: 'Dashboard', to: '/admin' },
-      { icon: TrendingUp, label: 'Analytics', to: '/admin/analytics' },
-    ]},
-    { section: 'MANAGEMENT', items: [
-      { icon: Users, label: 'Users', to: '/admin/users' },
-      { icon: UserPlus, label: 'Add User', to: '/admin/users/new' },
-      { icon: Upload, label: 'Bulk Import', to: '/admin/users/bulk' },
-    ]},
-    { section: 'OPERATIONS', items: [
-      { icon: Calendar, label: 'Events', to: '/admin/events' },
-      { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
-      { icon: Bell, label: 'Announcements', to: '/announcements' },
-      { icon: Clock, label: 'Timesheets', to: '/timesheets' },
-    ]},
-    { section: 'ACCOUNT', items: [
-      { icon: UserIcon, label: 'My Profile', to: '/profile' },
-      { icon: Settings, label: 'Preferences', to: '/preferences' },
-    ]},
+    {
+      section: 'OVERVIEW', items: [
+        { icon: LayoutDashboard, label: 'Dashboard', to: '/admin' },
+        { icon: TrendingUp, label: 'Analytics', to: '/admin/analytics' },
+      ]
+    },
+    {
+      section: 'MANAGEMENT', items: [
+        { icon: Users, label: 'Users', to: '/admin/users' },
+        { icon: UserPlus, label: 'Add User', to: '/admin/users/new' },
+        { icon: Upload, label: 'Bulk Import', to: '/admin/users/bulk' },
+      ]
+    },
+    {
+      section: 'OPERATIONS', items: [
+        { icon: Calendar, label: 'Events', to: '/admin/events' },
+        { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
+        { icon: Bell, label: 'Announcements', to: '/announcements' },
+        { icon: Clock, label: 'Timesheets', to: '/timesheets' },
+      ]
+    },
+    {
+      section: 'ACCOUNT', items: [
+        { icon: UserIcon, label: 'My Profile', to: '/profile' },
+        { icon: Settings, label: 'Preferences', to: '/preferences' },
+      ]
+    },
   ],
   T3_EXECUTIVE: [
-    { section: 'MY WORKSPACE', items: [
-      { icon: LayoutDashboard, label: 'Dashboard', to: '/t3' },
-      { icon: UsersRound, label: 'My Teams', to: '/t3/teams' },
-      { icon: FileText, label: 'Applications', to: '/t3/applications' },
-      { icon: CheckCircle, label: 'Attendance', to: '/t3/attendance' },
-      { icon: Clock, label: 'Timesheets', to: '/timesheets' },
-    ]},
-    { section: 'COMMUNICATION', items: [
-      { icon: MessageSquare, label: 'Team Chats', to: '/chat' },
-      { icon: Bell, label: 'Announcements', to: '/announcements' },
-      { icon: Star, label: 'Submit Review', to: '/t3/reviews' },
-    ]},
-    { section: 'ACHIEVEMENTS', items: [
-      { icon: Award, label: 'Certificates', to: '/t3/certificates' },
-      { icon: UserIcon, label: 'My Profile', to: '/profile' },
-      { icon: Settings, label: 'Preferences', to: '/preferences' },
-    ]},
+    {
+      section: 'MY WORKSPACE', items: [
+        { icon: LayoutDashboard, label: 'Dashboard', to: '/t3' },
+        { icon: UsersRound, label: 'My Teams', to: '/t3/teams' },
+        { icon: FileText, label: 'Applications', to: '/t3/applications' },
+        { icon: CheckCircle, label: 'Attendance', to: '/t3/attendance' },
+        { icon: Clock, label: 'Timesheets', to: '/timesheets' },
+      ]
+    },
+    {
+      section: 'COMMUNICATION', items: [
+        { icon: MessageSquare, label: 'Team Chats', to: '/chat' },
+        { icon: Bell, label: 'Announcements', to: '/announcements' },
+        { icon: Star, label: 'Submit Review', to: '/t3/reviews' },
+      ]
+    },
+    {
+      section: 'ACHIEVEMENTS', items: [
+        { icon: Award, label: 'Certificates', to: '/t3/certificates' },
+        { icon: UserIcon, label: 'My Profile', to: '/profile' },
+        { icon: Settings, label: 'Preferences', to: '/preferences' },
+      ]
+    },
   ],
   T2_ASSOCIATE: [
     {
@@ -258,45 +265,43 @@ const MENUS = {
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [challengeToken, setChallengeToken] = useState('');
-  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, beginPasswordChange } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const performLogin = async (loginEmail, loginPassword) => {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/v1/auth/${challengeToken ? 'mfa/verify' : 'login'}`, {
+      const res = await fetch('http://localhost:5000/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(challengeToken ? { challengeToken, code } : { email, password }),
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Login failed');
-      if (data.data.mfaRequired) {
-        setChallengeToken(data.data.challengeToken);
-        setPassword('');
-        return;
-      }
-      if (data.data.mustChangePassword) {
-        beginPasswordChange(data.data.passwordChangeToken);
-        navigate('/change-password', { replace: true });
-        return;
-      }
       login(data.data.user, data.data.accessToken);
       navigate(ROLES[data.data.user.role].route);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const quickLogin = (e, p) => { setChallengeToken(''); setCode(''); setEmail(e); setPassword(p); };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await performLogin(email, password);
+  };
+
+  const quickLogin = (e, p) => {
+    setEmail(e);
+    setPassword(p);
+    performLogin(e, p);
+  };
+
+  const isDev = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -311,7 +316,6 @@ export const Login = () => {
         </div>
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {!challengeToken && <>
             <div>
               <label className="block text-sm font-medium mb-2">Email</label>
               <div className="relative">
@@ -330,35 +334,25 @@ export const Login = () => {
                   className="w-full h-12 pl-10 pr-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
               </div>
             </div>
-            </>}
-            {challengeToken && <div>
-              <label htmlFor="mfa-code" className="block text-sm font-medium mb-2">Authenticator code</label>
-              <input id="mfa-code" type="text" inputMode="numeric" autoComplete="one-time-code"
-                pattern="[0-9]{6}" maxLength={6} required autoFocus value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="w-full h-12 px-3 rounded-lg border border-gray-200" />
-              <button type="button" className="mt-3 text-sm text-blue-600" disabled={loading}
-                onClick={() => { setChallengeToken(''); setCode(''); setError(''); }}>Back to sign in</button>
-            </div>}
             {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>}
             <button type="submit" disabled={loading}
               className="w-full h-12 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-lg transition">
-              {loading ? 'Signing in...' : challengeToken ? 'Verify code' : 'Sign In'}
+              {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
           <div className="mt-6 pt-6 border-t border-gray-100">
-            {/* C1: Demo login buttons — only visible in development */}
-            {import.meta.env.VITE_DEV_MODE === 'true' && (
+            {/* Quick Demo Login buttons */}
+            {isDev && (
               <>
-                <p className="text-xs text-gray-500 mb-3 text-center">Quick Demo Login</p>
+                <p className="text-xs text-gray-500 mb-3 text-center">Quick Demo Login (Click to Sign In)</p>
                 <div className="grid grid-cols-3 gap-2">
-                  <button onClick={() => quickLogin('super@tbi.org', 'Super@123')} className="text-xs py-2 px-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 font-medium">Super Admin</button>
-                  <button onClick={() => quickLogin('admin@tbi.org', 'Admin@123')} className="text-xs py-2 px-2 bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 font-medium">Admin</button>
-                  <button onClick={() => quickLogin('mayank@tbi.org', 'Mayank@123')} className="text-xs py-2 px-2 bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 font-medium">T3 Exec</button>
+                  <button type="button" disabled={loading} onClick={() => quickLogin('super@tbi.org', 'Super@123')} className="text-xs py-2 px-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 disabled:opacity-50 font-medium transition cursor-pointer">Super Admin</button>
+                  <button type="button" disabled={loading} onClick={() => quickLogin('admin@tbi.org', 'Admin@123')} className="text-xs py-2 px-2 bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 disabled:opacity-50 font-medium transition cursor-pointer">Admin</button>
+                  <button type="button" disabled={loading} onClick={() => quickLogin('mayank@tbi.org', 'Mayank@123')} className="text-xs py-2 px-2 bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 disabled:opacity-50 font-medium transition cursor-pointer">T3 Exec</button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                  <button onClick={() => quickLogin('abhishek@tbi.org', 'Abhishek@123')} className="text-xs py-2 px-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium">T2 Assoc</button>
-                  <button onClick={() => quickLogin('ayush@tbi.org', 'Ayush@123')} className="text-xs py-2 px-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 font-medium">T1 Vol</button>
+                  <button type="button" disabled={loading} onClick={() => quickLogin('abhishek@tbi.org', 'Abhishek@123')} className="text-xs py-2 px-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 disabled:opacity-50 font-medium transition cursor-pointer">T2 Assoc</button>
+                  <button type="button" disabled={loading} onClick={() => quickLogin('ayush@tbi.org', 'Ayush@123')} className="text-xs py-2 px-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 disabled:opacity-50 font-medium transition cursor-pointer">T1 Vol</button>
                 </div>
               </>
             )}
@@ -1826,8 +1820,8 @@ export const Chat = () => {
                         <p className="text-xs text-gray-500 truncate">{u.email}</p>
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
-                          u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
-                            'bg-purple-100 text-purple-700'
+                        u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                          'bg-purple-100 text-purple-700'
                         }`}>{u.role.replace('_', ' ')}</span>
                     </label>
                   ))}
@@ -2151,11 +2145,10 @@ export const QRCheckIn = () => {
                   <td className="px-6 py-3 text-sm text-gray-500">{h.checkOutTime ? new Date(h.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                   <td className="px-6 py-3 text-sm text-gray-500">{h.durationMinutes ? `${h.durationMinutes}m` : '—'}</td>
                   <td className="px-6 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      h.status === 'present' ? 'bg-green-100 text-green-700' :
-                      h.status === 'late' ? 'bg-amber-100 text-amber-700' :
-                      h.status === 'absent' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                    }`}>{h.status.replace('_', ' ')}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${h.status === 'present' ? 'bg-green-100 text-green-700' :
+                        h.status === 'late' ? 'bg-amber-100 text-amber-700' :
+                          h.status === 'absent' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                      }`}>{h.status.replace('_', ' ')}</span>
                   </td>
                 </tr>
               ))}
@@ -2880,11 +2873,10 @@ export const AttendancePage = () => {
                       key={opt.value}
                       type="button"
                       onClick={() => setManualForm({ ...manualForm, status: opt.value })}
-                      className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
-                        manualForm.status === opt.value
+                      className={`p-3 rounded-lg border-2 text-sm font-medium transition ${manualForm.status === opt.value
                           ? `border-${opt.color}-500 bg-${opt.color}-50`
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                        }`}
                     >
                       {opt.label}
                     </button>
@@ -3066,21 +3058,18 @@ export const NotificationsPage = () => {
               <div
                 key={n._id}
                 onClick={() => !n.isRead && markRead(n._id)}
-                className={`p-4 flex gap-4 items-start cursor-pointer transition ${
-                  i > 0 ? 'border-t border-gray-100' : ''
-                } ${
-                  isAnn
+                className={`p-4 flex gap-4 items-start cursor-pointer transition ${i > 0 ? 'border-t border-gray-100' : ''
+                  } ${isAnn
                     ? !n.isRead
                       ? 'bg-indigo-50 border-l-4 border-l-indigo-500 hover:bg-indigo-100'
                       : 'bg-indigo-50/30 border-l-4 border-l-indigo-200 hover:bg-indigo-50/60'
                     : !n.isRead
                       ? 'bg-blue-50/30 hover:bg-blue-50/50'
                       : 'hover:bg-gray-50'
-                }`}
+                  }`}
               >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  isAnn ? 'bg-indigo-100' : 'bg-gray-100'
-                }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isAnn ? 'bg-indigo-100' : 'bg-gray-100'
+                  }`}>
                   {iconFor(n.type)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -3342,14 +3331,12 @@ export const AdminManagementPage = () => {
                   <td className="px-6 py-4 text-sm font-medium">{a.name}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{a.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      a.role === 'SUPER_ADMIN' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
-                    }`}>{a.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${a.role === 'SUPER_ADMIN' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                      }`}>{a.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      a.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
-                    }`}>{a.isActive ? 'Active' : 'Revoked'}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${a.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+                      }`}>{a.isActive ? 'Active' : 'Revoked'}</span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-400 italic text-xs">
                     Manage via User Management
@@ -4342,8 +4329,8 @@ export const MyTeamsPage = () => {
                   <td className="px-6 py-4 text-sm text-gray-500">{m.email}</td>
                   <td className="px-6 py-4">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${m.role === 'T3_EXECUTIVE' ? 'bg-purple-100 text-purple-700' :
-                        m.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
-                          'bg-green-100 text-green-700'
+                      m.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                        'bg-green-100 text-green-700'
                       }`}>
                       {m.role.replace('_', ' ')}
                     </span>
@@ -5025,8 +5012,8 @@ export const EventDetailPage = () => {
                       <p className="text-xs text-gray-500 truncate">{u.email}</p>
                     </div>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0 ${u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
-                        u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
-                          'bg-purple-100 text-purple-700'
+                      u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
+                        'bg-purple-100 text-purple-700'
                       }`}>
                       {u.role.replace('_', ' ')}
                     </span>
@@ -5373,7 +5360,7 @@ export const LandingPage = () => {
 
 
 export const ChangePasswordPage = () => {
-  const { user, logout, passwordChangeToken } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -5397,7 +5384,7 @@ export const ChangePasswordPage = () => {
     if (!allValid) return setError('Please complete all requirements');
     setLoading(true);
     try {
-      await api.post('/auth/change-password', { oldPassword, newPassword }, passwordChangeToken || undefined);
+      await api.post('/auth/change-password', { oldPassword, newPassword });
       alert('Password changed successfully. Please login again.');
       logout();
       navigate('/login', { replace: true });
@@ -5418,20 +5405,17 @@ export const ChangePasswordPage = () => {
             </div>
             <h1 className="text-2xl font-bold">Password Change Required</h1>
             <p className="text-gray-500 mt-2 text-sm">
-              {passwordChangeToken
-                ? 'Set a new password within five minutes of signing in. If this page is closed or time runs out, ask an administrator for a new temporary password.'
-                : user ? 'Enter your current password and choose a new password.'
-                : 'Sign in to change your password. If you already used a temporary password, ask an administrator to reset it.'}
+              You must set a new password before continuing.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {!passwordChangeToken && <div>
+            <div>
               <label className="block text-sm font-medium mb-2">Current Password</label>
               <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="Your current password"
+                placeholder="Your temp password"
                 className="w-full h-12 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" required />
-            </div>}
+            </div>
             <div>
               <label className="block text-sm font-medium mb-2">New Password</label>
               <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
@@ -5463,7 +5447,7 @@ export const ChangePasswordPage = () => {
 
             {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>}
 
-            <button type="submit" disabled={loading || !allValid || (!user && !passwordChangeToken)}
+            <button type="submit" disabled={loading || !allValid}
               className="w-full h-12 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-lg transition">
               {loading ? 'Updating...' : 'Change Password & Continue'}
             </button>
@@ -5687,14 +5671,12 @@ export const ToggleSwitch = ({ checked, onChange }) => (
   <button
     type="button"
     onClick={onChange}
-    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-      checked ? 'bg-blue-500' : 'bg-gray-300'
-    }`}
+    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-blue-500' : 'bg-gray-300'
+      }`}
   >
     <span
-      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-        checked ? 'translate-x-6' : 'translate-x-1'
-      }`}
+      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'
+        }`}
     />
   </button>
 );
@@ -5844,11 +5826,10 @@ export const AddUserPage = () => {
                   key={opt.value}
                   type="button"
                   onClick={() => setForm({ ...form, role: opt.value })}
-                  className={`p-4 rounded-lg border-2 text-left transition-all ${
-                    form.role === opt.value
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${form.role === opt.value
                       ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500/20'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-bold ${opt.color} mb-2`}>
                     {opt.icon}
@@ -6003,7 +5984,7 @@ export const AnnouncementsPage = () => {
           <h1 className="text-2xl font-bold">Announcements</h1>
           <p className="text-gray-500">
             {isAdmin ? 'Broadcast messages to everyone or specific events' :
-             'Send messages to your team'}
+              'Send messages to your team'}
           </p>
         </div>
         {canCreate && (
@@ -6106,11 +6087,10 @@ export const AnnouncementsPage = () => {
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, target: 'ALL', targetTeamId: '', targetEventId: '' })}
-                      className={`p-4 rounded-lg border-2 text-left transition ${
-                        form.target === 'ALL'
+                      className={`p-4 rounded-lg border-2 text-left transition ${form.target === 'ALL'
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                        }`}
                     >
                       <Users className="w-5 h-5 text-blue-500 mb-2" />
                       <p className="text-sm font-semibold">Everyone</p>
@@ -6119,11 +6099,10 @@ export const AnnouncementsPage = () => {
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, target: 'EVENT', targetTeamId: '', targetEventId: '' })}
-                      className={`p-4 rounded-lg border-2 text-left transition ${
-                        form.target === 'EVENT'
+                      className={`p-4 rounded-lg border-2 text-left transition ${form.target === 'EVENT'
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                        }`}
                     >
                       <Calendar className="w-5 h-5 text-purple-500 mb-2" />
                       <p className="text-sm font-semibold">Specific Event</p>
@@ -6328,9 +6307,8 @@ export const AnnouncementPopup = () => {
               {announcements.map((_, i) => (
                 <span
                   key={i}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === currentIndex ? 'w-6 bg-blue-500' : 'w-1.5 bg-gray-300'
-                  }`}
+                  className={`h-1.5 rounded-full transition-all ${i === currentIndex ? 'w-6 bg-blue-500' : 'w-1.5 bg-gray-300'
+                    }`}
                 />
               ))}
             </div>
@@ -6434,7 +6412,7 @@ export const TimesheetPage = () => {
           const t = await api.get('/timesheets/teams/reviewable');
           setReviewTeams(t.data.data);
           if (t.data.data.length > 0) setSelectedTeamId(t.data.data[0]._id);
-        } catch {}
+        } catch { }
       }
       if (isAdmin) await fetchAll();
       setLoading(false);
@@ -6742,4 +6720,4 @@ const TimesheetTable = ({ rows, statusColor, showUser, onApprove, onReject, onDe
     </div>
   </div>
 );
-
+

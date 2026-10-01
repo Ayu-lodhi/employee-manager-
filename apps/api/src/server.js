@@ -13,13 +13,23 @@ const { initSocket } = require('./config/socket');
 
 const app = express();
 
-// M9: Read allowed origins from env (comma-separated) — fallback to localhost for dev
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-  : ['http://localhost:3000', 'http://localhost:5173'];
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (process.env.ALLOWED_ORIGINS) {
+    const list = process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim());
+    if (list.includes(origin)) return true;
+  }
+  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+};
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS not allowed for origin: ' + origin));
+    }
+  },
   credentials: true,
 }));
 app.use(securityMiddleware);

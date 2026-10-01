@@ -18,15 +18,21 @@ const canAccessRoom = async (roomId, userId) => {
   }
 };
 
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-];
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (process.env.ALLOWED_ORIGINS) {
+    const list = process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim());
+    if (list.includes(origin)) return true;
+  }
+  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+};
 
 const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: ALLOWED_ORIGINS,
+      origin: (origin, callback) => {
+        callback(null, isAllowedOrigin(origin));
+      },
       credentials: true,
     },
     pingTimeout: 60000,
