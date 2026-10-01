@@ -270,6 +270,7 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -309,64 +310,309 @@ export const Login = () => {
     performLogin(e, p);
   };
 
-  const isDev = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true';
+  const emailHasValue = email.trim().length > 0;
+  const passHasValue = password.length > 0;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-            <h1 className="text-3xl font-bold text-gray-900">TBI</h1>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
-          <p className="text-gray-500 mt-1">Sign in to your account</p>
+    <div className="min-h-screen flex flex-col bg-[#F7F4EB] text-slate-900 select-none overflow-x-hidden">
+      {/* ========================================================================= */}
+      {/* RETRO TOP NAVIGATION BAR */}
+      {/* ========================================================================= */}
+      <header className="w-full bg-[#0E2233] h-12 px-4 sm:px-8 flex items-center justify-between border-b border-[#1E3A52] shadow-md z-30">
+        {/* Left: TBI Brand mark */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#E5B558] shadow-[0_0_8px_#E5B558] animate-pulse" />
+          <span className="font-['Barlow_Condensed',sans-serif] font-black text-2xl tracking-widest text-[#E5B558] uppercase">
+            TBI
+          </span>
         </div>
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@tbi.org" required autoFocus
-                  className="w-full h-12 pl-10 pr-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+
+        {/* Center: Search Capsule */}
+        <div className="hidden sm:flex items-center bg-white rounded-full px-3.5 py-1 w-64 md:w-80 shadow-inner border border-slate-200">
+          <Search size={14} className="text-slate-400 mr-2 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search focus sectors..."
+            disabled
+            className="w-full text-xs font-sans text-slate-700 bg-transparent outline-none cursor-not-allowed placeholder:text-slate-400"
+          />
+        </div>
+
+        {/* Right: User Avatar icon */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowDemo(!showDemo)}
+            className="text-[11px] font-['Space_Mono',monospace] text-[#E5B558] hover:text-white transition px-2 py-0.5 rounded border border-[#E5B558]/40 hover:border-[#E5B558] bg-[#0E2233]"
+            title="Toggle Quick Role Access"
+          >
+            {showDemo ? 'Hide Quick Login' : 'Quick Access Keys'}
+          </button>
+          <div className="w-7 h-7 rounded-full bg-[#183954] border border-[#2B5478] flex items-center justify-center text-slate-200 shadow-sm">
+            <User size={15} />
+          </div>
+        </div>
+      </header>
+
+      {/* ========================================================================= */}
+      {/* MAIN DUAL-PANEL CONTENT */}
+      {/* ========================================================================= */}
+      <main className="flex-1 flex flex-col lg:flex-row blueprint-grid relative">
+        {/* ----------------------------------------------------------------------- */}
+        {/* LEFT COLUMN: Innovation Sectors Mural Collage */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="w-full lg:w-[46%] xl:w-[44%] relative flex items-center justify-center p-4 lg:p-6 lg:border-r border-[#D9D1BF] bg-[#F4EFE3]/80 overflow-hidden">
+          <div className="relative w-full max-w-lg shadow-xl rounded-lg overflow-hidden border-2 border-[#C9C0AE] bg-[#F7F4EB]">
+            {/* The Authentic Innovation Mural */}
+            <img
+              src="/tbi-mural-2x.png"
+              alt="TBI Innovation Sectors — DeepTech, AgriTech, MedTech, Carbon Risk, Bioinformatics, Sustainability, Robotics"
+              className="w-full h-auto object-cover block"
+            />
+
+            {/* Technical overlay watermark / Blueprint lines */}
+            <div className="absolute inset-0 pointer-events-none border border-black/10" />
+          </div>
+
+          {/* Technical drafting dimension marker */}
+          <div className="hidden xl:flex absolute top-6 right-6 flex-col items-center gap-1 text-[10px] font-['Space_Mono',monospace] text-[#7A7465]">
+            <div className="w-8 h-[1px] bg-[#9A9180]" />
+            <span>2ft</span>
+            <div className="w-8 h-[1px] bg-[#9A9180]" />
+          </div>
+        </div>
+
+        {/* ----------------------------------------------------------------------- */}
+        {/* THE BRONZE GEAR MEDALLION LOGO (Positioned at seam / junction) */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="hidden lg:flex absolute top-6 left-[46%] xl:left-[44%] -translate-x-1/2 z-20 flex-col items-center pointer-events-none">
+          {/* Radiating drafting circles and guideline */}
+          <div className="relative flex items-center justify-center">
+            {/* Outer technical compass circle */}
+            <div className="absolute w-36 h-36 rounded-full border border-dashed border-[#A89F8D] animate-spin-slow opacity-60" />
+            <div className="absolute w-44 h-44 rounded-full border border-[#C5BBA7]/50" />
+            <div className="absolute w-52 h-[1px] bg-[#B0A591]/40" />
+            <div className="absolute h-52 w-[1px] bg-[#B0A591]/40" />
+
+            {/* The pristine 500x500 gear medallion */}
+            <img
+              src="/tbi-logo.png"
+              alt="TBI GEU Technology Business Incubator"
+              className="w-24 h-24 xl:w-28 xl:h-28 object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.35)] relative z-10 transition-transform hover:rotate-6 duration-300"
+            />
+          </div>
+        </div>
+
+        {/* ----------------------------------------------------------------------- */}
+        {/* RIGHT COLUMN: Industrial Access Console */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="w-full lg:w-[54%] xl:w-[56%] flex flex-col justify-center px-6 sm:px-12 lg:px-16 py-8 lg:py-12 z-10">
+          <div className="max-w-xl w-full mx-auto">
+            {/* Mobile Logo display */}
+            <div className="flex lg:hidden items-center justify-center mb-6">
+              <img
+                src="/tbi-logo.png"
+                alt="TBI Logo"
+                className="w-20 h-20 object-contain drop-shadow-md"
+              />
+            </div>
+
+            {/* Header Titles */}
+            <div className="mb-6">
+              <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-3xl sm:text-4xl text-[#121922] tracking-tight uppercase leading-none">
+                WELCOME, TBI-GEU INNOVATION TEAM!
+              </h1>
+              <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-xl sm:text-2xl text-[#2B3542] tracking-wide uppercase mt-1">
+                EMPLOYEES MANAGEMENT PORTAL ACCESS
+              </h2>
+
+              <div className="mt-3 flex items-center gap-2">
+                <span className="font-['Space_Mono',monospace] font-bold text-xs uppercase tracking-[0.18em] text-[#4A5568]">
+                  FOCUS SECTOR INTEGRATION PANEL
+                </span>
+                <div className="flex-1 h-[1px] bg-[#C5BBA7]" />
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="********" required
-                  className="w-full h-12 pl-10 pr-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+
+            {/* =================================================================== */}
+            {/* AUTHENTICATION FORM */}
+            {/* =================================================================== */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Field 1: Username / Email */}
+              <div>
+                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-xl sm:text-2xl text-[#121922] tracking-wide mb-1.5">
+                  Username
+                </label>
+                <div className="industrial-chassis rounded-lg p-2 sm:p-2.5 transition">
+                  {/* 4 Corner Screws */}
+                  <span className="screw-rivet absolute top-1.5 left-1.5" />
+                  <span className="screw-rivet absolute top-1.5 right-1.5" />
+                  <span className="screw-rivet absolute bottom-1.5 left-1.5" />
+                  <span className="screw-rivet absolute bottom-1.5 right-1.5" />
+
+                  <div className="flex items-center justify-between px-3">
+                    <input
+                      type="text"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Username / Email"
+                      required
+                      autoFocus
+                      className="w-full bg-transparent font-['Space_Mono',monospace] text-base sm:text-lg text-slate-100 placeholder-[#768090] outline-none py-1.5 tracking-wide"
+                    />
+
+                    {/* Status LED Pod on right */}
+                    <div className="shrink-0 bg-[#1A1C21] px-2.5 py-1 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                      <span className={`led-indicator ${emailHasValue ? 'led-green' : 'led-off'}`} title="Input Active" />
+                      <span className={`led-indicator ${emailHasValue && email.includes('@') ? 'led-amber' : 'led-off'}`} title="Format Verified" />
+                      <span className={`led-indicator ${error ? 'led-red' : 'led-off'}`} title="Status Check" />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>}
-            <button type="submit" disabled={loading}
-              className="w-full h-12 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-lg transition">
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            {/* Quick Demo Login buttons */}
-            {isDev && (
-              <>
-                <p className="text-xs text-gray-500 mb-3 text-center">Quick Demo Login (Click to Sign In)</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button type="button" disabled={loading} onClick={() => quickLogin('super@tbi.org', 'Super@123')} className="text-xs py-2 px-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 disabled:opacity-50 font-medium transition cursor-pointer">Super Admin</button>
-                  <button type="button" disabled={loading} onClick={() => quickLogin('admin@tbi.org', 'Admin@123')} className="text-xs py-2 px-2 bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 disabled:opacity-50 font-medium transition cursor-pointer">Admin</button>
-                  <button type="button" disabled={loading} onClick={() => quickLogin('mayank@tbi.org', 'Mayank@123')} className="text-xs py-2 px-2 bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 disabled:opacity-50 font-medium transition cursor-pointer">T3 Exec</button>
+
+              {/* Field 2: Password */}
+              <div>
+                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-xl sm:text-2xl text-[#121922] tracking-wide mb-1.5">
+                  Password
+                </label>
+                <div className="industrial-chassis rounded-lg p-2 sm:p-2.5 transition">
+                  {/* 4 Corner Screws */}
+                  <span className="screw-rivet absolute top-1.5 left-1.5" />
+                  <span className="screw-rivet absolute top-1.5 right-1.5" />
+                  <span className="screw-rivet absolute bottom-1.5 left-1.5" />
+                  <span className="screw-rivet absolute bottom-1.5 right-1.5" />
+
+                  <div className="flex items-center justify-between px-3">
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Password"
+                      required
+                      className="w-full bg-transparent font-['Space_Mono',monospace] text-base sm:text-lg text-slate-100 placeholder-[#768090] outline-none py-1.5 tracking-wider"
+                    />
+
+                    {/* Status LED Pod on right */}
+                    <div className="shrink-0 bg-[#1A1C21] px-2.5 py-1 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                      <span className={`led-indicator ${passHasValue ? 'led-green' : 'led-off'}`} title="Key Accepted" />
+                      <span className={`led-indicator ${passHasValue && password.length >= 6 ? 'led-amber' : 'led-off'}`} title="Cipher Lock" />
+                      <span className={`led-indicator ${error ? 'led-red' : 'led-off'}`} title="Security Guard" />
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <button type="button" disabled={loading} onClick={() => quickLogin('abhishek@tbi.org', 'Abhishek@123')} className="text-xs py-2 px-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 disabled:opacity-50 font-medium transition cursor-pointer">T2 Assoc</button>
-                  <button type="button" disabled={loading} onClick={() => quickLogin('ayush@tbi.org', 'Ayush@123')} className="text-xs py-2 px-2 bg-green-50 text-green-600 rounded-md hover:bg-green-100 disabled:opacity-50 font-medium transition cursor-pointer">T1 Vol</button>
+              </div>
+
+              {/* Error Notice */}
+              {error && (
+                <div className="p-3 bg-red-900/90 border-2 border-red-500 rounded-lg text-sm text-red-100 font-['Space_Mono',monospace] shadow-lg flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping shrink-0" />
+                  <span>{error}</span>
                 </div>
-              </>
+              )}
+
+              {/* Submit Button ("Sign In" / "Sign Up") */}
+              <div className="pt-2 flex flex-col items-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="industrial-button rounded-xl px-10 py-3.5 sm:px-12 sm:py-4 cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto"
+                >
+                  {/* Corner metallic rivets on button */}
+                  <span className="screw-rivet absolute top-1.5 left-2 scale-75" />
+                  <span className="screw-rivet absolute top-1.5 right-2 scale-75" />
+                  <span className="screw-rivet absolute bottom-1.5 left-2 scale-75" />
+                  <span className="screw-rivet absolute bottom-1.5 right-2 scale-75" />
+
+                  <span className="font-['Barlow_Condensed',sans-serif] font-black text-2xl sm:text-3xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
+                    {loading ? 'Accessing...' : 'Sign In'}
+                  </span>
+                </button>
+
+                {/* Secondary link */}
+                <p className="mt-4 text-center sm:text-right font-['Barlow_Condensed',sans-serif] font-bold text-xl text-[#B38F43] tracking-wide">
+                  Already have an Account?{' '}
+                  <span
+                    onClick={() => setShowDemo(!showDemo)}
+                    className="text-[#96742B] underline decoration-[#96742B]/50 hover:text-[#7A5B1B] cursor-pointer ml-1"
+                  >
+                    Quick Keys
+                  </span>
+                </p>
+              </div>
+            </form>
+
+            {/* =================================================================== */}
+            {/* QUICK DEMO ACCESS PANEL */}
+            {/* =================================================================== */}
+            {showDemo && (
+              <div className="mt-8 p-4 bg-[#1E232B] rounded-xl border-2 border-[#3D4452] shadow-xl text-slate-100">
+                <div className="flex items-center justify-between border-b border-[#343B48] pb-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="font-['Space_Mono',monospace] text-xs font-bold uppercase tracking-wider text-slate-300">
+                      System Access Keys (One-Click)
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">TBI-GEU DIRECT AUTH</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => quickLogin('super@tbi.org', 'SuperAdmin@123')}
+                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
+                  >
+                    <div className="text-red-400 font-bold">SUPER ADMIN</div>
+                    <div className="text-[10px] text-slate-400 truncate">super@tbi.org</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => quickLogin('admin@tbi.org', 'Admin@123')}
+                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
+                  >
+                    <div className="text-amber-400 font-bold">ADMIN</div>
+                    <div className="text-[10px] text-slate-400 truncate">admin@tbi.org</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => quickLogin('mayank@tbi.org', 'Mayank@123')}
+                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
+                  >
+                    <div className="text-purple-400 font-bold">T3 EXECUTIVE</div>
+                    <div className="text-[10px] text-slate-400 truncate">mayank@tbi.org</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => quickLogin('abhishek@tbi.org', 'Abhishek@123')}
+                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
+                  >
+                    <div className="text-blue-400 font-bold">T2 ASSOCIATE</div>
+                    <div className="text-[10px] text-slate-400 truncate">abhishek@tbi.org</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => quickLogin('ayush@tbi.org', 'Ayush@123')}
+                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
+                  >
+                    <div className="text-emerald-400 font-bold">T1 VOLUNTEER</div>
+                    <div className="text-[10px] text-slate-400 truncate">ayush@tbi.org</div>
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
