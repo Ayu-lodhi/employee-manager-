@@ -2,6 +2,7 @@
 node_modules/
 */node_modules/
 */*/node_modules/
+package-lock.json
 
 # Environment variables & secrets (CRITICAL: never commit .env)
 .env
