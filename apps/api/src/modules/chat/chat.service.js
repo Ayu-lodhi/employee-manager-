@@ -5,6 +5,15 @@ const { notify } = require('../notifications/notifications.service');
 
 class ChatService {
 
+  // Socket access follows the HTTP account and room-membership checks.
+  async canAccessRoom(roomId, userId) {
+    if (typeof roomId !== 'string' || !/^[a-f\d]{24}$/i.test(roomId) ||
+        typeof userId !== 'string' || !/^[a-f\d]{24}$/i.test(userId)) return false;
+
+    if (!await User.exists({ _id: userId, isActive: true })) return false;
+    return Boolean(await ChatRoom.exists({ _id: roomId, members: userId }));
+  }
+
   // List rooms where current user is a member
   async getMyRooms(userId) {
     return await ChatRoom.find({ members: userId, isArchived: false })

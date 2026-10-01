@@ -7,6 +7,18 @@ const jwt = require('jsonwebtoken');
 
 let io = null;
 
+const normalizeRoomId = (roomId) =>
+  typeof roomId === 'string' && /^[a-f\d]{24}$/i.test(roomId) ? roomId.toLowerCase() : null;
+
+const canAccessRoom = async (roomId, userId) => {
+  try {
+    // Load lazily: chat notifications also depend on this socket module.
+    return await require('../modules/chat/chat.service').canAccessRoom(roomId, userId);
+  } catch {
+    return false; // A failed authorization lookup must never disclose messages.
+  }
+};
+
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:5173',
@@ -44,15 +56,27 @@ const initSocket = (httpServer) => {
 
     socket.join(`user:${socket.userId}`);
 
-    socket.on('chat:join', (roomId) => {
-      if (typeof roomId === 'string' && roomId.length > 0) {
-        socket.join(`chat:${roomId}`);
+    const pendingJoins = new Map();
+    socket.on('chat:join', async (roomId) => {
+      const id = normalizeRoomId(roomId);
+      if (!id) return;
+      const request = Symbol();
+      pendingJoins.set(id, request);
+      const allowed = await canAccessRoom(id, socket.userId);
+      if (pendingJoins.get(id) !== request) return;
+      pendingJoins.delete(id);
+      if (allowed && socket.connected) {
+        await socket.join(`chat:${id}`);
+      } else {
+        await socket.leave(`chat:${id}`);
       }
     });
 
     socket.on('chat:leave', (roomId) => {
-      if (typeof roomId === 'string') {
-        socket.leave(`chat:${roomId}`);
+      const id = normalizeRoomId(roomId);
+      if (id) {
+        pendingJoins.delete(id);
+        socket.leave(`chat:${id}`);
       }
     });
 
@@ -74,10 +98,29 @@ const emitToUser = (userId, event, data) => {
   io.to(`user:${userId.toString()}`).emit(event, data);
 };
 
-const emitToRoom = (roomId, event, data) => {
+const emitToRoom = async (roomId, event, data) => {
   if (!io || !roomId) return;
-  const room = roomId.startsWith('room:') || roomId.startsWith('chat:') ? roomId : `chat:${roomId}`;
-  io.to(room).to(roomId).emit(event, data);
+  const id = normalizeRoomId(typeof roomId === 'string' ? roomId.replace(/^chat:/, '') : null);
+  if (!id) return;
+  const room = `chat:${id}`;
+  const sockets = await io.in(room).fetchSockets();
+  await Promise.all(sockets.map(async (socket) => {
+    // Recheck stored access so an existing subscription cannot outlive access.
+    if (await canAccessRoom(id, socket.userId)) {
+      if (socket.rooms.has(room)) socket.emit(event, data);
+    } else {
+      await socket.leave(room);
+    }
+  }));
+};
+
+const closeChatRoom = (roomId) => {
+  const id = normalizeRoomId(roomId);
+  if (!io || !id) return;
+  const room = `chat:${id}`;
+  // The room no longer exists. Send only its identifier, then evict subscribers.
+  io.to(room).emit('chat:room_deleted', { roomId: id });
+  io.in(room).socketsLeave(room);
 };
 
 const emitToAll = (event, data) => {
@@ -90,5 +133,6 @@ module.exports = {
   getIO,
   emitToUser,
   emitToRoom,
+  closeChatRoom,
   emitToAll,
 };
