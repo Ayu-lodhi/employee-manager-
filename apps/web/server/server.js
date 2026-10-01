@@ -19,6 +19,7 @@ const isAllowedOrigin = (origin) => {
     const list = process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim());
     if (list.includes(origin)) return true;
   }
+  if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return true;
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 };
 
