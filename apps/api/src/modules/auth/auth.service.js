@@ -1,17 +1,13 @@
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../admin/admin.model');
 
-// Fail hard at startup if JWT_SECRET is missing or too short
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error('FATAL: JWT_SECRET is missing or too short (min 32 chars). Set it in .env.');
-}
-const JWT_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
-const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
+const repository = require('./auth.repository');
+const tokens = require('./auth.tokens');
+const mfa = require('./mfa.service');
 
 exports.login = async (email, password) => {
-  const user = await User.findOne({ email }).select('+password');
+  if (typeof email !== 'string' || typeof password !== 'string') throw new Error('Invalid credentials');
+  const user = await repository.findByEmail(email);
   if (!user) throw new Error('Invalid credentials');
   if (!user.isActive) throw new Error('Account is deactivated');
 
@@ -21,17 +17,29 @@ exports.login = async (email, password) => {
   const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) throw new Error('Invalid credentials');
 
-  const accessToken = jwt.sign(
-    { sub: user._id, role: user.role },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRY }
-  );
+  if (await tokens.requiresMfa(user.role)) {
+    if (!user.mfa) throw new Error('MFA enrollment required; contact your system operator');
+    return { mfaRequired: true, challengeToken: tokens.sign(user, 'mfa', '5m') };
+  }
+  return issueSession(user, false);
+};
 
-  const refreshToken = jwt.sign(
-    { sub: user._id },
-    JWT_SECRET,
-    { expiresIn: REFRESH_EXPIRY }
-  );
+exports.verifyMfa = async (challengeToken, code) => {
+  const challenge = tokens.verify(challengeToken, 'mfa');
+  const user = await repository.findById(challenge.sub);
+  if (!user?.isActive || !user.mfa || !(await tokens.requiresMfa(user.role)) ||
+      challenge.authState !== tokens.authState(user)) {
+    throw new Error('MFA verification expired; sign in again');
+  }
+  const verified = await mfa.verify(user, code);
+  return issueSession(verified, true);
+};
+
+const issueSession = (user, isMfaVerified) => {
+  const accessToken = tokens.sign(user, 'access', process.env.JWT_ACCESS_EXPIRY || '15m', {
+    role: user.role, isMfaVerified,
+  });
+  const refreshToken = tokens.sign(user, 'refresh', process.env.JWT_REFRESH_EXPIRY || '7d');
 
   return {
     user: {

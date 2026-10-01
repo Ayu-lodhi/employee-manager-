@@ -69,3 +69,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - **Reason**: Gracefully recovers from race conditions or duplicate key collisions from stale indexes during attendance marking without failing the operation.
 - **Where**: `apps/api/src/modules/attendance/attendance.service.js`
 
+
+### [2026-10-01] Enforce MFA in the mounted authentication flow
+- What: Privileged login now requires a restricted password challenge and verified TOTP before issuing access; HTTP and Socket.io share access-purpose and MFA enforcement.
+- Reason: Confirmed password-only and refresh-token access to administrative operations. Trusted operator enrollment prevents password possession from also enrolling an attacker-controlled factor; the security-fix request authorizes this change.
+- Where: `apps/api/src/modules/auth/`, `apps/api/src/modules/admin/admin.model.js`, `apps/api/src/config/socket.js`, `apps/api/scripts/enroll-mfa.js`, `apps/web/src/pages.jsx`, `docs/security/mfa-policy.md`, `docs/database/mfa.md`, `packages/shared-types/index.js`, `.env.example`, API dependency manifests.

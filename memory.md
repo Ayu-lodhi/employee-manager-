@@ -2,7 +2,7 @@
 
 **Read this file first, before scanning the repo.** It is a self-contained, current snapshot of the project — what’s being built, what’s been decided, and what’s still open. Only fall back to the detailed docs (`prd.md`, `architecture.md`, `rules.md`, `phases.md`, `designe.md`, `CHANGELOG-decisions.md`) when this file doesn’t have the detail a task needs. Any agent that consults a detailed doc for something missing here must add a condensed version of what it learned back into this file — see the Update Protocol at the bottom.
 
-*Last updated: 2026-09-17*
+*Last updated: 2026-10-01*
 
 ---
 
@@ -90,3 +90,13 @@ No public signup. All accounts are created by an Admin or Super Admin.
 - Every approved change logged in `CHANGELOG-decisions.md` must also be reflected here in the same pass — add to Section 6, and update Sections 3/4/5 if the decision changes a standing fact.
 - If an open item in Section 7 gets resolved, move it into Section 6 and remove it from Section 7.
 - If this file and a detailed doc (`architecture.md`, `rules.md`, etc.) ever disagree, the detailed doc is the source of truth — fix this file to match, don't assume this file is right.
+
+## Security implementation update — 2026-10-01
+
+Mounted authentication now requires TOTP before issuing privileged access, with
+separate challenge/access/refresh token purposes and shared HTTP/Socket.io checks.
+Existing privileged users require trusted operator enrollment using
+`apps/api/scripts/enroll-mfa.js`; self-service enrollment/reset is not exposed.
+See `docs/security/mfa-policy.md` for deployment, encryption-key, and recovery limits.
+All existing tokens require a fresh login. Authentication changes require human
+review before merge; corresponding regression tests belong in `__tests__/`.

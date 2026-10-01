@@ -14,7 +14,7 @@ exports.login = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: result.mfaRequired ? 'MFA verification required' : 'Login successful',
       data: result,
     });
   } catch (error) {
@@ -41,5 +41,15 @@ exports.changePassword = async (req, res) => {
     res.status(200).json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.verifyMfa = async (req, res) => {
+  try {
+    const { challengeToken, code } = req.body;
+    const result = await authService.verifyMfa(challengeToken, code);
+    res.status(200).json({ success: true, message: 'Login successful', data: result });
+  } catch (error) {
+    res.status(401).json({ success: false, message: error.message });
   }
 };

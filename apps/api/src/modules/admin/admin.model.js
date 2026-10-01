@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 
+const mfaSchema = new mongoose.Schema({
+  secret: { type: String, required: true }, // AES-256-GCM encrypted TOTP secret
+  version: { type: String, required: true },
+  lastStep: { type: Number, default: -1 },
+  attempts: { type: Number, default: 0 },
+  windowStartedAt: { type: Date, default: Date.now },
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
@@ -11,6 +19,7 @@ const userSchema = new mongoose.Schema({
     default: 'T1_VOLUNTEER',
   },
   isActive: { type: Boolean, default: true },
+  mfa: { type: mfaSchema, select: false },
   mustChangePassword: { type: Boolean, default: true },
   teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
 

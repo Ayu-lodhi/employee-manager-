@@ -3,6 +3,9 @@ const { once } = require('node:events');
 const http = require('node:http');
 const { test } = require('node:test');
 const jwt = require('jsonwebtoken');
+process.env.JWT_SECRET = 'socket-authorization-test-secret-only';
+const tokens = require('../../modules/auth/auth.tokens');
+const { ROLES } = require('../../../../../packages/shared-constants/roles.js');
 const { initSocket, emitToRoom, closeChatRoom } = require('../socket');
 const chatService = require('../../modules/chat/chat.service');
 const controller = require('../../modules/chat/chat.controller');
@@ -29,6 +32,10 @@ test('chat socket authorization and delivery', async (t) => {
   });
 
   const users = new Set([memberId, otherId]);
+  const accounts = new Map([...users].map((id) => [id, {
+    _id: id, isActive: true, role: ROLES.T1_VOLUNTEER, password: 'synthetic-hash',
+  }]));
+  t.mock.method(User, 'findById', (id) => ({ select: async () => accounts.get(id) || null }));
   let room = { members: [memberId], name: 'Private room', save: async () => {} };
   const userLookup = t.mock.method(User, 'exists', async (filter) => {
     assert.equal(filter.isActive, true);
@@ -39,7 +46,7 @@ test('chat socket authorization and delivery', async (t) => {
   t.mock.method(ChatRoom, 'findById', async (id) => id === roomId ? room : null);
   t.mock.method(Message, 'create', async (data) => ({ ...data, _id: 'message-id' }));
 
-  async function connect(userId, token = jwt.sign({ sub: userId }, secret)) {
+  async function connect(userId, token = tokens.sign(accounts.get(userId), 'access', '5m')) {
     const client = new WebSocket(`ws://127.0.0.1:${server.address().port}/socket.io/?EIO=4&transport=websocket`);
     t.after(() => client.close());
     return await new Promise((resolve, reject) => {
@@ -57,6 +64,19 @@ test('chat socket authorization and delivery', async (t) => {
       });
     });
   }
+  await t.test('socket handshake rejects pre-MFA, refresh, legacy and expired credentials', async () => {
+    const account = accounts.get(memberId);
+    account.role = ROLES.ADMIN;
+    for (const token of [tokens.sign(account, 'mfa', '5m'), tokens.sign(account, 'refresh', '5m'),
+      tokens.sign(account, 'access', '5m'), tokens.sign(account, 'access', -1, { isMfaVerified: true }),
+      jwt.sign({ sub: memberId, role: ROLES.ADMIN }, secret)]) {
+      await assert.rejects(connect(memberId, token), /Invalid or expired token/);
+    }
+    const verified = await connect(memberId, tokens.sign(account, 'access', '5m', { isMfaVerified: true }));
+    assert.equal(verified.socket.userRole, ROLES.ADMIN);
+    verified.socket.disconnect(true);
+    account.role = ROLES.T1_VOLUNTEER;
+  });
   const member = await connect(memberId);
   const other = await connect(otherId);
   const join = (client, id = roomId) => client.socket.listeners('chat:join')[0](id);

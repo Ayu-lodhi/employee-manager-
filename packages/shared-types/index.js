@@ -9,6 +9,13 @@
  * @property {boolean} isMfaVerified
  * @property {boolean} isPasswordChangeRequired
  *
+ * @typedef {Object} UserMfa (server only; excluded from user responses)
+ * @property {string} secret AES-256-GCM encrypted TOTP secret
+ * @property {string} version Random enrollment identifier
+ * @property {number} lastStep Last consumed TOTP time step
+ * @property {number} attempts Attempts in the current five-minute window
+ * @property {Date} windowStartedAt
+ *
  * @typedef {Object} AccessGrant
  * @property {string} permission
  * @property {string} grantedBy
