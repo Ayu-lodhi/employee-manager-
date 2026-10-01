@@ -70,7 +70,17 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - **Where**: `apps/api/src/modules/attendance/attendance.service.js`
 
 
+### [2026-10-01] Enforce MFA in the mounted authentication flow
+- What: Privileged login now requires a restricted password challenge and verified TOTP before issuing access; HTTP and Socket.io share access-purpose and MFA enforcement.
+- Reason: Confirmed password-only and refresh-token access to administrative operations. Trusted operator enrollment prevents password possession from also enrolling an attacker-controlled factor; the security-fix request authorizes this change.
+- Where: `apps/api/src/modules/auth/`, `apps/api/src/modules/admin/admin.model.js`, `apps/api/src/config/socket.js`, `apps/api/scripts/enroll-mfa.js`, `apps/web/src/pages.jsx`, `docs/security/mfa-policy.md`, `docs/database/mfa.md`, `packages/shared-types/index.js`, `.env.example`, API dependency manifests.
+
 ### [2026-10-01] Enforce JWT purpose at resource authentication
 - What: Login signs access/refresh purpose claims; HTTP protect and socket handshakes require access purpose, with regression tests.
 - Reason: Confirmed that a login-issued seven-day refresh token could authenticate as an access token. Enforce signed purpose using the existing key configuration; no refresh endpoint currently exists. Existing tokens without purpose require a new login. Fix authorized by the security investigation request; authentication changes require human review before merge.
 - Where: `apps/api/src/modules/auth/auth.service.js`, `apps/api/src/modules/auth/auth.middleware.js`, `apps/api/src/modules/auth/__tests__/auth.test.js`, `apps/api/src/config/socket.js`, `apps/api/src/config/__tests__/socket.test.js`
+
+### [2026-10-01] Reconcile token-purpose and MFA fixes
+- What: Resolved overlap with main while retaining MFA enforcement, access-only HTTP/socket authentication, and both regression suites.
+- Reason: PR #4 and PR #5 independently changed the same authentication paths. Shared MFA token validation already enforces the token-purpose requirement.
+- Where: Auth service/middleware/tests, Socket.io authentication/tests, this changelog, and memory.md.

@@ -1,119 +1,203 @@
 const assert = require('node:assert/strict');
-const { once } = require('node:events');
 const { test } = require('node:test');
+const { once } = require('node:events');
+const { randomUUID } = require('node:crypto');
 const express = require('express');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { generateSync, verifySync } = require('otplib');
+
+process.env.JWT_SECRET = 'synthetic-mfa-test-signing-secret-only';
+process.env.MFA_ENCRYPTION_KEY = 'ab'.repeat(32);
 const User = require('../../admin/admin.model');
+const repository = require('../auth.repository');
+const tokens = require('../auth.tokens');
+const mfaService = require('../mfa.service');
+const { authenticateToken } = require('../auth.middleware');
+const { ROLES } = require('../../../../../../packages/shared-constants/roles.js');
 
-const secret = 'auth-purpose-test-secret-not-for-production';
+// RFC 6238 SHA-1 test vector (six-digit truncation of 94287082 at epoch 59).
+test('installed TOTP verifier matches the RFC vector and enforces time/replay bounds', () => {
+  const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+  const result = verifySync({ secret, token: '287082', epoch: 59 });
+  assert.equal(result.valid, true);
+  assert.equal(result.timeStep, 1);
+  assert.equal(verifySync({ secret, token: '287082', epoch: 59, afterTimeStep: 1 }).valid, false);
+  assert.equal(verifySync({ secret, token: '287082', epoch: 120, epochTolerance: 30 }).valid, false);
+});
 
-test('login tokens enforce purpose on protected HTTP routes', async (t) => {
-  const environment = {
-    JWT_SECRET: secret,
-    JWT_ACCESS_EXPIRY: '15m',
-    JWT_REFRESH_EXPIRY: '7d',
-  };
-  for (const [key, value] of Object.entries(environment)) {
-    const previous = process.env[key];
-    process.env[key] = value;
-    t.after(() => {
-      if (previous === undefined) delete process.env[key];
-      else process.env[key] = previous;
+test('privileged authentication policy and token-purpose separation', async (t) => {
+  const user = { _id: '111111111111111111111111', password: 'fixture-hash', isActive: true, role: ROLES.ADMIN };
+  t.mock.method(repository, 'findById', async () => user);
+  for (const role of [ROLES.ADMIN, ROLES.SUPER_ADMIN]) {
+    user.role = role;
+    await assert.rejects(authenticateToken(tokens.sign(user, 'access', '5m')), /MFA/);
+    await assert.rejects(authenticateToken(tokens.sign(user, 'access', '5m', { isMfaVerified: 'true' })), /MFA/);
+  }
+  for (const purpose of ['mfa', 'refresh']) {
+    await assert.rejects(authenticateToken(tokens.sign(user, purpose, '5m', { isMfaVerified: true })), /purpose/);
+  }
+  await assert.rejects(authenticateToken(jwt.sign({ sub: user._id, role: user.role }, process.env.JWT_SECRET)), /purpose/);
+});
+
+const databaseUri = process.env.MFA_TEST_MONGODB_URI;
+test('MFA login and mounted-route regression tests with MongoDB', { skip: !databaseUri }, async (t) => {
+  const dbName = `mfa_test_${randomUUID().replaceAll('-', '')}`;
+  await mongoose.connect(databaseUri, { dbName, serverSelectionTimeoutMS: 5000 });
+  t.after(async () => { await mongoose.connection.dropDatabase(); await mongoose.disconnect(); });
+  await User.init();
+  const app = express();
+  app.use(express.json());
+  app.use('/api/v1/auth', require('../auth.routes'));
+  app.use('/api/v1/admin', require('../../admin/admin.routes'));
+  app.use('/api/v1/super-admin', require('../../super-admin/superAdmin.routes'));
+  app.use('/api/v1/events', require('../../events/events.routes'));
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/v1`;
+  const password = 'Synthetic-password!1';
+  const hash = await bcrypt.hash(password, 4);
+
+  async function fixture(role = ROLES.ADMIN, enrolled = true) {
+    const email = `${randomUUID()}@example.test`;
+    const enrollment = mfaService.createEnrollment(email);
+    const secret = new URL(enrollment.otpauthUrl).searchParams.get('secret');
+    const user = await User.create({ name: 'Synthetic fixture', email, password: hash, role,
+      ...(enrolled ? { mfa: enrollment.mfa } : {}) });
+    return { user, secret, enrollment, code: () => generateSync({ secret }) };
+  }
+  async function request(path, { token, body, method = body ? 'POST' : 'GET' } = {}) {
+    const response = await fetch(`${base}${path}`, {
+      method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { status: response.status, body: await response.json(), cache: response.headers.get('cache-control') };
+  }
+  const login = (user, extra = {}) => request('/auth/login', { body: { email: user.email, password, ...extra } });
+  const verify = (challengeToken, code, extra = {}) => request('/auth/mfa/verify', { body: { challengeToken, code, ...extra } });
+
+  for (const role of [ROLES.ADMIN, ROLES.SUPER_ADMIN]) {
+    await t.test(`${role}: password alone cannot read or mutate privileged routes; verified TOTP can`, async () => {
+      const f = await fixture(role);
+      const first = await login(f.user, { isMfaVerified: true });
+      assert.equal(first.status, 200);
+      assert.equal(first.cache, 'no-store');
+      assert.equal(first.body.data.mfaRequired, true);
+      assert.deepEqual(Object.keys(first.body.data).sort(), ['challengeToken', 'mfaRequired']);
+      const challenge = first.body.data.challengeToken;
+      const claims = tokens.verify(challenge, 'mfa');
+      assert.equal(claims.exp - claims.iat, 300);
+      assert.equal(claims.role, undefined);
+      const oldToken = jwt.sign({ sub: String(f.user._id), role }, process.env.JWT_SECRET);
+      for (const token of [challenge, oldToken, tokens.sign(f.user, 'refresh', '5m'),
+        tokens.sign(f.user, 'access', '5m', { role, isMfaVerified: false })]) {
+        for (const path of ['/admin/users', '/super-admin/audit-logs', '/events']) {
+          assert.equal((await request(path, { token })).status, 401);
+        }
+        assert.equal((await request('/admin/users', { token, body: { role: ROLES.SUPER_ADMIN } })).status, 401);
+      }
+      for (const code of [undefined, '', 'abc123', 123456, {}, generateSync({ secret: f.secret, epoch: 59 })]) {
+        assert.equal((await verify(challenge, code, { isMfaVerified: true })).status, 401);
+      }
+      const second = await verify(challenge, f.code());
+      assert.equal(second.status, 200, second.body.message);
+      const { accessToken, refreshToken, user } = second.body.data;
+      assert.equal(user.mfa, undefined);
+      assert.equal(user.password, undefined);
+      assert.equal(tokens.verify(accessToken, 'access').isMfaVerified, true);
+      assert.equal((await request('/admin/users', { token: accessToken })).status, 200);
+      assert.equal((await request('/super-admin/audit-logs', { token: accessToken })).status, role === ROLES.SUPER_ADMIN ? 200 : 403);
+      assert.equal((await request('/admin/users', { token: refreshToken })).status, 401);
+      assert.equal((await verify(refreshToken, f.code())).status, 401);
+      assert.equal((await verify(accessToken, f.code())).status, 401);
+      assert.equal((await verify(challenge, f.code())).status, 401);
+      const me = await request('/auth/me', { token: accessToken });
+      assert.equal(me.body.data.mfa, undefined);
+      const profile = await request(`/admin/users/${f.user._id}`, {
+        method: 'PATCH', token: accessToken, body: { name: 'Updated', mfa: { version: 'attacker' }, 'mfa.secret': 'attacker' },
+      });
+      assert.equal(profile.status, 200);
+      assert.equal(profile.body.data.mfa, undefined);
+      assert.equal((await repository.findById(f.user._id)).mfa.version, f.enrollment.mfa.version);
     });
   }
 
-  const user = {
-    _id: '111111111111111111111111',
-    email: 'fixture@example.test',
-    name: 'Fixture user',
-    role: 'ADMIN',
-    isActive: true,
-    password: await bcrypt.hash('Test-only-password1!', 4),
-  };
-  let currentUser = user;
-  t.mock.method(User, 'findOne', ({ email }) => ({
-    select: async () => email === user.email ? user : null,
-  }));
-  const lookup = t.mock.method(User, 'findById', (id) => ({
-    select: async () => id === user._id ? currentUser : null,
-  }));
-
-  const { protect, restrictTo } = require('../auth.middleware');
-  const app = express();
-  app.use(express.json());
-  app.use('/auth', require('../auth.routes'));
-  app.get('/admin', protect, restrictTo('ADMIN'), (req, res) => {
-    res.json({ sub: req.user.sub, role: req.user.role });
-  });
-  const server = app.listen(0, '127.0.0.1');
-  t.after(() => new Promise((resolve) => server.close(resolve)));
-  await once(server, 'listening');
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const request = (token, path = '/auth/me') => fetch(base + path, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  await t.test('unenrolled privileged accounts fail closed and trusted enrollment requires a code', async () => {
+    const f = await fixture(ROLES.ADMIN, false);
+    assert.equal((await login(f.user)).status, 401);
+    assert.equal((await User.findById(f.user._id)).mfa, undefined);
+    await assert.rejects(mfaService.enroll(f.user.email, f.enrollment,
+      generateSync({ secret: f.secret, epoch: 59 })), /Invalid/);
+    assert.equal((await repository.findById(f.user._id)).mfa, undefined);
+    await mfaService.enroll(f.user.email, f.enrollment, f.code());
+    await assert.rejects(mfaService.enroll(f.user.email, f.enrollment, f.code()), /eligible/);
+    const stored = await repository.findById(f.user._id);
+    assert.notEqual(stored.mfa.secret, f.secret);
+    assert.equal((await login(f.user)).body.data.mfaRequired, true);
+    assert.equal((await User.findById(f.user._id)).mfa, undefined);
   });
 
-  const response = await fetch(base + '/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: user.email, password: 'Test-only-password1!' }),
-  });
-  assert.equal(response.status, 200);
-  const { data: tokens } = await response.json();
-
-  await t.test('issues distinct signed purposes with the configured lifetimes', () => {
-    const access = jwt.verify(tokens.accessToken, secret);
-    const refresh = jwt.verify(tokens.refreshToken, secret);
-    assert.equal(access.purpose, 'access');
-    assert.equal(refresh.purpose, 'refresh');
-    assert.equal(access.sub, user._id);
-    assert.equal(refresh.sub, user._id);
-    assert.equal(access.exp - access.iat, 900);
-    assert.equal(refresh.exp - refresh.iat, 604800);
+  await t.test('five attempts across challenges and concurrent requests, then window reset', async () => {
+    const f = await fixture();
+    const first = (await login(f.user)).body.data.challengeToken;
+    const wrong = generateSync({ secret: f.secret, epoch: 59 });
+    const responses = await Promise.all(Array.from({ length: 8 }, () => verify(first, wrong)));
+    assert.ok(responses.every((r) => r.status === 401));
+    assert.equal((await repository.findById(f.user._id)).mfa.attempts, 5);
+    const next = (await login(f.user)).body.data.challengeToken;
+    assert.equal((await verify(next, f.code())).status, 401);
+    await User.updateOne({ _id: f.user._id }, { $set: { 'mfa.windowStartedAt': new Date(Date.now() - 301000) } });
+    assert.equal((await verify(next, f.code())).status, 200);
   });
 
-  await t.test('accepts login-issued access tokens on protected routes', async () => {
-    const me = await request(tokens.accessToken);
-    assert.equal(me.status, 200);
-    assert.equal((await me.json()).data._id, user._id);
-    assert.equal((await request(tokens.accessToken, '/admin')).status, 200);
+  await t.test('simultaneous verification cannot consume a TOTP twice', async () => {
+    const f = await fixture();
+    const first = (await login(f.user)).body.data.challengeToken;
+    const code = f.code();
+    const outcomes = await Promise.all([verify(first, code), verify(first, code)]);
+    assert.deepEqual(outcomes.map((r) => r.status).sort(), [200, 401]);
   });
 
-  await t.test('rejects login-issued refresh tokens before querying the account', async () => {
-    const calls = lookup.mock.callCount();
-    assert.equal((await request(tokens.refreshToken)).status, 401);
-    assert.equal((await request(tokens.refreshToken, '/admin')).status, 401);
-    assert.equal(lookup.mock.callCount(), calls);
+  await t.test('rejects expired/tampered challenges and account or credential changes', async () => {
+    const f = await fixture();
+    const first = (await login(f.user)).body.data.challengeToken;
+    assert.equal((await verify(tokens.sign(f.user, 'mfa', -1), f.code())).status, 401);
+    assert.equal((await verify(first.slice(0, -4) + 'xxxx', f.code())).status, 401);
+    assert.equal((await login(f.user, { password: 'incorrect' })).status, 401);
+    await User.updateOne({ _id: f.user._id }, { $set: { password: 'changed-password-hash' } });
+    assert.equal((await verify(first, f.code())).status, 401);
+    await User.updateOne({ _id: f.user._id }, { $set: { password: hash, isActive: false } });
+    assert.equal((await verify(first, f.code())).status, 401);
+    await User.updateOne({ _id: f.user._id }, { $set: { isActive: true, 'mfa.version': randomUUID() } });
+    assert.equal((await verify(first, f.code())).status, 401);
+    await User.deleteOne({ _id: f.user._id });
+    assert.equal((await verify(first, f.code())).status, 401);
   });
 
-  await t.test('rejects missing, legacy, unknown-purpose, expired and invalid credentials', async () => {
-    const invalidTokens = [
-      undefined,
-      'not-a-jwt',
-      jwt.sign({ sub: user._id, role: 'ADMIN' }, secret),
-      jwt.sign({ sub: user._id, purpose: 'unknown' }, secret),
-      jwt.sign({ sub: user._id, purpose: 'access' }, secret, { expiresIn: -1 }),
-      jwt.sign({ sub: user._id, purpose: 'access' }, 'different-test-key'),
-    ];
-    // Editing the refresh payload cannot turn it into a signed access token.
-    const parts = tokens.refreshToken.split('.');
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url'));
-    parts[1] = Buffer.from(JSON.stringify({ ...payload, purpose: 'access' })).toString('base64url');
-    invalidTokens.push(parts.join('.'));
-    const calls = lookup.mock.callCount();
-    for (const token of invalidTokens) {
-      assert.equal((await request(token)).status, 401);
-    }
-    assert.equal(lookup.mock.callCount(), calls);
+  await t.test('nonprivileged login works; promoting an existing session requires MFA', async () => {
+    const f = await fixture(ROLES.T1_VOLUNTEER, false);
+    const first = await login(f.user);
+    assert.equal(first.status, 200);
+    const token = first.body.data.accessToken;
+    assert.equal((await request('/auth/me', { token })).status, 200);
+    assert.equal((await request('/admin/users', { token })).status, 403);
+    await User.updateOne({ _id: f.user._id }, { $set: { role: ROLES.ADMIN } });
+    assert.equal((await request('/admin/users', { token })).status, 401);
+    assert.equal((await login(f.user)).status, 401);
   });
 
-  await t.test('still rejects inactive/deleted accounts and uses the current database role', async () => {
-    currentUser = { ...user, isActive: false };
-    assert.equal((await request(tokens.accessToken)).status, 401);
-    currentUser = null;
-    assert.equal((await request(tokens.accessToken)).status, 401);
-    currentUser = { ...user, role: 'T1_VOLUNTEER' };
-    assert.equal((await request(tokens.accessToken, '/admin')).status, 403);
+  await t.test('completed MFA is invalidated by password/factor changes or deactivation', async () => {
+    const f = await fixture();
+    const first = (await login(f.user)).body.data.challengeToken;
+    const verified = await verify(first, f.code());
+    const token = verified.body.data.accessToken;
+    await User.updateOne({ _id: f.user._id }, { $set: { isActive: false } });
+    assert.equal((await request('/admin/users', { token })).status, 401);
+    await User.updateOne({ _id: f.user._id }, { $set: { isActive: true, password: 'changed' } });
+    assert.equal((await request('/admin/users', { token })).status, 401);
+    await User.updateOne({ _id: f.user._id }, { $set: { password: hash, 'mfa.version': randomUUID() } });
+    assert.equal((await request('/admin/users', { token })).status, 401);
   });
 });

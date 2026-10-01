@@ -1,22 +1,64 @@
-import speakeasy from 'otplib';
-import QRCode from 'qrcode';
-import { logger } from '../../core/utils/logger.js';
+const { createCipheriv, createDecipheriv, randomBytes, randomUUID } = require('node:crypto');
+const { generateSecret, generateURI, verifySync } = require('otplib');
+const repository = require('./auth.repository');
 
-/**
- * Red-Zone File: MFA (TOTP) Service
- */
-export class MfaService {
-  static generateSecret(email) {
-    const secret = speakeasy.authenticator.generateSecret();
-    const otpauthUrl = speakeasy.authenticator.keyuri(email, 'TBI Platform', secret);
-    return { secret, otpauthUrl };
-  }
+const encryptionKey = () => {
+  const key = process.env.MFA_ENCRYPTION_KEY;
+  if (!/^[a-f\d]{64}$/i.test(key || '')) throw new Error('MFA encryption key is not configured');
+  return Buffer.from(key, 'hex');
+};
 
-  static async generateQrCodeDataUrl(otpauthUrl) {
-    return QRCode.toDataURL(otpauthUrl);
-  }
+const encrypt = (secret) => {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', encryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
+  return [iv, cipher.getAuthTag(), encrypted].map((part) => part.toString('base64')).join('.');
+};
 
-  static verifyToken(token, secret) {
-    return speakeasy.authenticator.verify({ token, secret });
+const decrypt = (value) => {
+  const [iv, tag, encrypted] = value.split('.').map((part) => Buffer.from(part, 'base64'));
+  const cipher = createDecipheriv('aes-256-gcm', encryptionKey(), iv);
+  cipher.setAuthTag(tag);
+  return Buffer.concat([cipher.update(encrypted), cipher.final()]).toString('utf8');
+};
+
+exports.createEnrollment = (email) => {
+  const secret = generateSecret();
+  return {
+    otpauthUrl: generateURI({ issuer: 'TBI Platform', label: email, secret }),
+    mfa: {
+      secret: encrypt(secret), version: randomUUID(), lastStep: -1,
+      attempts: 0, windowStartedAt: new Date(),
+    },
+  };
+};
+
+exports.verify = async (user, token) => {
+  if (typeof token !== 'string' || !/^\d{6}$/.test(token)) throw new Error('Invalid authenticator code');
+  const attempt = await repository.reserveMfaAttempt(user._id, user.mfa.version);
+  if (!attempt) throw new Error('Too many MFA attempts; try again in five minutes');
+  const result = verifySync({
+    secret: decrypt(attempt.mfa.secret), token,
+    epochTolerance: 30,
+    afterTimeStep: attempt.mfa.lastStep >= 0 ? attempt.mfa.lastStep : undefined,
+  });
+  if (!result.valid) throw new Error('Invalid or already used authenticator code');
+  // The conditional update also prevents simultaneous reuse of the same code.
+  const verified = await repository.consumeMfaCode(user, result.timeStep);
+  if (!verified) throw new Error('MFA verification expired; sign in again');
+  return verified;
+};
+
+exports.enroll = async (email, enrollment, code) => {
+  const { requiresMfa } = require('./auth.tokens');
+  const user = await repository.findByEmail(email);
+  if (!user?.isActive || user.mfa || !(await requiresMfa(user.role))) {
+    throw new Error('Account is not eligible for enrollment');
   }
-}
+  const result = verifySync({ secret: decrypt(enrollment.mfa.secret), token: code, epochTolerance: 30 });
+  if (!result.valid) throw new Error('Invalid authenticator code');
+  const enrolled = await repository.enrollMfa(user._id, user.role, {
+    ...enrollment.mfa, lastStep: result.timeStep,
+  });
+  if (!enrolled) throw new Error('Account enrollment changed; retry');
+};

@@ -251,6 +251,8 @@ const MENUS = {
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -261,13 +263,18 @@ export const Login = () => {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/v1/auth/login', {
+      const res = await fetch(`http://localhost:5000/api/v1/auth/${challengeToken ? 'mfa/verify' : 'login'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(challengeToken ? { challengeToken, code } : { email, password }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Login failed');
+      if (data.data.mfaRequired) {
+        setChallengeToken(data.data.challengeToken);
+        setPassword('');
+        return;
+      }
       login(data.data.user, data.data.accessToken);
       navigate(ROLES[data.data.user.role].route);
     } catch (err) {
@@ -277,7 +284,7 @@ export const Login = () => {
     }
   };
 
-  const quickLogin = (e, p) => { setEmail(e); setPassword(p); };
+  const quickLogin = (e, p) => { setChallengeToken(''); setCode(''); setEmail(e); setPassword(p); };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -292,6 +299,7 @@ export const Login = () => {
         </div>
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
+            {!challengeToken && <>
             <div>
               <label className="block text-sm font-medium mb-2">Email</label>
               <div className="relative">
@@ -310,10 +318,20 @@ export const Login = () => {
                   className="w-full h-12 pl-10 pr-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
               </div>
             </div>
+            </>}
+            {challengeToken && <div>
+              <label htmlFor="mfa-code" className="block text-sm font-medium mb-2">Authenticator code</label>
+              <input id="mfa-code" type="text" inputMode="numeric" autoComplete="one-time-code"
+                pattern="[0-9]{6}" maxLength={6} required autoFocus value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full h-12 px-3 rounded-lg border border-gray-200" />
+              <button type="button" className="mt-3 text-sm text-blue-600" disabled={loading}
+                onClick={() => { setChallengeToken(''); setCode(''); setError(''); }}>Back to sign in</button>
+            </div>}
             {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>}
             <button type="submit" disabled={loading}
               className="w-full h-12 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-lg transition">
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Signing in...' : challengeToken ? 'Verify code' : 'Sign In'}
             </button>
           </form>
           <div className="mt-6 pt-6 border-t border-gray-100">

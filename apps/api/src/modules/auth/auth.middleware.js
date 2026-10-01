@@ -1,35 +1,30 @@
-const jwt = require('jsonwebtoken');
-const User = require('../admin/admin.model');
+const repository = require('./auth.repository');
+const tokens = require('./auth.tokens');
 
-// Fail hard at startup if JWT_SECRET is missing or too short
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error('FATAL: JWT_SECRET is missing or too short (min 32 chars). Set it in .env.');
-}
+// Shared by every mounted HTTP router and the Socket.io handshake.
+const authenticateToken = async (token) => {
+  const decoded = tokens.verify(token, 'access');
+  const user = await repository.findById(decoded.sub);
+  if (!user?.isActive || decoded.authState !== tokens.authState(user)) {
+    throw new Error('Account or credentials changed; sign in again');
+  }
+  if (await tokens.requiresMfa(user.role) && decoded.isMfaVerified !== true) {
+    throw new Error('MFA verification required for privileged operations');
+  }
+  return { ...decoded, name: user.name, email: user.email, role: user.role };
+};
+exports.authenticateToken = authenticateToken;
 
-// Verify JWT token + check user is still active in DB
 exports.protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, message: 'Not authenticated' });
   }
-  const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.purpose !== 'access') {
-      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
-    }
-
-    // Check account is still active (catches revoked users with unexpired tokens)
-    const user = await User.findById(decoded.sub).select('isActive role name email');
-    if (!user || !user.isActive) {
-      return res.status(401).json({ success: false, message: 'Account is deactivated or not found' });
-    }
-
-    req.user = { ...decoded, name: user.name, email: user.email, role: user.role };
+    req.user = await authenticateToken(authHeader.slice(7));
     next();
-  } catch (err) {
-    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  } catch {
+    return res.status(401).json({ success: false, message: 'Invalid token or MFA verification required' });
   }
 };
 

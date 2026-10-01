@@ -3,7 +3,6 @@
 // ====================================================================
 
 const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
 
 let io = null;
 
@@ -36,15 +35,13 @@ const initSocket = (httpServer) => {
   });
 
   // JWT handshake
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error('Authentication required'));
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (decoded.purpose !== 'access') {
-        return next(new Error('Invalid or expired token'));
-      }
+      const { authenticateToken } = require('../modules/auth/auth.middleware');
+      const decoded = await authenticateToken(token);
       socket.userId = decoded.sub;
       socket.userRole = decoded.role;
       socket.userName = decoded.name || 'User';
