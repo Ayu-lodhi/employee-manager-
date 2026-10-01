@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth, ROLES, ProtectedRoute, SocketProvider } from './pages';
 import {
-  Login, LandingPage, SuperAdminDashboard, AdminDashboard,
+  Login, SuperAdminDashboard, AdminDashboard,
   T3DashboardEnhanced, T2DashboardEnhanced, T1Dashboard,
   UserManagement, AddUserPage, BulkImportPage, EventsPage, ApplicationsPage, MyApplicationsPage,
   AttendancePage, CertificatesPage, TeamsPage, MyTeamsPage, MyShiftsPage,
@@ -27,7 +27,6 @@ function App() {
         <SocketProvider>
           <Routes>
             {/* Public */}
-            <Route path="/landing" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
             <Route path="/" element={<RootRedirect />} />
