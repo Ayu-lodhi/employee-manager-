@@ -67,19 +67,19 @@ exports.addMember = async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ success: false, message: 'userId required' });
-    const team = await teamService.addMember(req.params.id, userId);
+    const team = await teamService.addMember(req.params.id, userId, req.user);
     res.json({ success: true, message: 'Member added', data: team });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(error.statusCode || 400).json({ success: false, message: error.message });
   }
 };
 
 exports.removeMember = async (req, res) => {
   try {
-    const team = await teamService.removeMember(req.params.id, req.params.userId);
+    const team = await teamService.removeMember(req.params.id, req.params.userId, req.user);
     res.json({ success: true, message: 'Member removed', data: team });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(error.statusCode || 400).json({ success: false, message: error.message });
   }
 };
 
