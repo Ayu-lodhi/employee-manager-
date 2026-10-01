@@ -315,36 +315,36 @@ export const Login = () => {
   const passHasValue = password.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7F4EB] text-slate-900 select-none overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen lg:max-h-screen flex flex-col bg-[#F0EDE6] text-slate-900 select-none overflow-y-auto lg:overflow-hidden">
       {/* ========================================================================= */}
       {/* RETRO TOP NAVIGATION BAR */}
       {/* ========================================================================= */}
-      <header className="w-full bg-[#0E2233] h-12 px-4 sm:px-8 flex items-center justify-between border-b border-[#1E3A52] shadow-md z-30 shrink-0">
+      <header className="w-full bg-[#0E2233] h-11 sm:h-12 px-4 sm:px-8 flex items-center justify-between border-b border-[#1E3A52] shadow-md z-30 shrink-0">
         {/* Left: TBI Brand mark */}
         <div className="flex items-center gap-2.5">
           <div className="w-2.5 h-2.5 rounded-full bg-[#E5B558] shadow-[0_0_8px_#E5B558] animate-pulse" />
-          <span className="font-['Barlow_Condensed',sans-serif] font-black text-2xl tracking-widest text-[#E5B558] uppercase">
+          <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl tracking-widest text-[#E5B558] uppercase">
             TBI
           </span>
         </div>
 
         {/* Clean right accent / indicator */}
-        <div className="flex items-center gap-2 text-[11px] font-['Space_Mono',monospace] text-[#8EA0B2] uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-[10px] sm:text-[11px] font-['Space_Mono',monospace] text-[#8EA0B2] uppercase tracking-wider">
           <span className="hidden sm:inline">PORTAL AUTHENTICATION</span>
           <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#10B981]" title="System Operational" />
         </div>
       </header>
 
       {/* ========================================================================= */}
-      {/* MAIN DUAL-PANEL CONTENT — SEAMLESSLY MERGED */}
+      {/* MAIN DUAL-PANEL CONTENT — SEAMLESS & FIT TO VIEWPORT (NO SCROLLBAR ON DESKTOP) */}
       {/* ========================================================================= */}
-      <main className="flex-1 flex flex-col lg:flex-row blueprint-grid relative w-full overflow-hidden min-h-[calc(100vh-48px)]">
+      <main className="flex-1 lg:h-[calc(100vh-48px)] lg:max-h-[calc(100vh-48px)] flex flex-col lg:flex-row blueprint-grid relative w-full overflow-visible lg:overflow-hidden">
         {/* ----------------------------------------------------------------------- */}
-        {/* LEFT COLUMN: Seamless Full-Bleed Artwork */}
+        {/* LEFT COLUMN: Seamless Full-Bleed Artwork (Fit to height, no overflow) */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-[48%] xl:w-[50%] relative flex items-stretch justify-start order-2 lg:order-1 self-stretch">
+        <div className="w-full lg:w-[48%] xl:w-[50%] h-auto lg:h-full lg:max-h-full relative flex flex-col lg:flex-row items-center justify-start order-2 lg:order-1 overflow-hidden shrink-0">
           {/* Mobile view toggle */}
-          <div className="w-full p-3 lg:hidden">
+          <div className="w-full p-3 lg:hidden flex justify-center">
             <button
               type="button"
               onClick={() => setShowMuralOnMobile(!showMuralOnMobile)}
@@ -354,12 +354,12 @@ export const Login = () => {
             </button>
           </div>
 
-          {/* Full-Bleed Merged Graphic (Flush on left, top, bottom, seamlessly feathered into background) */}
-          <div className={`w-full h-full ${showMuralOnMobile ? 'block' : 'hidden lg:block'}`}>
+          {/* Full-Bleed Merged Graphic: Fit to 100% of viewport height without cropping sectors */}
+          <div className={`w-full h-auto lg:h-full lg:max-h-full flex items-center justify-start ${showMuralOnMobile ? 'block' : 'hidden lg:flex'}`}>
             <img
               src="/tbi-mural-merged.png"
               alt="TBI Innovation Focus Sectors — DeepTech, AgriTech, MedTech, Carbon Risk, Bioinformatics, Sustainability, Robotics"
-              className="w-full h-full object-cover object-left block select-none pointer-events-none"
+              className="w-full lg:w-auto h-auto lg:h-full max-w-full lg:max-h-[calc(100vh-48px)] object-contain object-left block select-none pointer-events-none"
               loading="eager"
             />
           </div>
@@ -368,31 +368,31 @@ export const Login = () => {
         {/* ----------------------------------------------------------------------- */}
         {/* RIGHT COLUMN: Industrial Access Console */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-[52%] xl:w-[50%] flex flex-col justify-center px-6 sm:px-12 md:px-14 lg:px-12 xl:px-16 py-8 lg:py-12 z-10 order-1 lg:order-2">
-          <div className="max-w-xl w-full mx-auto">
+        <div className="w-full lg:w-[52%] xl:w-[50%] flex-1 lg:h-full lg:max-h-full flex flex-col justify-center px-4 sm:px-10 md:px-12 lg:px-10 xl:px-14 py-6 lg:py-4 z-10 order-1 lg:order-2 overflow-visible lg:overflow-hidden">
+          <div className="max-w-md xl:max-w-lg w-full mx-auto">
             {/* Mobile / Tablet Logo Badge with Drafting Circles */}
-            <div className="flex lg:hidden flex-col items-center justify-center mb-5">
-              <div className="relative flex items-center justify-center p-2">
-                <div className="absolute w-24 h-24 rounded-full border border-dashed border-[#A89F8D] opacity-60 animate-spin-slow" />
+            <div className="flex lg:hidden flex-col items-center justify-center mb-3">
+              <div className="relative flex items-center justify-center p-1">
+                <div className="absolute w-20 h-20 rounded-full border border-dashed border-[#A89F8D] opacity-60 animate-spin-slow" />
                 <img
                   src="/tbi-logo.png"
                   alt="TBI Logo"
-                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md relative z-10"
+                  className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md relative z-10"
                 />
               </div>
             </div>
 
             {/* Header Titles */}
-            <div className="mb-5 sm:mb-6 text-center sm:text-left">
-              <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-2xl sm:text-3xl md:text-4xl text-[#121922] tracking-tight uppercase leading-tight">
+            <div className="mb-4 sm:mb-5 text-center sm:text-left">
+              <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-3xl xl:text-4xl text-[#121922] tracking-tight uppercase leading-tight">
                 WELCOME, TBI-GEU INNOVATION TEAM!
               </h1>
-              <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-lg sm:text-xl md:text-2xl text-[#2B3542] tracking-wide uppercase mt-0.5">
+              <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-sm sm:text-lg xl:text-xl text-[#2B3542] tracking-wide uppercase mt-0.5">
                 EMPLOYEES MANAGEMENT PORTAL ACCESS
               </h2>
 
-              <div className="mt-2.5 flex items-center gap-2">
-                <span className="font-['Space_Mono',monospace] font-bold text-[10px] sm:text-xs uppercase tracking-[0.14em] sm:tracking-[0.18em] text-[#4A5568]">
+              <div className="mt-2 flex items-center gap-2">
+                <span className="font-['Space_Mono',monospace] font-bold text-[9px] sm:text-xs uppercase tracking-wider sm:tracking-[0.18em] text-[#4A5568] whitespace-nowrap">
                   FOCUS SECTOR INTEGRATION PANEL
                 </span>
                 <div className="flex-1 h-[1px] bg-[#C5BBA7]" />
@@ -402,13 +402,13 @@ export const Login = () => {
             {/* =================================================================== */}
             {/* AUTHENTICATION FORM */}
             {/* =================================================================== */}
-            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
               {/* Field 1: Username / Email */}
               <div>
-                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-lg sm:text-xl md:text-2xl text-[#121922] tracking-wide mb-1">
+                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-lg xl:text-xl text-[#121922] tracking-wide mb-1">
                   Username
                 </label>
-                <div className="relative industrial-chassis rounded-lg px-4 py-2 sm:py-2.5 transition">
+                <div className="relative industrial-chassis rounded-lg px-3.5 py-1.5 sm:py-2 transition">
                   {/* 4 Corner Screws */}
                   <span className="screw-rivet top-1.5 left-1.5" />
                   <span className="screw-rivet top-1.5 right-1.5" />
@@ -423,11 +423,11 @@ export const Login = () => {
                       placeholder="Username / Email"
                       required
                       autoFocus
-                      className="w-full bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base md:text-lg text-slate-100 placeholder-[#768090] outline-none py-1 sm:py-1.5 tracking-wide"
+                      className="w-full bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base text-slate-100 placeholder-[#768090] outline-none py-1 tracking-wide"
                     />
 
                     {/* Status LED Pod on right */}
-                    <div className="shrink-0 bg-[#1A1C21] px-2 sm:px-2.5 py-1 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                    <div className="shrink-0 bg-[#1A1C21] px-2 py-0.5 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
                       <span className={`led-indicator ${emailHasValue ? 'led-green' : 'led-dim-green'}`} title="Input Active" />
                       <span className={`led-indicator ${emailHasValue && email.includes('@') ? 'led-amber' : 'led-dim-amber'}`} title="Format Verified" />
                       <span className={`led-indicator ${error ? 'led-red' : 'led-dim-red'}`} title="Status Check" />
@@ -438,10 +438,10 @@ export const Login = () => {
 
               {/* Field 2: Password */}
               <div>
-                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-lg sm:text-xl md:text-2xl text-[#121922] tracking-wide mb-1">
+                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-lg xl:text-xl text-[#121922] tracking-wide mb-1">
                   Password
                 </label>
-                <div className="relative industrial-chassis rounded-lg px-4 py-2 sm:py-2.5 transition">
+                <div className="relative industrial-chassis rounded-lg px-3.5 py-1.5 sm:py-2 transition">
                   {/* 4 Corner Screws */}
                   <span className="screw-rivet top-1.5 left-1.5" />
                   <span className="screw-rivet top-1.5 right-1.5" />
@@ -455,11 +455,11 @@ export const Login = () => {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Password"
                       required
-                      className="w-full bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base md:text-lg text-slate-100 placeholder-[#768090] outline-none py-1 sm:py-1.5 tracking-wider"
+                      className="w-full bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base text-slate-100 placeholder-[#768090] outline-none py-1 tracking-wider"
                     />
 
                     {/* Status LED Pod on right */}
-                    <div className="shrink-0 bg-[#1A1C21] px-2 sm:px-2.5 py-1 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                    <div className="shrink-0 bg-[#1A1C21] px-2 py-0.5 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
                       <span className={`led-indicator ${passHasValue ? 'led-green' : 'led-dim-green'}`} title="Key Accepted" />
                       <span className={`led-indicator ${passHasValue && password.length >= 6 ? 'led-amber' : 'led-dim-amber'}`} title="Cipher Lock" />
                       <span className={`led-indicator ${error ? 'led-red' : 'led-dim-red'}`} title="Security Guard" />
@@ -470,8 +470,8 @@ export const Login = () => {
 
               {/* Error Notice */}
               {error && (
-                <div className="p-3 bg-red-900/90 border-2 border-red-500 rounded-lg text-xs sm:text-sm text-red-100 font-['Space_Mono',monospace] shadow-lg flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping shrink-0" />
+                <div className="p-2.5 bg-red-900/90 border-2 border-red-500 rounded-lg text-xs text-red-100 font-['Space_Mono',monospace] shadow-lg flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-400 animate-ping shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
@@ -481,7 +481,7 @@ export const Login = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="relative industrial-button rounded-xl px-10 sm:px-14 py-3 sm:py-3.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto text-center"
+                  className="relative industrial-button rounded-xl px-10 sm:px-12 py-2.5 sm:py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto text-center"
                 >
                   {/* Corner metallic rivets on button */}
                   <span className="screw-rivet top-1.5 left-2" />
@@ -489,86 +489,17 @@ export const Login = () => {
                   <span className="screw-rivet bottom-1.5 left-2" />
                   <span className="screw-rivet bottom-1.5 right-2" />
 
-                  <span className="font-['Barlow_Condensed',sans-serif] font-black text-2xl sm:text-3xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
+                  <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
                     {loading ? 'Accessing...' : 'Sign In'}
                   </span>
                 </button>
 
                 {/* Secondary link */}
-                <p className="mt-4 text-center sm:text-right font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-xl text-[#B38F43] tracking-wide">
+                <p className="mt-3 text-center sm:text-right font-['Barlow_Condensed',sans-serif] font-bold text-sm sm:text-base text-[#B38F43] tracking-wide">
                   Already have an Account?
                 </p>
               </div>
             </form>
-
-            {/* =================================================================== */}
-            {/* QUICK DEMO ACCESS PANEL */}
-            {/* =================================================================== */}
-            {showDemo && (
-              <div className="mt-6 sm:mt-8 p-3.5 sm:p-4 bg-[#1E232B] rounded-xl border-2 border-[#3D4452] shadow-xl text-slate-100">
-                <div className="flex items-center justify-between border-b border-[#343B48] pb-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="font-['Space_Mono',monospace] text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">
-                      System Access Keys (One-Click)
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-400">TBI-GEU DIRECT AUTH</span>
-                </div>
-
-                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => quickLogin('super@tbi.org', 'SuperAdmin@123')}
-                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
-                  >
-                    <div className="text-red-400 font-bold">SUPER ADMIN</div>
-                    <div className="text-[10px] text-slate-400 truncate">super@tbi.org</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => quickLogin('admin@tbi.org', 'Admin@123')}
-                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
-                  >
-                    <div className="text-amber-400 font-bold">ADMIN</div>
-                    <div className="text-[10px] text-slate-400 truncate">admin@tbi.org</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => quickLogin('mayank@tbi.org', 'Mayank@123')}
-                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
-                  >
-                    <div className="text-purple-400 font-bold">T3 EXECUTIVE</div>
-                    <div className="text-[10px] text-slate-400 truncate">mayank@tbi.org</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => quickLogin('abhishek@tbi.org', 'Abhishek@123')}
-                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
-                  >
-                    <div className="text-blue-400 font-bold">T2 ASSOCIATE</div>
-                    <div className="text-[10px] text-slate-400 truncate">abhishek@tbi.org</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => quickLogin('ayush@tbi.org', 'Ayush@123')}
-                    className="text-left p-2 rounded bg-[#2D333F] hover:bg-[#394150] border border-[#485366] text-xs font-['Space_Mono',monospace] transition cursor-pointer"
-                  >
-                    <div className="text-emerald-400 font-bold">T1 VOLUNTEER</div>
-                    <div className="text-[10px] text-slate-400 truncate">ayush@tbi.org</div>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </main>
