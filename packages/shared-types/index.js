@@ -29,6 +29,9 @@
  * @property {Date} endTime
  * @property {number} capacity
  * @property {number} filledSlots
+ *
+ * @typedef {Object} ApplicationOwnership
+ * @property {string} teamId Required Team ObjectId for new applications; may be absent on legacy records
  */
 
 export const TypeEnums = Object.freeze({

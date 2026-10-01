@@ -84,3 +84,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Resolved overlap with main while retaining MFA enforcement, access-only HTTP/socket authentication, and both regression suites.
 - Reason: PR #4 and PR #5 independently changed the same authentication paths. Shared MFA token validation already enforces the token-purpose requirement.
 - Where: Auth service/middleware/tests, Socket.io authentication/tests, this changelog, and memory.md.
+
+### [2026-10-01] Preserve application listing team authorization
+- What: Validate scalar listing filters, retain the lead's team scope as a separate query condition, and persist required application team ownership with regression coverage.
+- Reason: Confirmed that request filters replaced the authorization predicate and the schema discarded ownership. The security-fix request authorizes this change. Legacy records stay outside T3 listings until ownership is restored from trusted evidence; event-based inference is unsafe. Authorization changes require human review before merge.
+- Where: `apps/api/src/modules/applications/applications.service.js`, `apps/api/src/modules/applications/applications.model.js`, `apps/api/src/modules/applications/__tests__/applications.test.js`, `packages/shared-types/index.js`, `docs/database/applications.md`, `memory.md`.

@@ -105,3 +105,12 @@ review before merge; corresponding regression tests belong in `__tests__/`.
 The MFA branch incorporates main's token-purpose fix (PR #4). Both regression
 suites are retained; ordinary-user token-purpose tests use a nonprivileged fixture,
 and MFA tests continue to cover administrative access after TOTP verification.
+
+## Application listing security — 2026-10-01
+
+Application listing now validates scalar identifier/status filters and intersects
+T3 requests with the teams they lead. The schema persists required `teamId` for
+new applications. Legacy records without ownership remain unavailable to T3 and
+require a trusted mapping before status updates; do not infer a team from the
+event. See `docs/database/applications.md`. Fix authorized by the security
+investigation request; authorization changes require human review before merge.

@@ -2,6 +2,7 @@ const Application = require('./applications.model');
 const Team = require('../teams/teams.model');
 const User = require('../admin/admin.model');
 const { notify } = require('../notifications/notifications.service');
+const { ValidationError } = require('../../core/errors/typedErrors');
 
 class ApplicationService {
 
@@ -58,16 +59,28 @@ class ApplicationService {
   async getAll(filters = {}, requester = {}) {
     const query = {};
 
+    for (const field of ['teamId', 'eventId']) {
+      if (filters?.[field] !== undefined) {
+        if (typeof filters[field] !== 'string' || !/^[a-f\d]{24}$/i.test(filters[field])) {
+          throw new ValidationError(`Invalid ${field}`);
+        }
+        query[field] = filters[field];
+      }
+    }
+    if (filters?.status !== undefined) {
+      if (!['pending', 'approved', 'rejected', 'waitlisted'].includes(filters.status)) {
+        throw new ValidationError('Invalid status');
+      }
+      query.status = filters.status;
+    }
+
     // T3 only sees applications for their teams
     if (requester && requester.role === 'T3_EXECUTIVE') {
       const teams = await Team.find({ leadId: requester.sub }).select('_id');
       const teamIds = teams.map((t) => t._id);
-      query.teamId = { $in: teamIds };
+      // Keep authorization independent of client filters, including teamId.
+      query.$and = [{ teamId: { $in: teamIds } }];
     }
-
-    if (filters && filters.status) query.status = filters.status;
-    if (filters && filters.teamId) query.teamId = filters.teamId;
-    if (filters && filters.eventId) query.eventId = filters.eventId;
 
     return await Application.find(query).sort({ appliedAt: -1 }).limit(200);
   }
