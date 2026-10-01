@@ -271,6 +271,7 @@ export const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
+  const [showMuralOnMobile, setShowMuralOnMobile] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -318,18 +319,18 @@ export const Login = () => {
       {/* ========================================================================= */}
       {/* RETRO TOP NAVIGATION BAR */}
       {/* ========================================================================= */}
-      <header className="w-full bg-[#0E2233] h-12 px-4 sm:px-8 flex items-center justify-between border-b border-[#1E3A52] shadow-md z-30">
+      <header className="w-full bg-[#0E2233] h-12 px-3 sm:px-6 lg:px-8 flex items-center justify-between border-b border-[#1E3A52] shadow-md z-30 shrink-0">
         {/* Left: TBI Brand mark */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-[#E5B558] shadow-[0_0_8px_#E5B558] animate-pulse" />
-          <span className="font-['Barlow_Condensed',sans-serif] font-black text-2xl tracking-widest text-[#E5B558] uppercase">
+          <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl tracking-widest text-[#E5B558] uppercase">
             TBI
           </span>
         </div>
 
-        {/* Center: Search Capsule */}
-        <div className="hidden sm:flex items-center bg-white rounded-full px-3.5 py-1 w-64 md:w-80 shadow-inner border border-slate-200">
-          <Search size={14} className="text-slate-400 mr-2 shrink-0" />
+        {/* Center: Search Capsule (desktop / tablet) */}
+        <div className="hidden md:flex items-center bg-white rounded-full px-3.5 py-1 w-56 lg:w-80 shadow-inner border border-slate-200">
+          <Search size={13} className="text-slate-400 mr-2 shrink-0" />
           <input
             type="text"
             placeholder="Search focus sectors..."
@@ -338,18 +339,18 @@ export const Login = () => {
           />
         </div>
 
-        {/* Right: User Avatar icon */}
-        <div className="flex items-center gap-3">
+        {/* Right: Quick Access & Avatar */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => setShowDemo(!showDemo)}
-            className="text-[11px] font-['Space_Mono',monospace] text-[#E5B558] hover:text-white transition px-2 py-0.5 rounded border border-[#E5B558]/40 hover:border-[#E5B558] bg-[#0E2233]"
+            className="text-[10px] sm:text-xs font-['Space_Mono',monospace] text-[#E5B558] hover:text-white transition px-2 py-1 rounded border border-[#E5B558]/40 hover:border-[#E5B558] bg-[#0E2233]"
             title="Toggle Quick Role Access"
           >
-            {showDemo ? 'Hide Quick Login' : 'Quick Access Keys'}
+            {showDemo ? 'Hide Keys' : 'Quick Keys'}
           </button>
-          <div className="w-7 h-7 rounded-full bg-[#183954] border border-[#2B5478] flex items-center justify-center text-slate-200 shadow-sm">
-            <User size={15} />
+          <div className="w-7 h-7 rounded-full bg-[#183954] border border-[#2B5478] flex items-center justify-center text-slate-200 shadow-sm shrink-0">
+            <User size={14} />
           </div>
         </div>
       </header>
@@ -357,24 +358,38 @@ export const Login = () => {
       {/* ========================================================================= */}
       {/* MAIN DUAL-PANEL CONTENT */}
       {/* ========================================================================= */}
-      <main className="flex-1 flex flex-col lg:flex-row blueprint-grid relative">
+      <main className="flex-1 flex flex-col lg:flex-row blueprint-grid relative w-full">
         {/* ----------------------------------------------------------------------- */}
         {/* LEFT COLUMN: Innovation Sectors Mural Collage */}
+        {/* On desktop: standard left column. On mobile: collapsible view */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-[46%] xl:w-[44%] relative flex items-center justify-center p-4 lg:p-6 lg:border-r border-[#D9D1BF] bg-[#F4EFE3]/80 overflow-hidden">
-          <div className="relative w-full max-w-lg shadow-xl rounded-lg overflow-hidden border-2 border-[#C9C0AE] bg-[#F7F4EB]">
+        <div className="w-full lg:w-[46%] xl:w-[44%] relative flex flex-col items-center justify-center p-3 sm:p-5 lg:p-6 lg:border-r border-[#D9D1BF] bg-[#F4EFE3]/80 order-2 lg:order-1">
+          {/* Mobile view toggle for the mural collage */}
+          <div className="w-full max-w-md lg:max-w-lg mb-2 flex lg:hidden items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowMuralOnMobile(!showMuralOnMobile)}
+              className="text-xs font-['Space_Mono',monospace] font-bold text-[#6B5A3E] flex items-center gap-1.5 py-1.5 px-3 rounded bg-[#EFE9DB] border border-[#D5CBB8] shadow-sm cursor-pointer"
+            >
+              <span>{showMuralOnMobile ? '▼ Hide' : '▶ View'} Innovation Focus Sectors Mural</span>
+            </button>
+          </div>
+
+          <div
+            className={`w-full max-w-md lg:max-w-lg shadow-xl rounded-lg overflow-hidden border-2 border-[#C9C0AE] bg-[#F7F4EB] transition-all duration-300 ${
+              showMuralOnMobile ? 'block' : 'hidden lg:block'
+            }`}
+          >
             {/* The Authentic Innovation Mural */}
             <img
               src="/tbi-mural-2x.png"
-              alt="TBI Innovation Sectors — DeepTech, AgriTech, MedTech, Carbon Risk, Bioinformatics, Sustainability, Robotics"
-              className="w-full h-auto object-cover block"
+              alt="TBI Innovation Sectors"
+              className="w-full h-auto max-h-[75vh] object-contain block mx-auto"
+              loading="lazy"
             />
-
-            {/* Technical overlay watermark / Blueprint lines */}
-            <div className="absolute inset-0 pointer-events-none border border-black/10" />
           </div>
 
-          {/* Technical drafting dimension marker */}
+          {/* Technical drafting dimension marker (desktop) */}
           <div className="hidden xl:flex absolute top-6 right-6 flex-col items-center gap-1 text-[10px] font-['Space_Mono',monospace] text-[#7A7465]">
             <div className="w-8 h-[1px] bg-[#9A9180]" />
             <span>2ft</span>
@@ -383,22 +398,21 @@ export const Login = () => {
         </div>
 
         {/* ----------------------------------------------------------------------- */}
-        {/* THE BRONZE GEAR MEDALLION LOGO (Positioned at seam / junction) */}
+        {/* THE BRONZE GEAR MEDALLION LOGO (Positioned at seam on desktop) */}
         {/* ----------------------------------------------------------------------- */}
         <div className="hidden lg:flex absolute top-6 left-[46%] xl:left-[44%] -translate-x-1/2 z-20 flex-col items-center pointer-events-none">
-          {/* Radiating drafting circles and guideline */}
           <div className="relative flex items-center justify-center">
             {/* Outer technical compass circle */}
-            <div className="absolute w-36 h-36 rounded-full border border-dashed border-[#A89F8D] animate-spin-slow opacity-60" />
-            <div className="absolute w-44 h-44 rounded-full border border-[#C5BBA7]/50" />
-            <div className="absolute w-52 h-[1px] bg-[#B0A591]/40" />
-            <div className="absolute h-52 w-[1px] bg-[#B0A591]/40" />
+            <div className="absolute w-32 h-32 xl:w-36 xl:h-36 rounded-full border border-dashed border-[#A89F8D] animate-spin-slow opacity-60" />
+            <div className="absolute w-40 h-40 xl:w-44 xl:h-44 rounded-full border border-[#C5BBA7]/50" />
+            <div className="absolute w-48 xl:w-52 h-[1px] bg-[#B0A591]/40" />
+            <div className="absolute h-48 xl:h-52 w-[1px] bg-[#B0A591]/40" />
 
             {/* The pristine 500x500 gear medallion */}
             <img
               src="/tbi-logo.png"
               alt="TBI GEU Technology Business Incubator"
-              className="w-24 h-24 xl:w-28 xl:h-28 object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.35)] relative z-10 transition-transform hover:rotate-6 duration-300"
+              className="w-20 h-20 xl:w-28 xl:h-28 object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.35)] relative z-10 transition-transform hover:rotate-6 duration-300"
             />
           </div>
         </div>
@@ -406,28 +420,31 @@ export const Login = () => {
         {/* ----------------------------------------------------------------------- */}
         {/* RIGHT COLUMN: Industrial Access Console */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-[54%] xl:w-[56%] flex flex-col justify-center px-6 sm:px-12 lg:px-16 py-8 lg:py-12 z-10">
+        <div className="w-full lg:w-[54%] xl:w-[56%] flex flex-col justify-center px-4 sm:px-8 md:px-12 lg:px-14 xl:px-16 py-6 sm:py-8 lg:py-12 z-10 order-1 lg:order-2">
           <div className="max-w-xl w-full mx-auto">
-            {/* Mobile Logo display */}
-            <div className="flex lg:hidden items-center justify-center mb-6">
-              <img
-                src="/tbi-logo.png"
-                alt="TBI Logo"
-                className="w-20 h-20 object-contain drop-shadow-md"
-              />
+            {/* Mobile / Tablet Logo Badge with Drafting Circles */}
+            <div className="flex lg:hidden flex-col items-center justify-center mb-5">
+              <div className="relative flex items-center justify-center p-2">
+                <div className="absolute w-24 h-24 rounded-full border border-dashed border-[#A89F8D] opacity-60 animate-spin-slow" />
+                <img
+                  src="/tbi-logo.png"
+                  alt="TBI Logo"
+                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md relative z-10"
+                />
+              </div>
             </div>
 
             {/* Header Titles */}
-            <div className="mb-6">
-              <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-3xl sm:text-4xl text-[#121922] tracking-tight uppercase leading-none">
+            <div className="mb-5 sm:mb-6 text-center sm:text-left">
+              <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-2xl sm:text-3xl md:text-4xl text-[#121922] tracking-tight uppercase leading-tight">
                 WELCOME, TBI-GEU INNOVATION TEAM!
               </h1>
-              <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-xl sm:text-2xl text-[#2B3542] tracking-wide uppercase mt-1">
+              <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-lg sm:text-xl md:text-2xl text-[#2B3542] tracking-wide uppercase mt-0.5">
                 EMPLOYEES MANAGEMENT PORTAL ACCESS
               </h2>
 
-              <div className="mt-3 flex items-center gap-2">
-                <span className="font-['Space_Mono',monospace] font-bold text-xs uppercase tracking-[0.18em] text-[#4A5568]">
+              <div className="mt-2.5 flex items-center gap-2">
+                <span className="font-['Space_Mono',monospace] font-bold text-[10px] sm:text-xs uppercase tracking-[0.14em] sm:tracking-[0.18em] text-[#4A5568]">
                   FOCUS SECTOR INTEGRATION PANEL
                 </span>
                 <div className="flex-1 h-[1px] bg-[#C5BBA7]" />
@@ -437,10 +454,10 @@ export const Login = () => {
             {/* =================================================================== */}
             {/* AUTHENTICATION FORM */}
             {/* =================================================================== */}
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               {/* Field 1: Username / Email */}
               <div>
-                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-xl sm:text-2xl text-[#121922] tracking-wide mb-1.5">
+                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-lg sm:text-xl md:text-2xl text-[#121922] tracking-wide mb-1">
                   Username
                 </label>
                 <div className="industrial-chassis rounded-lg p-2 sm:p-2.5 transition">
@@ -450,7 +467,7 @@ export const Login = () => {
                   <span className="screw-rivet absolute bottom-1.5 left-1.5" />
                   <span className="screw-rivet absolute bottom-1.5 right-1.5" />
 
-                  <div className="flex items-center justify-between px-3">
+                  <div className="flex items-center justify-between px-2 sm:px-3">
                     <input
                       type="text"
                       value={email}
@@ -458,11 +475,11 @@ export const Login = () => {
                       placeholder="Username / Email"
                       required
                       autoFocus
-                      className="w-full bg-transparent font-['Space_Mono',monospace] text-base sm:text-lg text-slate-100 placeholder-[#768090] outline-none py-1.5 tracking-wide"
+                      className="w-full bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base md:text-lg text-slate-100 placeholder-[#768090] outline-none py-1 sm:py-1.5 tracking-wide"
                     />
 
                     {/* Status LED Pod on right */}
-                    <div className="shrink-0 bg-[#1A1C21] px-2.5 py-1 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                    <div className="shrink-0 bg-[#1A1C21] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded border border-[#404550] flex items-center gap-1 sm:gap-1.5 shadow-inner ml-2">
                       <span className={`led-indicator ${emailHasValue ? 'led-green' : 'led-off'}`} title="Input Active" />
                       <span className={`led-indicator ${emailHasValue && email.includes('@') ? 'led-amber' : 'led-off'}`} title="Format Verified" />
                       <span className={`led-indicator ${error ? 'led-red' : 'led-off'}`} title="Status Check" />
@@ -473,7 +490,7 @@ export const Login = () => {
 
               {/* Field 2: Password */}
               <div>
-                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-xl sm:text-2xl text-[#121922] tracking-wide mb-1.5">
+                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-lg sm:text-xl md:text-2xl text-[#121922] tracking-wide mb-1">
                   Password
                 </label>
                 <div className="industrial-chassis rounded-lg p-2 sm:p-2.5 transition">
@@ -483,18 +500,18 @@ export const Login = () => {
                   <span className="screw-rivet absolute bottom-1.5 left-1.5" />
                   <span className="screw-rivet absolute bottom-1.5 right-1.5" />
 
-                  <div className="flex items-center justify-between px-3">
+                  <div className="flex items-center justify-between px-2 sm:px-3">
                     <input
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Password"
                       required
-                      className="w-full bg-transparent font-['Space_Mono',monospace] text-base sm:text-lg text-slate-100 placeholder-[#768090] outline-none py-1.5 tracking-wider"
+                      className="w-full bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base md:text-lg text-slate-100 placeholder-[#768090] outline-none py-1 sm:py-1.5 tracking-wider"
                     />
 
                     {/* Status LED Pod on right */}
-                    <div className="shrink-0 bg-[#1A1C21] px-2.5 py-1 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                    <div className="shrink-0 bg-[#1A1C21] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded border border-[#404550] flex items-center gap-1 sm:gap-1.5 shadow-inner ml-2">
                       <span className={`led-indicator ${passHasValue ? 'led-green' : 'led-off'}`} title="Key Accepted" />
                       <span className={`led-indicator ${passHasValue && password.length >= 6 ? 'led-amber' : 'led-off'}`} title="Cipher Lock" />
                       <span className={`led-indicator ${error ? 'led-red' : 'led-off'}`} title="Security Guard" />
@@ -505,18 +522,18 @@ export const Login = () => {
 
               {/* Error Notice */}
               {error && (
-                <div className="p-3 bg-red-900/90 border-2 border-red-500 rounded-lg text-sm text-red-100 font-['Space_Mono',monospace] shadow-lg flex items-center gap-2">
+                <div className="p-3 bg-red-900/90 border-2 border-red-500 rounded-lg text-xs sm:text-sm text-red-100 font-['Space_Mono',monospace] shadow-lg flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-ping shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
 
-              {/* Submit Button ("Sign In" / "Sign Up") */}
-              <div className="pt-2 flex flex-col items-end">
+              {/* Submit Button ("Sign In") */}
+              <div className="pt-2 flex flex-col items-center sm:items-end">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="industrial-button rounded-xl px-10 py-3.5 sm:px-12 sm:py-4 cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto"
+                  className="industrial-button rounded-xl px-8 sm:px-12 py-3 sm:py-4 cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto text-center"
                 >
                   {/* Corner metallic rivets on button */}
                   <span className="screw-rivet absolute top-1.5 left-2 scale-75" />
@@ -524,13 +541,13 @@ export const Login = () => {
                   <span className="screw-rivet absolute bottom-1.5 left-2 scale-75" />
                   <span className="screw-rivet absolute bottom-1.5 right-2 scale-75" />
 
-                  <span className="font-['Barlow_Condensed',sans-serif] font-black text-2xl sm:text-3xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
+                  <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl md:text-3xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
                     {loading ? 'Accessing...' : 'Sign In'}
                   </span>
                 </button>
 
                 {/* Secondary link */}
-                <p className="mt-4 text-center sm:text-right font-['Barlow_Condensed',sans-serif] font-bold text-xl text-[#B38F43] tracking-wide">
+                <p className="mt-4 text-center sm:text-right font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-xl text-[#B38F43] tracking-wide">
                   Already have an Account?{' '}
                   <span
                     onClick={() => setShowDemo(!showDemo)}
@@ -546,18 +563,18 @@ export const Login = () => {
             {/* QUICK DEMO ACCESS PANEL */}
             {/* =================================================================== */}
             {showDemo && (
-              <div className="mt-8 p-4 bg-[#1E232B] rounded-xl border-2 border-[#3D4452] shadow-xl text-slate-100">
+              <div className="mt-6 sm:mt-8 p-3.5 sm:p-4 bg-[#1E232B] rounded-xl border-2 border-[#3D4452] shadow-xl text-slate-100">
                 <div className="flex items-center justify-between border-b border-[#343B48] pb-2 mb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="font-['Space_Mono',monospace] text-xs font-bold uppercase tracking-wider text-slate-300">
+                    <span className="font-['Space_Mono',monospace] text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">
                       System Access Keys (One-Click)
                     </span>
                   </div>
                   <span className="text-[10px] font-mono text-slate-400">TBI-GEU DIRECT AUTH</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     disabled={loading}
