@@ -2,6 +2,8 @@ const Timesheet = require('./timesheets.model');
 const Team = require('../teams/teams.model');
 const User = require('../admin/admin.model');
 const { notify } = require('../notifications/notifications.service');
+const { AuthorizationError, ValidationError } = require('../../core/errors/typedErrors');
+const { PRIVILEGED_ROLES } = require('../../../../../packages/shared-constants/roles.js');
 
 const calcHours = (startTime, endTime, breakMinutes) => {
   if (!startTime || !endTime) return 0;
@@ -198,7 +200,17 @@ class TimesheetService {
   }
 
   // ⭐ Export team CSV
-  async exportTeamCSV(teamId, from, to) {
+  async exportTeamCSV(teamId, from, to, requester) {
+    if (typeof teamId !== 'string' || !teamId) throw new ValidationError('teamId required');
+    const team = await Team.findById(teamId);
+    if (!team) throw new Error('Team not found');
+
+    const isAdmin = !!requester?.sub && PRIVILEGED_ROLES.includes(requester.role);
+    const isLead = !!requester?.sub && team.leadId?.toString() === requester.sub;
+    if (!isAdmin && !isLead) {
+      throw new AuthorizationError('Only the team lead or admin can export team timesheets');
+    }
+
     const query = { teamId };
     if (from && to) query.date = { $gte: from, $lte: to };
     const list = await Timesheet.find(query).sort({ date: 1 });
