@@ -336,170 +336,172 @@ export const Login = () => {
       </header>
 
       {/* ========================================================================= */}
-      {/* MAIN DUAL-PANEL CONTENT — SEAMLESS & FIT TO VIEWPORT (NO SCROLLBAR ON DESKTOP) */}
+      {/* MAIN DUAL-PANEL CONTENT — CENTERED IN THE MIDDLE (NO SCROLLBAR ON DESKTOP) */}
       {/* ========================================================================= */}
-      <main className="flex-1 lg:h-[calc(100vh-48px)] lg:max-h-[calc(100vh-48px)] flex flex-col lg:flex-row blueprint-grid relative w-full overflow-visible lg:overflow-hidden">
-        {/* ----------------------------------------------------------------------- */}
-        {/* LEFT COLUMN: Seamless Full-Bleed Artwork (Fit to height, no overflow) */}
-        {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-[48%] xl:w-[50%] h-auto lg:h-full lg:max-h-full relative flex flex-col lg:flex-row items-center justify-start order-2 lg:order-1 overflow-hidden shrink-0">
-          {/* Mobile view toggle */}
-          <div className="w-full p-3 lg:hidden flex justify-center">
-            <button
-              type="button"
-              onClick={() => setShowMuralOnMobile(!showMuralOnMobile)}
-              className="text-xs font-['Space_Mono',monospace] font-bold text-[#6B5A3E] flex items-center gap-1.5 py-1.5 px-3 rounded bg-[#E4DDD0] border border-[#D5CBB8] shadow-sm cursor-pointer"
-            >
-              <span>{showMuralOnMobile ? '▼ Hide' : '▶ View'} Innovation Focus Sectors Mural</span>
-            </button>
-          </div>
-
-          {/* Full-Bleed Merged Graphic: Fit to 100% of viewport height without cropping sectors */}
-          <div className={`w-full h-auto lg:h-full lg:max-h-full flex items-center justify-start ${showMuralOnMobile ? 'block' : 'hidden lg:flex'}`}>
-            <img
-              src="/tbi-mural-merged.png"
-              alt="TBI Innovation Focus Sectors — DeepTech, AgriTech, MedTech, Carbon Risk, Bioinformatics, Sustainability, Robotics"
-              className="w-full lg:w-auto h-auto lg:h-full max-w-full lg:max-h-[calc(100vh-48px)] object-contain object-left block select-none pointer-events-none"
-              loading="eager"
-            />
-          </div>
-        </div>
-
-        {/* ----------------------------------------------------------------------- */}
-        {/* RIGHT COLUMN: Industrial Access Console */}
-        {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-[52%] xl:w-[50%] flex-1 lg:h-full lg:max-h-full flex flex-col justify-center px-4 sm:px-10 md:px-12 lg:px-10 xl:px-14 py-6 lg:py-4 z-10 order-1 lg:order-2 overflow-visible lg:overflow-hidden">
-          <div className="max-w-md xl:max-w-lg w-full mx-auto">
-            {/* Mobile / Tablet Logo Badge with Drafting Circles */}
-            <div className="flex lg:hidden flex-col items-center justify-center mb-3">
-              <div className="relative flex items-center justify-center p-1">
-                <div className="absolute w-20 h-20 rounded-full border border-dashed border-[#A89F8D] opacity-60 animate-spin-slow" />
-                <img
-                  src="/tbi-logo.png"
-                  alt="TBI Logo"
-                  className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md relative z-10"
-                />
-              </div>
+      <main className="flex-1 lg:h-[calc(100vh-48px)] lg:max-h-[calc(100vh-48px)] blueprint-grid relative w-full overflow-y-auto lg:overflow-hidden flex items-center justify-center px-4 sm:px-8 py-3 lg:py-0">
+        <div className="w-full max-w-5xl xl:max-w-6xl h-full flex flex-col lg:flex-row items-center justify-center gap-6 sm:gap-8 lg:gap-8 xl:gap-12">
+          {/* ----------------------------------------------------------------------- */}
+          {/* LEFT COLUMN: Crystal-Clear Innovation Mural (Centered in the middle) */}
+          {/* ----------------------------------------------------------------------- */}
+          <div className="w-full lg:w-auto h-auto lg:h-full max-h-full flex flex-col items-center justify-center order-2 lg:order-1 shrink-0">
+            {/* Mobile view toggle */}
+            <div className="w-full p-2 lg:hidden flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowMuralOnMobile(!showMuralOnMobile)}
+                className="text-xs font-['Space_Mono',monospace] font-bold text-[#6B5A3E] flex items-center gap-1.5 py-1.5 px-3 rounded bg-[#E4DDD0] border border-[#D5CBB8] shadow-sm cursor-pointer"
+              >
+                <span>{showMuralOnMobile ? '▼ Hide' : '▶ View'} Innovation Focus Sectors Mural</span>
+              </button>
             </div>
 
-            {/* Header Titles */}
-            <div className="mb-4 sm:mb-5 text-center sm:text-left">
-              <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-3xl xl:text-4xl text-[#121922] tracking-tight uppercase leading-tight">
-                WELCOME, TBI-GEU INNOVATION TEAM!
-              </h1>
-              <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-sm sm:text-lg xl:text-xl text-[#2B3542] tracking-wide uppercase mt-0.5">
-                EMPLOYEES MANAGEMENT PORTAL ACCESS
-              </h2>
-
-              <div className="mt-2 flex items-center gap-2">
-                <span className="font-['Space_Mono',monospace] font-bold text-[9px] sm:text-xs uppercase tracking-wider sm:tracking-[0.18em] text-[#4A5568] whitespace-nowrap">
-                  FOCUS SECTOR INTEGRATION PANEL
-                </span>
-                <div className="flex-1 h-[1px] bg-[#C5BBA7]" />
-              </div>
+            {/* High-Definition Crisp Graphic */}
+            <div className={`w-full lg:w-auto h-auto lg:h-full flex items-center justify-center ${showMuralOnMobile ? 'block' : 'hidden lg:flex'}`}>
+              <img
+                src="/tbi-mural-crisp.png"
+                alt="TBI Innovation Focus Sectors — DeepTech, AgriTech, MedTech, Carbon Risk, Bioinformatics, Sustainability, Robotics"
+                className="w-auto h-auto lg:h-full max-h-[520px] lg:max-h-[calc(100vh-76px)] max-w-full object-contain object-center drop-shadow-sm block select-none pointer-events-none"
+                loading="eager"
+              />
             </div>
+          </div>
 
-            {/* =================================================================== */}
-            {/* AUTHENTICATION FORM */}
-            {/* =================================================================== */}
-            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-              {/* Field 1: Username / Email */}
-              <div>
-                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-lg xl:text-xl text-[#121922] tracking-wide mb-1">
-                  Username
-                </label>
-                <div className="relative industrial-chassis rounded-lg px-3.5 py-1.5 sm:py-2 transition">
-                  {/* 4 Corner Screws */}
-                  <span className="screw-rivet top-1.5 left-1.5" />
-                  <span className="screw-rivet top-1.5 right-1.5" />
-                  <span className="screw-rivet bottom-1.5 left-1.5" />
-                  <span className="screw-rivet bottom-1.5 right-1.5" />
-
-                  <div className="flex items-center justify-between pl-2 pr-1">
-                    <input
-                      type="text"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Username / Email"
-                      required
-                      autoFocus
-                      className="w-full bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base text-slate-100 placeholder-[#768090] outline-none py-1 tracking-wide"
-                    />
-
-                    {/* Status LED Pod on right */}
-                    <div className="shrink-0 bg-[#1A1C21] px-2 py-0.5 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
-                      <span className={`led-indicator ${emailHasValue ? 'led-green' : 'led-dim-green'}`} title="Input Active" />
-                      <span className={`led-indicator ${emailHasValue && email.includes('@') ? 'led-amber' : 'led-dim-amber'}`} title="Format Verified" />
-                      <span className={`led-indicator ${error ? 'led-red' : 'led-dim-red'}`} title="Status Check" />
-                    </div>
-                  </div>
+          {/* ----------------------------------------------------------------------- */}
+          {/* RIGHT COLUMN: Industrial Access Console */}
+          {/* ----------------------------------------------------------------------- */}
+          <div className="w-full lg:w-[420px] xl:w-[460px] flex flex-col justify-center py-2 lg:py-0 z-10 order-1 lg:order-2 shrink-0">
+            <div className="w-full">
+              {/* Mobile / Tablet Logo Badge with Drafting Circles */}
+              <div className="flex lg:hidden flex-col items-center justify-center mb-3">
+                <div className="relative flex items-center justify-center p-1">
+                  <div className="absolute w-20 h-20 rounded-full border border-dashed border-[#A89F8D] opacity-60 animate-spin-slow" />
+                  <img
+                    src="/tbi-logo.png"
+                    alt="TBI Logo"
+                    className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md relative z-10"
+                  />
                 </div>
               </div>
 
-              {/* Field 2: Password */}
-              <div>
-                <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-lg xl:text-xl text-[#121922] tracking-wide mb-1">
-                  Password
-                </label>
-                <div className="relative industrial-chassis rounded-lg px-3.5 py-1.5 sm:py-2 transition">
-                  {/* 4 Corner Screws */}
-                  <span className="screw-rivet top-1.5 left-1.5" />
-                  <span className="screw-rivet top-1.5 right-1.5" />
-                  <span className="screw-rivet bottom-1.5 left-1.5" />
-                  <span className="screw-rivet bottom-1.5 right-1.5" />
+              {/* Header Titles */}
+              <div className="mb-4 text-center lg:text-left">
+                <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl xl:text-3xl text-[#121922] tracking-tight uppercase leading-tight">
+                  WELCOME, TBI-GEU INNOVATION TEAM!
+                </h1>
+                <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-sm sm:text-base xl:text-lg text-[#2B3542] tracking-wide uppercase mt-0.5">
+                  EMPLOYEES MANAGEMENT PORTAL ACCESS
+                </h2>
 
-                  <div className="flex items-center justify-between pl-2 pr-1">
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Password"
-                      required
-                      className="w-full bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base text-slate-100 placeholder-[#768090] outline-none py-1 tracking-wider"
-                    />
-
-                    {/* Status LED Pod on right */}
-                    <div className="shrink-0 bg-[#1A1C21] px-2 py-0.5 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
-                      <span className={`led-indicator ${passHasValue ? 'led-green' : 'led-dim-green'}`} title="Key Accepted" />
-                      <span className={`led-indicator ${passHasValue && password.length >= 6 ? 'led-amber' : 'led-dim-amber'}`} title="Cipher Lock" />
-                      <span className={`led-indicator ${error ? 'led-red' : 'led-dim-red'}`} title="Security Guard" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Error Notice */}
-              {error && (
-                <div className="p-2.5 bg-red-900/90 border-2 border-red-500 rounded-lg text-xs text-red-100 font-['Space_Mono',monospace] shadow-lg flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-red-400 animate-ping shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Submit Button ("Sign In") */}
-              <div className="pt-2 flex flex-col items-center sm:items-end">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="relative industrial-button rounded-xl px-10 sm:px-12 py-2.5 sm:py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto text-center"
-                >
-                  {/* Corner metallic rivets on button */}
-                  <span className="screw-rivet top-1.5 left-2" />
-                  <span className="screw-rivet top-1.5 right-2" />
-                  <span className="screw-rivet bottom-1.5 left-2" />
-                  <span className="screw-rivet bottom-1.5 right-2" />
-
-                  <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
-                    {loading ? 'Accessing...' : 'Sign In'}
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="font-['Space_Mono',monospace] font-bold text-[9px] sm:text-[10px] uppercase tracking-wider sm:tracking-[0.16em] text-[#4A5568] whitespace-nowrap">
+                    FOCUS SECTOR INTEGRATION PANEL
                   </span>
-                </button>
-
-                {/* Secondary link */}
-                <p className="mt-3 text-center sm:text-right font-['Barlow_Condensed',sans-serif] font-bold text-sm sm:text-base text-[#B38F43] tracking-wide">
-                  Already have an Account?
-                </p>
+                  <div className="flex-1 h-[1px] bg-[#C5BBA7]" />
+                </div>
               </div>
-            </form>
+
+              {/* =================================================================== */}
+              {/* AUTHENTICATION FORM */}
+              {/* =================================================================== */}
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
+                {/* Field 1: Username / Email */}
+                <div>
+                  <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-lg text-[#121922] tracking-wide mb-1">
+                    Username
+                  </label>
+                  <div className="relative industrial-chassis rounded-lg px-3.5 py-1.5 sm:py-2 transition">
+                    {/* 4 Corner Screws */}
+                    <span className="screw-rivet top-1.5 left-1.5" />
+                    <span className="screw-rivet top-1.5 right-1.5" />
+                    <span className="screw-rivet bottom-1.5 left-1.5" />
+                    <span className="screw-rivet bottom-1.5 right-1.5" />
+
+                    <div className="flex items-center justify-between pl-2 pr-1">
+                      <input
+                        type="text"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Username / Email"
+                        required
+                        autoFocus
+                        className="flex-1 min-w-0 bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base text-slate-100 placeholder-[#768090] outline-none py-1 tracking-wide"
+                      />
+
+                      {/* Status LED Pod on right */}
+                      <div className="shrink-0 bg-[#1A1C21] px-2 py-0.5 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                        <span className={`led-indicator ${emailHasValue ? 'led-green' : 'led-dim-green'}`} title="Input Active" />
+                        <span className={`led-indicator ${emailHasValue && email.includes('@') ? 'led-amber' : 'led-dim-amber'}`} title="Format Verified" />
+                        <span className={`led-indicator ${error ? 'led-red' : 'led-dim-red'}`} title="Status Check" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Field 2: Password */}
+                <div>
+                  <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-lg text-[#121922] tracking-wide mb-1">
+                    Password
+                  </label>
+                  <div className="relative industrial-chassis rounded-lg px-3.5 py-1.5 sm:py-2 transition">
+                    {/* 4 Corner Screws */}
+                    <span className="screw-rivet top-1.5 left-1.5" />
+                    <span className="screw-rivet top-1.5 right-1.5" />
+                    <span className="screw-rivet bottom-1.5 left-1.5" />
+                    <span className="screw-rivet bottom-1.5 right-1.5" />
+
+                    <div className="flex items-center justify-between pl-2 pr-1">
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Password"
+                        required
+                        className="flex-1 min-w-0 bg-transparent font-['Space_Mono',monospace] text-sm sm:text-base text-slate-100 placeholder-[#768090] outline-none py-1 tracking-wider"
+                      />
+
+                      {/* Status LED Pod on right */}
+                      <div className="shrink-0 bg-[#1A1C21] px-2 py-0.5 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                        <span className={`led-indicator ${passHasValue ? 'led-green' : 'led-dim-green'}`} title="Key Accepted" />
+                        <span className={`led-indicator ${passHasValue && password.length >= 6 ? 'led-amber' : 'led-dim-amber'}`} title="Cipher Lock" />
+                        <span className={`led-indicator ${error ? 'led-red' : 'led-dim-red'}`} title="Security Guard" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Error Notice */}
+                {error && (
+                  <div className="p-2.5 bg-red-900/90 border-2 border-red-500 rounded-lg text-xs text-red-100 font-['Space_Mono',monospace] shadow-lg flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-400 animate-ping shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                {/* Submit Button ("Sign In") */}
+                <div className="pt-2 flex flex-col items-center sm:items-end">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="relative industrial-button rounded-xl px-10 sm:px-12 py-2.5 sm:py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto text-center"
+                  >
+                    {/* Corner metallic rivets on button */}
+                    <span className="screw-rivet top-1.5 left-2" />
+                    <span className="screw-rivet top-1.5 right-2" />
+                    <span className="screw-rivet bottom-1.5 left-2" />
+                    <span className="screw-rivet bottom-1.5 right-2" />
+
+                    <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
+                      {loading ? 'Accessing...' : 'Sign In'}
+                    </span>
+                  </button>
+
+                  {/* Secondary link */}
+                  <p className="mt-3 text-center sm:text-right font-['Barlow_Condensed',sans-serif] font-bold text-sm sm:text-base text-[#B38F43] tracking-wide">
+                    Already have an Account?
+                  </p>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </main>
