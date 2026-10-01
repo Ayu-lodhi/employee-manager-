@@ -350,7 +350,7 @@ export const Login = () => {
             {showDemo ? 'Hide Keys' : 'Quick Keys'}
           </button>
           <div className="w-7 h-7 rounded-full bg-[#183954] border border-[#2B5478] flex items-center justify-center text-slate-200 shadow-sm shrink-0">
-            <User size={14} />
+            <UserIcon size={14} />
           </div>
         </div>
       </header>
@@ -460,14 +460,14 @@ export const Login = () => {
                 <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-lg sm:text-xl md:text-2xl text-[#121922] tracking-wide mb-1">
                   Username
                 </label>
-                <div className="industrial-chassis rounded-lg p-2 sm:p-2.5 transition">
+                <div className="relative industrial-chassis rounded-lg px-4 py-2 sm:py-2.5 transition">
                   {/* 4 Corner Screws */}
-                  <span className="screw-rivet absolute top-1.5 left-1.5" />
-                  <span className="screw-rivet absolute top-1.5 right-1.5" />
-                  <span className="screw-rivet absolute bottom-1.5 left-1.5" />
-                  <span className="screw-rivet absolute bottom-1.5 right-1.5" />
+                  <span className="screw-rivet top-1.5 left-1.5" />
+                  <span className="screw-rivet top-1.5 right-1.5" />
+                  <span className="screw-rivet bottom-1.5 left-1.5" />
+                  <span className="screw-rivet bottom-1.5 right-1.5" />
 
-                  <div className="flex items-center justify-between px-2 sm:px-3">
+                  <div className="flex items-center justify-between pl-2 pr-1">
                     <input
                       type="text"
                       value={email}
@@ -479,10 +479,10 @@ export const Login = () => {
                     />
 
                     {/* Status LED Pod on right */}
-                    <div className="shrink-0 bg-[#1A1C21] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded border border-[#404550] flex items-center gap-1 sm:gap-1.5 shadow-inner ml-2">
-                      <span className={`led-indicator ${emailHasValue ? 'led-green' : 'led-off'}`} title="Input Active" />
-                      <span className={`led-indicator ${emailHasValue && email.includes('@') ? 'led-amber' : 'led-off'}`} title="Format Verified" />
-                      <span className={`led-indicator ${error ? 'led-red' : 'led-off'}`} title="Status Check" />
+                    <div className="shrink-0 bg-[#1A1C21] px-2 sm:px-2.5 py-1 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                      <span className={`led-indicator ${emailHasValue ? 'led-green' : 'led-dim-green'}`} title="Input Active" />
+                      <span className={`led-indicator ${emailHasValue && email.includes('@') ? 'led-amber' : 'led-dim-amber'}`} title="Format Verified" />
+                      <span className={`led-indicator ${error ? 'led-red' : 'led-dim-red'}`} title="Status Check" />
                     </div>
                   </div>
                 </div>
@@ -493,14 +493,14 @@ export const Login = () => {
                 <label className="block font-['Barlow_Condensed',sans-serif] font-bold text-lg sm:text-xl md:text-2xl text-[#121922] tracking-wide mb-1">
                   Password
                 </label>
-                <div className="industrial-chassis rounded-lg p-2 sm:p-2.5 transition">
+                <div className="relative industrial-chassis rounded-lg px-4 py-2 sm:py-2.5 transition">
                   {/* 4 Corner Screws */}
-                  <span className="screw-rivet absolute top-1.5 left-1.5" />
-                  <span className="screw-rivet absolute top-1.5 right-1.5" />
-                  <span className="screw-rivet absolute bottom-1.5 left-1.5" />
-                  <span className="screw-rivet absolute bottom-1.5 right-1.5" />
+                  <span className="screw-rivet top-1.5 left-1.5" />
+                  <span className="screw-rivet top-1.5 right-1.5" />
+                  <span className="screw-rivet bottom-1.5 left-1.5" />
+                  <span className="screw-rivet bottom-1.5 right-1.5" />
 
-                  <div className="flex items-center justify-between px-2 sm:px-3">
+                  <div className="flex items-center justify-between pl-2 pr-1">
                     <input
                       type="password"
                       value={password}
@@ -511,10 +511,10 @@ export const Login = () => {
                     />
 
                     {/* Status LED Pod on right */}
-                    <div className="shrink-0 bg-[#1A1C21] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded border border-[#404550] flex items-center gap-1 sm:gap-1.5 shadow-inner ml-2">
-                      <span className={`led-indicator ${passHasValue ? 'led-green' : 'led-off'}`} title="Key Accepted" />
-                      <span className={`led-indicator ${passHasValue && password.length >= 6 ? 'led-amber' : 'led-off'}`} title="Cipher Lock" />
-                      <span className={`led-indicator ${error ? 'led-red' : 'led-off'}`} title="Security Guard" />
+                    <div className="shrink-0 bg-[#1A1C21] px-2 sm:px-2.5 py-1 rounded border border-[#404550] flex items-center gap-1.5 shadow-inner ml-2">
+                      <span className={`led-indicator ${passHasValue ? 'led-green' : 'led-dim-green'}`} title="Key Accepted" />
+                      <span className={`led-indicator ${passHasValue && password.length >= 6 ? 'led-amber' : 'led-dim-amber'}`} title="Cipher Lock" />
+                      <span className={`led-indicator ${error ? 'led-red' : 'led-dim-red'}`} title="Security Guard" />
                     </div>
                   </div>
                 </div>
@@ -533,15 +533,15 @@ export const Login = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="industrial-button rounded-xl px-8 sm:px-12 py-3 sm:py-4 cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto text-center"
+                  className="relative industrial-button rounded-xl px-10 sm:px-14 py-3 sm:py-3.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group w-full sm:w-auto text-center"
                 >
                   {/* Corner metallic rivets on button */}
-                  <span className="screw-rivet absolute top-1.5 left-2 scale-75" />
-                  <span className="screw-rivet absolute top-1.5 right-2 scale-75" />
-                  <span className="screw-rivet absolute bottom-1.5 left-2 scale-75" />
-                  <span className="screw-rivet absolute bottom-1.5 right-2 scale-75" />
+                  <span className="screw-rivet top-1.5 left-2" />
+                  <span className="screw-rivet top-1.5 right-2" />
+                  <span className="screw-rivet bottom-1.5 left-2" />
+                  <span className="screw-rivet bottom-1.5 right-2" />
 
-                  <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl md:text-3xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
+                  <span className="font-['Barlow_Condensed',sans-serif] font-black text-2xl sm:text-3xl uppercase tracking-wider text-[#FCEBEB] block drop-shadow-sm">
                     {loading ? 'Accessing...' : 'Sign In'}
                   </span>
                 </button>

@@ -27,14 +27,15 @@
   }
 
   .screw-rivet {
-    width: 7px;
-    height: 7px;
+    position: absolute;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: radial-gradient(circle, #9aa1ad 25%, #464a52 80%);
-    border: 1px solid #23252a;
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), 0 1px 1px rgba(0, 0, 0, 0.5);
-    position: relative;
-    display: inline-block;
+    background: radial-gradient(circle, #b0b7c3 20%, #464a52 80%);
+    border: 1px solid #1a1c20;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    z-index: 10;
   }
 
   .screw-rivet::after {
@@ -42,9 +43,9 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 4px;
-    height: 1px;
-    background: #1b1d22;
+    width: 5px;
+    height: 1.5px;
+    background: #181a1f;
     transform: translate(-50%, -50%) rotate(45deg);
   }
 
@@ -52,7 +53,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.8);
     transition: all 0.25s ease;
     display: inline-block;
   }
@@ -72,10 +73,19 @@
     box-shadow: 0 0 7px #ef4444, inset 0 1px 1px rgba(255, 255, 255, 0.7);
   }
 
-  .led-off {
-    background: #23262c;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
-    opacity: 0.45;
+  .led-dim-green {
+    background: radial-gradient(circle, #2d6a4f 20%, #1b4332 80%);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .led-dim-amber {
+    background: radial-gradient(circle, #78590f 20%, #4a3608 80%);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .led-dim-red {
+    background: radial-gradient(circle, #7f1d1d 20%, #450a0a 80%);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
   }
 
   .industrial-button {
