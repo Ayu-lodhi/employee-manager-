@@ -44,6 +44,13 @@ class AttendanceService {
     const student = await User.findById(studentId).select('name email');
     if (!student) throw new Error('Student not found');
 
+    // All markers, including admins, may only mark members or the team lead.
+    const targetId = student._id.toString();
+    const isMember =
+      team.members.some((m) => m.toString() === targetId) ||
+      (team.leadId && team.leadId.toString() === targetId);
+    if (!isMember) throw new Error('Student is not a member of this team');
+
     // Upsert — one record per student per team per day
     let record;
     try {
