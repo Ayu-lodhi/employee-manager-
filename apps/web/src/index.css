@@ -108,11 +108,9 @@
   }
 
   .blueprint-grid {
-    background-color: #f7f4eb;
+    background-color: #f0ede6;
     background-image: 
-      radial-gradient(#d8d0bf 1px, transparent 1px),
-      linear-gradient(to right, rgba(180, 170, 150, 0.12) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(180, 170, 150, 0.12) 1px, transparent 1px);
-    background-size: 24px 24px, 48px 48px, 48px 48px;
+      radial-gradient(#d5ccbf 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 }

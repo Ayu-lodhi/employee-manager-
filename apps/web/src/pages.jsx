@@ -336,63 +336,31 @@ export const Login = () => {
       </header>
 
       {/* ========================================================================= */}
-      {/* MAIN DUAL-PANEL CONTENT */}
+      {/* MAIN DUAL-PANEL CONTENT — SEAMLESSLY MERGED */}
       {/* ========================================================================= */}
-      <main className="flex-1 flex flex-col lg:flex-row blueprint-grid relative w-full">
+      <main className="flex-1 flex flex-col lg:flex-row blueprint-grid relative w-full overflow-hidden min-h-[calc(100vh-48px)]">
         {/* ----------------------------------------------------------------------- */}
-        {/* LEFT COLUMN: Innovation Sectors Mural Collage */}
-        {/* On desktop: standard left column. On mobile: collapsible view */}
+        {/* LEFT COLUMN: Seamless Full-Bleed Artwork */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-[46%] xl:w-[44%] relative flex flex-col items-center justify-center p-3 sm:p-5 lg:p-6 lg:border-r border-[#D9D1BF] bg-[#F4EFE3]/80 order-2 lg:order-1">
-          {/* Mobile view toggle for the mural collage */}
-          <div className="w-full max-w-md lg:max-w-lg mb-2 flex lg:hidden items-center justify-between">
+        <div className="w-full lg:w-[48%] xl:w-[50%] relative flex items-stretch justify-start order-2 lg:order-1 self-stretch">
+          {/* Mobile view toggle */}
+          <div className="w-full p-3 lg:hidden">
             <button
               type="button"
               onClick={() => setShowMuralOnMobile(!showMuralOnMobile)}
-              className="text-xs font-['Space_Mono',monospace] font-bold text-[#6B5A3E] flex items-center gap-1.5 py-1.5 px-3 rounded bg-[#EFE9DB] border border-[#D5CBB8] shadow-sm cursor-pointer"
+              className="text-xs font-['Space_Mono',monospace] font-bold text-[#6B5A3E] flex items-center gap-1.5 py-1.5 px-3 rounded bg-[#E4DDD0] border border-[#D5CBB8] shadow-sm cursor-pointer"
             >
               <span>{showMuralOnMobile ? '▼ Hide' : '▶ View'} Innovation Focus Sectors Mural</span>
             </button>
           </div>
 
-          <div
-            className={`w-full max-w-md lg:max-w-lg shadow-xl rounded-lg overflow-hidden border-2 border-[#C9C0AE] bg-[#F7F4EB] transition-all duration-300 ${
-              showMuralOnMobile ? 'block' : 'hidden lg:block'
-            }`}
-          >
-            {/* The Authentic Innovation Mural */}
+          {/* Full-Bleed Merged Graphic (Flush on left, top, bottom, seamlessly feathered into background) */}
+          <div className={`w-full h-full ${showMuralOnMobile ? 'block' : 'hidden lg:block'}`}>
             <img
-              src="/tbi-mural-2x.png"
-              alt="TBI Innovation Sectors"
-              className="w-full h-auto max-h-[75vh] object-contain block mx-auto"
-              loading="lazy"
-            />
-          </div>
-
-          {/* Technical drafting dimension marker (desktop) */}
-          <div className="hidden xl:flex absolute top-6 right-6 flex-col items-center gap-1 text-[10px] font-['Space_Mono',monospace] text-[#7A7465]">
-            <div className="w-8 h-[1px] bg-[#9A9180]" />
-            <span>2ft</span>
-            <div className="w-8 h-[1px] bg-[#9A9180]" />
-          </div>
-        </div>
-
-        {/* ----------------------------------------------------------------------- */}
-        {/* THE BRONZE GEAR MEDALLION LOGO (Positioned at seam on desktop) */}
-        {/* ----------------------------------------------------------------------- */}
-        <div className="hidden lg:flex absolute top-6 left-[46%] xl:left-[44%] -translate-x-1/2 z-20 flex-col items-center pointer-events-none">
-          <div className="relative flex items-center justify-center">
-            {/* Outer technical compass circle */}
-            <div className="absolute w-32 h-32 xl:w-36 xl:h-36 rounded-full border border-dashed border-[#A89F8D] animate-spin-slow opacity-60" />
-            <div className="absolute w-40 h-40 xl:w-44 xl:h-44 rounded-full border border-[#C5BBA7]/50" />
-            <div className="absolute w-48 xl:w-52 h-[1px] bg-[#B0A591]/40" />
-            <div className="absolute h-48 xl:h-52 w-[1px] bg-[#B0A591]/40" />
-
-            {/* The pristine 500x500 gear medallion */}
-            <img
-              src="/tbi-logo.png"
-              alt="TBI GEU Technology Business Incubator"
-              className="w-20 h-20 xl:w-28 xl:h-28 object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.35)] relative z-10 transition-transform hover:rotate-6 duration-300"
+              src="/tbi-mural-merged.png"
+              alt="TBI Innovation Focus Sectors — DeepTech, AgriTech, MedTech, Carbon Risk, Bioinformatics, Sustainability, Robotics"
+              className="w-full h-full object-cover object-left block select-none pointer-events-none"
+              loading="eager"
             />
           </div>
         </div>
@@ -400,7 +368,7 @@ export const Login = () => {
         {/* ----------------------------------------------------------------------- */}
         {/* RIGHT COLUMN: Industrial Access Console */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-[54%] xl:w-[56%] flex flex-col justify-center px-4 sm:px-8 md:px-12 lg:px-14 xl:px-16 py-6 sm:py-8 lg:py-12 z-10 order-1 lg:order-2">
+        <div className="w-full lg:w-[52%] xl:w-[50%] flex flex-col justify-center px-6 sm:px-12 md:px-14 lg:px-12 xl:px-16 py-8 lg:py-12 z-10 order-1 lg:order-2">
           <div className="max-w-xl w-full mx-auto">
             {/* Mobile / Tablet Logo Badge with Drafting Circles */}
             <div className="flex lg:hidden flex-col items-center justify-center mb-5">
