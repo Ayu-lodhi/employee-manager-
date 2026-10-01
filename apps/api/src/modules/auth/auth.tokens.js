@@ -13,7 +13,8 @@ exports.requiresMfa = async (role) => {
 
 // Bind password proof and MFA proof to the current account credentials.
 exports.authState = (user) => createHmac('sha256', JWT_SECRET)
-  .update(JSON.stringify([String(user._id), user.password, user.mfa?.version || null]))
+  .update(JSON.stringify([String(user._id), user.password, user.mfa?.version || null,
+    !!user.mustChangePassword, user.passwordChangeStartedAt || null]))
   .digest('hex');
 
 exports.sign = (user, purpose, expiresIn, claims = {}) => jwt.sign({
@@ -22,6 +23,6 @@ exports.sign = (user, purpose, expiresIn, claims = {}) => jwt.sign({
 
 exports.verify = (token, purpose) => {
   const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-  if (decoded.purpose !== purpose || typeof decoded.sub !== 'string') throw new Error('Invalid token purpose');
+  if (![purpose].flat().includes(decoded.purpose) || typeof decoded.sub !== 'string') throw new Error('Invalid token purpose');
   return decoded;
 };

@@ -76,6 +76,7 @@ export const SocketProvider = ({ children }) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  const [passwordChangeToken, setPasswordChangeToken] = useState('');
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -101,13 +102,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    setPasswordChangeToken('');
     setUser(null);
     localStorage.removeItem('tbi_user');
     localStorage.removeItem('tbi_token');
   };
 
+  const beginPasswordChange = (token) => {
+    logout();
+    setPasswordChangeToken(token);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, initializing }}>
+    <AuthContext.Provider value={{ user, login, logout, initializing, passwordChangeToken, beginPasswordChange }}>
       {children}
     </AuthContext.Provider>
   );
@@ -255,7 +262,7 @@ export const Login = () => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, beginPasswordChange } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -273,6 +280,11 @@ export const Login = () => {
       if (data.data.mfaRequired) {
         setChallengeToken(data.data.challengeToken);
         setPassword('');
+        return;
+      }
+      if (data.data.mustChangePassword) {
+        beginPasswordChange(data.data.passwordChangeToken);
+        navigate('/change-password', { replace: true });
         return;
       }
       login(data.data.user, data.data.accessToken);
@@ -5361,7 +5373,7 @@ export const LandingPage = () => {
 
 
 export const ChangePasswordPage = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, passwordChangeToken } = useAuth();
   const navigate = useNavigate();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -5385,7 +5397,7 @@ export const ChangePasswordPage = () => {
     if (!allValid) return setError('Please complete all requirements');
     setLoading(true);
     try {
-      await api.post('/auth/change-password', { oldPassword, newPassword });
+      await api.post('/auth/change-password', { oldPassword, newPassword }, passwordChangeToken || undefined);
       alert('Password changed successfully. Please login again.');
       logout();
       navigate('/login', { replace: true });
@@ -5406,17 +5418,20 @@ export const ChangePasswordPage = () => {
             </div>
             <h1 className="text-2xl font-bold">Password Change Required</h1>
             <p className="text-gray-500 mt-2 text-sm">
-              You must set a new password before continuing.
+              {passwordChangeToken
+                ? 'Set a new password within five minutes of signing in. If this page is closed or time runs out, ask an administrator for a new temporary password.'
+                : user ? 'Enter your current password and choose a new password.'
+                : 'Sign in to change your password. If you already used a temporary password, ask an administrator to reset it.'}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
+            {!passwordChangeToken && <div>
               <label className="block text-sm font-medium mb-2">Current Password</label>
               <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="Your temp password"
+                placeholder="Your current password"
                 className="w-full h-12 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" required />
-            </div>
+            </div>}
             <div>
               <label className="block text-sm font-medium mb-2">New Password</label>
               <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
@@ -5448,7 +5463,7 @@ export const ChangePasswordPage = () => {
 
             {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>}
 
-            <button type="submit" disabled={loading || !allValid}
+            <button type="submit" disabled={loading || !allValid || (!user && !passwordChangeToken)}
               className="w-full h-12 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-lg transition">
               {loading ? 'Updating...' : 'Change Password & Continue'}
             </button>

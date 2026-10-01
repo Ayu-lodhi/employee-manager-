@@ -115,3 +115,13 @@ new applications. Legacy records without ownership remain unavailable to T3 and
 require a trusted mapping before status updates; do not infer a team from the
 event. See `docs/database/applications.md`. Fix authorized by the security
 investigation request; authorization changes require human review before merge.
+
+## Mandatory password replacement — 2026-10-01
+
+Temporary login now atomically records `passwordChangeStartedAt` and cannot be
+repeated. Until replacement, only password-change credentials are issued, after
+MFA for privileged users. HTTP and Socket.io authentication enforce this state.
+Replacement must finish within five minutes of login; abandoned/expired flows
+require an administrative reset. The UI holds the restricted token in memory.
+See `docs/database/password-replacement.md`. Existing sessions require fresh
+login. Security investigation authorized the fix; human review is required before merge.

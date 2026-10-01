@@ -22,7 +22,7 @@ test('manual attendance enforces team membership through the HTTP route', async 
   const tokens = require('../../auth/auth.tokens');
   const marker = {
     _id: id('1'), name: 'Fixture lead', email: 'lead@example.test',
-    role: ROLES.T3_EXECUTIVE, isActive: true, password: 'fixture-hash',
+    role: ROLES.T3_EXECUTIVE, isActive: true, password: 'fixture-hash', mustChangePassword: false,
   };
   const member = { _id: id('a'), name: 'Member', email: 'member@example.test' };
   const outsider = { _id: id('b'), name: 'Outsider', email: 'outsider@example.test' };

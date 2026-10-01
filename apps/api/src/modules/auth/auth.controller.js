@@ -14,7 +14,8 @@ exports.login = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: result.mfaRequired ? 'MFA verification required' : 'Login successful',
+      message: result.mfaRequired ? 'MFA verification required'
+        : result.mustChangePassword ? 'Password replacement required' : 'Login successful',
       data: result,
     });
   } catch (error) {
@@ -37,7 +38,7 @@ exports.getMe = async (req, res) => {
 exports.changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
-    await authService.changePassword(req.user.sub, oldPassword, newPassword);
+    await authService.changePassword(req.user, oldPassword, newPassword);
     res.status(200).json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

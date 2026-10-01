@@ -79,6 +79,7 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
 
   // 5. Deactivate + reset password to prevent re-login
   user.isActive = false;
+  user.passwordChangeStartedAt = null;
   user.password = await bcrypt.hash(generateDefaultPassword(), 12);
   user.mustChangePassword = true;
   await user.save();
@@ -108,6 +109,7 @@ exports.reactivateUser = async (id, adminId) => {
 
   // Generate new temp password (old one was reset at revoke time)
   const tempPassword = generateDefaultPassword();
+  user.passwordChangeStartedAt = null;
   user.password = await bcrypt.hash(tempPassword, 12);
   user.isActive = true;
   user.mustChangePassword = true;  // Force password change on next login
@@ -153,6 +155,7 @@ exports.resetPassword = async (id, adminId = null) => {
 
   // Generate new temp password
   const tempPassword = generateDefaultPassword();
+  user.passwordChangeStartedAt = null;
   user.password = await bcrypt.hash(tempPassword, 12);
   user.mustChangePassword = true;  // force change on next login
   await user.save();
@@ -186,6 +189,7 @@ exports.setPassword = async (id, newPassword, adminId) => {
   if (!/[0-9]/.test(newPassword)) throw new Error('Password must contain a number');
   if (!/[^A-Za-z0-9]/.test(newPassword)) throw new Error('Password must contain a special character');
 
+  user.passwordChangeStartedAt = null;
   user.password = await bcrypt.hash(newPassword, 12);
   user.mustChangePassword = false;
   await user.save();
