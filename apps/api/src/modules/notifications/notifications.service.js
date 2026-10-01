@@ -33,7 +33,7 @@ exports.notify = async (userId, type, title, message) => {
     // 1. In-app notification
     if (shouldSend(prefs, 'inApp', type)) {
       notif = await Notification.create({ userId, type, title, message });
-      emitToUser(userId, 'notification:new', {
+      await emitToUser(userId, 'notification:new', {
         _id: notif._id,
         type: notif.type,
         title: notif.title,

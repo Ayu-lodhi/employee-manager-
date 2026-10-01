@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { disconnectUserSockets } = require('../../config/socket');
 const User = require('./admin.model');
 const { sendWelcomeEmail, sendPasswordResetEmail } = require('../../services/email.service');
 
@@ -82,6 +83,7 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
   user.password = await bcrypt.hash(generateDefaultPassword(), 12);
   user.mustChangePassword = true;
   await user.save();
+  disconnectUserSockets(user._id);
 
   return {
     userId: user._id,
