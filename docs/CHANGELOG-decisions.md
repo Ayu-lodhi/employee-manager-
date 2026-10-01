@@ -69,3 +69,7 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - **Reason**: Gracefully recovers from race conditions or duplicate key collisions from stale indexes during attendance marking without failing the operation.
 - **Where**: `apps/api/src/modules/attendance/attendance.service.js`
 
+### [2026-10-01] Enforce account provisioning authority
+- **What**: Account creation checks the authenticated requester's allowed target roles before persistence or credential delivery and returns 403 for unauthorized grants. Admin may provision student roles; Super Admin may provision all existing roles.
+- **Reason**: The user authorized a minimal fix for confirmed privilege escalation. The active API uses role-based authentication; its permission-based scaffold is not wired into this flow. Server enforcement closes the gap left by the UI's role choices.
+- **Where**: `apps/api/src/modules/admin/admin.service.js`, `admin.controller.js`, `__tests__/admin.test.js`; `memory.md`.
