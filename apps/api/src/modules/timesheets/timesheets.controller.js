@@ -81,9 +81,9 @@ exports.exportTeamCSV = async (req, res) => {
   try {
     const { teamId, from, to } = req.query;
     if (!teamId) return res.status(400).json({ success: false, message: 'teamId required' });
-    const data = await service.exportTeamCSV(teamId, from, to);
+    const data = await service.exportTeamCSV(teamId, from, to, req.user);
     res.json({ success: true, data });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(err.statusCode || 400).json({ success: false, message: err.message });
   }
 };
