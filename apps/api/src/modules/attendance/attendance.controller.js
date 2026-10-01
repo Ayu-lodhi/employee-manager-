@@ -53,7 +53,7 @@ exports.getTeamHistory = async (req, res) => {
   try {
     const { teamId, days } = req.query;
     if (!teamId) return res.status(400).json({ success: false, message: 'teamId required' });
-    const data = await service.getTeamAttendanceHistory(teamId, parseInt(days) || 7);
+    const data = await service.getTeamAttendanceHistory(teamId, days);
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });

@@ -114,3 +114,10 @@ new applications. Legacy records without ownership remain unavailable to T3 and
 require a trusted mapping before status updates; do not infer a team from the
 event. See `docs/database/applications.md`. Fix authorized by the security
 investigation request; authorization changes require human review before merge.
+
+## Attendance history interval limit — 2026-10-01
+
+Team attendance history accepts integer intervals from 1 to 30 days, defaulting
+to seven only when omitted. The service validates raw query input before database
+access and row generation, including direct calls. This bounds synchronous work;
+the existing UI's seven-day history remains supported.

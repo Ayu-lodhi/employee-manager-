@@ -1,6 +1,10 @@
 const Attendance = require('./attendance.model');
 const Team = require('../teams/teams.model');
 const User = require('../admin/admin.model');
+const { ValidationError } = require('../../core/errors/typedErrors');
+
+// Bound history generation to the module's 30-day reporting window.
+const MAX_TEAM_HISTORY_DAYS = 30;
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -237,6 +241,13 @@ class AttendanceService {
 
   // Historical attendance percentage for a team (last N days)
   async getTeamAttendanceHistory(teamId, days = 7) {
+    if (typeof days === 'string') {
+      days = /^\d+$/.test(days) ? Number(days) : NaN;
+    }
+    if (!Number.isInteger(days) || days < 1 || days > MAX_TEAM_HISTORY_DAYS) {
+      throw new ValidationError(`days must be an integer between 1 and ${MAX_TEAM_HISTORY_DAYS}`);
+    }
+
     const team = await Team.findById(teamId).populate('members', 'name');
     if (!team) throw new Error('Team not found');
 

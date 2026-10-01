@@ -89,3 +89,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Validate scalar listing filters, retain the lead's team scope as a separate query condition, and persist required application team ownership with regression coverage.
 - Reason: Confirmed that request filters replaced the authorization predicate and the schema discarded ownership. The security-fix request authorizes this change. Legacy records stay outside T3 listings until ownership is restored from trusted evidence; event-based inference is unsafe. Authorization changes require human review before merge.
 - Where: `apps/api/src/modules/applications/applications.service.js`, `apps/api/src/modules/applications/applications.model.js`, `apps/api/src/modules/applications/__tests__/applications.test.js`, `packages/shared-types/index.js`, `docs/database/applications.md`, `memory.md`.
+
+### [2026-10-01] Bound team attendance history generation
+- What: Validate raw history intervals in the service as integers from 1 to 30 before querying or generating rows; retain the seven-day default and add service/HTTP regressions.
+- Reason: Confirmed that authorized callers could request unbounded synchronous work. A 30-day cap matches the attendance module's longer reporting defaults and preserves the UI's seven-day request. Fix authorized by the security investigation request.
+- Where: `apps/api/src/modules/attendance/attendance.controller.js`, `apps/api/src/modules/attendance/attendance.service.js`, `apps/api/src/modules/attendance/__tests__/attendance.test.js`, `memory.md`.
