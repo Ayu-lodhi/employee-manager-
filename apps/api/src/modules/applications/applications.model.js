@@ -4,6 +4,7 @@ const applicationSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   studentName: { type: String, required: true },
   studentEmail: { type: String, required: true },
+  teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: true },
   eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'Event' },
   eventTitle: { type: String, default: '' },
   role: { type: String, default: 'Team Member' },
