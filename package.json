@@ -2,7 +2,12 @@
   "name": "tbi-monorepo",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
+    "build": "npm run build --workspace=@tbi/web",
     "dev:api": "cd apps/api && npm run dev",
     "dev:web": "cd apps/web && npm run dev"
   }

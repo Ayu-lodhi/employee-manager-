@@ -19,7 +19,7 @@ import {
   AreaChart, Area,
 } from 'recharts';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.location.hostname !== 'localhost' ? '' : 'http://localhost:5000');
 const API_BASE = `${BACKEND_URL}/api/v1`;
 
 // ====================================================================
@@ -50,7 +50,7 @@ export const SocketProvider = ({ children }) => {
     const token = localStorage.getItem('tbi_token');
     if (!token) return;
 
-    const newSocket = io(BACKEND_URL, {
+    const newSocket = io(BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : ''), {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
