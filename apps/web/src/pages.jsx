@@ -320,11 +320,16 @@ export const Login = () => {
       {/* RETRO TOP NAVIGATION BAR */}
       {/* ========================================================================= */}
       <header className="w-full bg-[#0E2233] h-11 sm:h-12 px-4 sm:px-8 flex items-center justify-between border-b border-[#1E3A52] shadow-md z-30 shrink-0">
-        {/* Left: TBI Brand mark */}
+        {/* Left: TBI-GEU Brand mark with Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#E5B558] shadow-[0_0_8px_#E5B558] animate-pulse" />
-          <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl tracking-widest text-[#E5B558] uppercase">
-            TBI
+          <img
+            src="/tbi-logo.png"
+            alt="TBI-GEU Logo"
+            className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded-full border border-[#E5B558]/40 shadow-[0_0_6px_rgba(229,181,88,0.3)] shrink-0"
+          />
+          <div className="w-2 h-2 rounded-full bg-[#E5B558] shadow-[0_0_8px_#E5B558] animate-pulse" />
+          <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl tracking-wider text-[#E5B558] uppercase">
+            TBI-GEU
           </span>
         </div>
 
@@ -334,64 +339,70 @@ export const Login = () => {
           <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#10B981]" title="System Operational" />
         </div>
       </header>
-
       {/* ========================================================================= */}
-      {/* MAIN DUAL-PANEL CONTENT — FLUSH LEFT TO MIDDLE MERGE, FORM AT MIDDLE */}
+      {/* MAIN DUAL-PANEL CONTENT — SEAMLESS CONTIGUOUS TECHNICAL TAPESTRY */}
       {/* ========================================================================= */}
-      <main className="flex-1 lg:h-[calc(100vh-48px)] lg:max-h-[calc(100vh-48px)] blueprint-grid relative w-full overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row items-center justify-start">
+      <main className="flex-1 lg:h-[calc(100vh-48px)] lg:max-h-[calc(100vh-48px)] relative w-full overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row items-center justify-start bg-[#FAF7F0] select-none">
         {/* ----------------------------------------------------------------------- */}
-        {/* LEFT COLUMN: Flush from left edge, ends & merges seamlessly at middle */}
+        {/* DESKTOP FULL CONTIGUOUS TAPESTRY BACKGROUND (Quilt, Circuits, AI chip, Gauges, Gears) */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="w-full lg:w-auto h-auto lg:h-full relative flex items-center justify-start overflow-hidden shrink-0 order-2 lg:order-1">
-          {/* Mobile view toggle */}
-          <div className="w-full p-2 lg:hidden flex justify-center">
-            <button
-              type="button"
-              onClick={() => setShowMuralOnMobile(!showMuralOnMobile)}
-              className="text-xs font-['Space_Mono',monospace] font-bold text-[#6B5A3E] flex items-center gap-1.5 py-1.5 px-3 rounded bg-[#E4DDD0] border border-[#D5CBB8] shadow-sm cursor-pointer"
-            >
-              <span>{showMuralOnMobile ? '▼ Hide' : '▶ View'} Innovation Focus Sectors Mural</span>
-            </button>
-          </div>
+        <div
+          className="hidden lg:block absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+          style={{
+            backgroundImage: `url('/tbi-tapestry-canvas.jpg')`,
+            backgroundSize: '100% 100%',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
 
-          {/* High-Definition Crisp Graphic (Flush Left, merges at middle) */}
-          <div className={`w-full lg:w-auto h-auto lg:h-full flex items-center justify-start ${showMuralOnMobile ? 'block' : 'hidden lg:flex'}`}>
+        {/* ----------------------------------------------------------------------- */}
+        {/* MOBILE FALLBACK: Banner Quilt Toggle */}
+        {/* ----------------------------------------------------------------------- */}
+        <div className="w-full lg:hidden relative flex flex-col items-center justify-start overflow-hidden shrink-0 z-10 p-2">
+          <button
+            type="button"
+            onClick={() => setShowMuralOnMobile(!showMuralOnMobile)}
+            className="text-xs font-['Space_Mono',monospace] font-bold text-[#6B5A3E] flex items-center gap-1.5 py-1.5 px-3 rounded bg-[#E4DDD0] border border-[#D5CBB8] shadow-sm cursor-pointer mb-2"
+          >
+            <span>{showMuralOnMobile ? '▼ Hide' : '▶ View'} Innovation Focus Sectors Mural</span>
+          </button>
+          {showMuralOnMobile && (
             <img
               src="/tbi-mural-crisp.png"
-              alt="TBI Innovation Focus Sectors — DeepTech, AgriTech, MedTech, Carbon Risk, Bioinformatics, Sustainability, Robotics"
-              className="w-full lg:w-auto h-auto lg:h-full max-h-[calc(100vh-48px)] object-contain object-left block select-none pointer-events-none"
-              loading="eager"
+              alt="TBI Innovation Focus Sectors"
+              className="w-full h-auto max-h-[360px] object-contain rounded-lg border border-[#D5CBB8] mb-4"
             />
-          </div>
+          )}
         </div>
 
         {/* ----------------------------------------------------------------------- */}
-        {/* RIGHT COLUMN: Neo-Brutalist Form Column (Balanced & Centered in Right Half) */}
+        {/* INTERACTIVE LOGIN CARD: EXACT MATCH TO USER IMAGE SPECIFICATION */}
         {/* ----------------------------------------------------------------------- */}
-        <div className="flex-1 w-full h-full flex flex-col justify-center items-center px-3 sm:px-8 lg:px-8 xl:px-14 z-10 order-1 lg:order-2 py-4 lg:py-0">
-          <div className="w-full max-w-[94%] sm:max-w-md xl:max-w-lg bg-[#FAF8F5] border-[3px] border-[#1A1A1A] rounded-xl p-4 sm:p-7 shadow-[5px_5px_0px_0px_#1A1A1A] sm:shadow-[6px_6px_0px_0px_#1A1A1A]">
-            {/* TBI-GEU Round Vintage Logo Emblem Header */}
-            <div className="flex items-center gap-3 mb-3 sm:mb-4">
-              <div className="w-12 h-12 sm:w-15 sm:h-15 rounded-full border-[3px] border-[#1A1A1A] p-1 bg-[#F5F2EB] shadow-[2px_2px_0px_0px_#1A1A1A] sm:shadow-[3px_3px_0px_0px_#1A1A1A] shrink-0 flex items-center justify-center">
+        <div className="w-full lg:w-auto lg:absolute lg:left-[49.9%] lg:top-1/2 lg:-translate-y-1/2 z-20 flex justify-center items-center px-4 py-4 lg:p-0">
+          <div className="w-full max-w-[440px] sm:max-w-[460px] lg:w-[516px] lg:h-[488px] bg-white border-[3px] border-[#1A1A1A] rounded-2xl p-5 sm:p-6 shadow-[7px_7px_0px_0px_#1A1A1A] flex flex-col justify-between">
+            {/* Header: Vintage TBI Round Seal + Titles */}
+            <div className="flex items-center gap-3 sm:gap-3.5 mb-3 sm:mb-3.5">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-[2.5px] border-[#1A1A1A] p-1 bg-[#F5F2EB] shadow-[2px_2px_0px_0px_#1A1A1A] shrink-0 flex items-center justify-center">
                 <img
                   src="/tbi-logo.png"
                   alt="TBI-GEU Logo"
-                  className="w-9 h-9 sm:w-12 sm:h-12 object-contain"
+                  className="w-9 h-9 sm:w-11 sm:h-11 object-contain"
                 />
               </div>
               <div className="min-w-0">
-                <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl xl:text-3xl text-[#1A1A1A] uppercase tracking-tight leading-tight">
-                  Welcome, TBI-GEU Innovation Team!
+                <h1 className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl text-[#1A1A1A] uppercase tracking-tight leading-none">
+                  WELCOME, TBI-GEU INNOVATION<br />TEAM!
                 </h1>
-                <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-[11px] sm:text-xs xl:text-sm text-[#1B5299] uppercase tracking-wide mt-0.5">
-                  Employee Management Portal Access
+                <h2 className="font-['Barlow_Condensed',sans-serif] font-bold text-[11px] sm:text-xs text-[#1B5299] uppercase tracking-wider mt-1">
+                  EMPLOYEE MANAGEMENT PORTAL ACCESS
                 </h2>
               </div>
             </div>
 
-            {/* Neo-brutalist Sector Badge */}
-            <div className="mb-3 sm:mb-4 flex items-center gap-2">
-              <span className="px-2 py-0.5 text-[8.5px] sm:text-[10px] font-['Space_Mono',monospace] font-bold uppercase tracking-wider bg-[#E6B800] text-[#1A1A1A] border-2 border-[#1A1A1A] shadow-[2px_2px_0px_0px_#1A1A1A]">
+            {/* Focus Sector Integration Panel Yellow Tag & Rule */}
+            <div className="mb-3.5 sm:mb-4 flex items-center gap-2">
+              <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-['Space_Mono',monospace] font-bold uppercase tracking-wider bg-[#E6B800] text-[#1A1A1A] border-2 border-[#1A1A1A] shadow-[2px_2px_0px_0px_#1A1A1A]">
                 Focus Sector Integration Panel
               </span>
               <div className="flex-1 h-[2px] bg-[#1A1A1A]" />
@@ -401,12 +412,12 @@ export const Login = () => {
             <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
               {/* Field 1: Username / Email */}
               <div>
-                <label className="block font-['Barlow_Condensed',sans-serif] font-black text-xs sm:text-sm md:text-base text-[#1A1A1A] uppercase tracking-wide mb-1">
+                <label className="block font-['Barlow_Condensed',sans-serif] font-black text-xs sm:text-sm text-[#1A1A1A] uppercase tracking-wide mb-1">
                   Username / Email
                 </label>
-                <div className="relative flex items-center bg-white border-[3px] border-[#1A1A1A] shadow-[3px_3px_0px_0px_#1A1A1A] sm:shadow-[4px_4px_0px_0px_#1A1A1A] rounded-lg transition-all focus-within:border-[#1B5299] focus-within:shadow-[3px_3px_0px_0px_#1B5299]">
-                  <span className="pl-2.5 sm:pl-3 text-[#1B5299] shrink-0">
-                    <UserIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="relative flex items-center bg-white border-[2.5px] border-[#1B5299] shadow-[3px_3px_0px_0px_#1A1A1A] rounded-xl transition-all focus-within:shadow-[3px_3px_0px_0px_#1B5299]">
+                  <span className="pl-3 text-slate-500 shrink-0">
+                    <UserIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                   </span>
                   <input
                     type="text"
@@ -415,22 +426,22 @@ export const Login = () => {
                     placeholder="Username / Email"
                     required
                     autoFocus
-                    className="flex-1 min-w-0 bg-transparent font-['Space_Mono',monospace] text-xs sm:text-sm md:text-base text-[#1A1A1A] placeholder-[#8A8A8A] outline-none py-2 sm:py-2.5 px-2 font-semibold"
+                    className="flex-1 min-w-0 bg-transparent font-['Space_Mono',monospace] text-xs sm:text-sm text-[#1A1A1A] placeholder-[#8A8A8A] outline-none py-2 sm:py-2.5 px-2.5 font-medium"
                   />
-                  <div className="pr-2.5 shrink-0">
-                    <span className={`inline-block w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full border-2 border-[#1A1A1A] ${emailHasValue ? 'bg-[#10B981]' : 'bg-slate-200'}`} />
+                  <div className="pr-3 shrink-0">
+                    <span className={`inline-block w-2.5 h-2.5 rounded-full border border-slate-400 ${emailHasValue ? 'bg-[#10B981]' : 'bg-transparent'}`} />
                   </div>
                 </div>
               </div>
 
               {/* Field 2: Password */}
               <div>
-                <label className="block font-['Barlow_Condensed',sans-serif] font-black text-xs sm:text-sm md:text-base text-[#1A1A1A] uppercase tracking-wide mb-1">
+                <label className="block font-['Barlow_Condensed',sans-serif] font-black text-xs sm:text-sm text-[#1A1A1A] uppercase tracking-wide mb-1">
                   Password
                 </label>
-                <div className="relative flex items-center bg-white border-[3px] border-[#1A1A1A] shadow-[3px_3px_0px_0px_#1A1A1A] sm:shadow-[4px_4px_0px_0px_#1A1A1A] rounded-lg transition-all focus-within:border-[#1B5299] focus-within:shadow-[3px_3px_0px_0px_#1B5299]">
-                  <span className="pl-2.5 sm:pl-3 text-[#1B5299] shrink-0">
-                    <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="relative flex items-center bg-white border-[2.5px] border-[#1A1A1A] shadow-[3px_3px_0px_0px_#1A1A1A] rounded-xl transition-all focus-within:border-[#1B5299] focus-within:shadow-[3px_3px_0px_0px_#1B5299]">
+                  <span className="pl-3 text-slate-500 shrink-0">
+                    <Lock className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                   </span>
                   <input
                     type="password"
@@ -438,28 +449,28 @@ export const Login = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
                     required
-                    className="flex-1 min-w-0 bg-transparent font-['Space_Mono',monospace] text-xs sm:text-sm md:text-base text-[#1A1A1A] placeholder-[#8A8A8A] outline-none py-2 sm:py-2.5 px-2 font-semibold"
+                    className="flex-1 min-w-0 bg-transparent font-['Space_Mono',monospace] text-xs sm:text-sm text-[#1A1A1A] placeholder-[#8A8A8A] outline-none py-2 sm:py-2.5 px-2.5 font-medium"
                   />
-                  <div className="pr-2.5 shrink-0">
-                    <span className={`inline-block w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full border-2 border-[#1A1A1A] ${passHasValue ? 'bg-[#10B981]' : 'bg-slate-200'}`} />
+                  <div className="pr-3 shrink-0">
+                    <span className={`inline-block w-2.5 h-2.5 rounded-full border border-slate-400 ${passHasValue ? 'bg-[#10B981]' : 'bg-transparent'}`} />
                   </div>
                 </div>
               </div>
 
               {/* Error notice */}
               {error && (
-                <div className="p-2 bg-red-100 border-[3px] border-[#C8322B] shadow-[2px_2px_0px_0px_#1A1A1A] rounded-lg text-xs text-[#C8322B] font-['Space_Mono',monospace] font-bold flex items-center gap-2">
+                <div className="p-2 bg-red-100 border-2 border-[#C8322B] shadow-[2px_2px_0px_0px_#1A1A1A] rounded-lg text-xs text-[#C8322B] font-['Space_Mono',monospace] font-bold flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[#C8322B] shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
 
               {/* Primary Action Button */}
-              <div className="pt-1.5 sm:pt-2">
+              <div className="pt-1 sm:pt-1.5">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-[#C8322B] hover:bg-[#B32720] text-white font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl uppercase tracking-wider py-2.5 sm:py-3 px-6 border-[3px] border-[#1A1A1A] shadow-[4px_4px_0px_0px_#1A1A1A] sm:shadow-[5px_5px_0px_0px_#1A1A1A] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-center"
+                  className="w-full bg-[#C8322B] hover:bg-[#B32720] text-white font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl uppercase tracking-wider py-2.5 sm:py-3 px-6 border-[2.5px] border-[#1A1A1A] shadow-[4px_4px_0px_0px_#1A1A1A] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-center"
                 >
                   {loading ? 'Accessing...' : 'Sign In'}
                 </button>
@@ -469,22 +480,26 @@ export const Login = () => {
               <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] sm:text-xs font-['Space_Mono',monospace] font-bold text-[#1A1A1A] pt-1">
                 <button
                   type="button"
-                  onClick={() => alert('Please contact your administrator for password recovery.')}
-                  className="hover:text-[#C8322B] underline decoration-2 underline-offset-4 cursor-pointer"
+                  onClick={() => alert('Password reset service: Please contact TBI IT Administration (support@tbi.geu.ac.in)')}
+                  className="underline hover:text-[#1B5299] transition cursor-pointer"
                 >
                   Forgot Password?
                 </button>
-                <span className="text-[#6B5A3E]">
-                  Already have an account?
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowDemo(!showDemo)}
+                  className="hover:text-[#1B5299] transition cursor-pointer"
+                >
+                  Already have an Account?
+                </button>
               </div>
             </form>
           </div>
         </div>
-        </main>
-      </div>
-    );
-  };
+      </main>
+    </div>
+  );
+};
 
 // ====================================================================
 // SIDEBAR
