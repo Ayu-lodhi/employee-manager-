@@ -89,3 +89,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Validate scalar listing filters, retain the lead's team scope as a separate query condition, and persist required application team ownership with regression coverage.
 - Reason: Confirmed that request filters replaced the authorization predicate and the schema discarded ownership. The security-fix request authorizes this change. Legacy records stay outside T3 listings until ownership is restored from trusted evidence; event-based inference is unsafe. Authorization changes require human review before merge.
 - Where: `apps/api/src/modules/applications/applications.service.js`, `apps/api/src/modules/applications/applications.model.js`, `apps/api/src/modules/applications/__tests__/applications.test.js`, `packages/shared-types/index.js`, `docs/database/applications.md`, `memory.md`.
+
+### [2026-10-01] Enforce membership for manual attendance
+- What: Require the selected student to be a current team member or lead before the attendance upsert or duplicate-key fallback; add HTTP regression coverage.
+- Reason: Confirmed that a lead could write attendance for unrelated users, affecting personal history and statistics. Existing self check-in establishes member/lead eligibility; administrators have no membership exception. Fix authorized by the security investigation request; authorization changes require human review before merge.
+- Where: `apps/api/src/modules/attendance/attendance.service.js`, `apps/api/src/modules/attendance/__tests__/attendance.test.js`, `memory.md`.

@@ -59,6 +59,7 @@ No public signup. All accounts are created by an Admin or Super Admin.
 
 | Date | Decision |
 |---|---|
+| 2026-10-01 | **Manual attendance membership**: All markers, including admins, must target a current team member or lead, matching self check-in eligibility. Authorization changes require human review before merge. |
 | 2026-10-01 | **JWT purpose enforcement**: Login marks access/refresh tokens; active HTTP and socket authentication require access purpose. Tokens without purpose require re-login; no refresh endpoint exists. |
 | 2026-09-17 | **RBAC: permission-based, not simple role-string**: role-default grants + per-user `ACCESS_GRANT` overrides |
 | 2026-09-17 | **Dropped redundant tier field from auth logic**: single `role` field; `tiers.js` is display-label only |
