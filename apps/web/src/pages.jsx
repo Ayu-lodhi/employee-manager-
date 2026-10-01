@@ -319,39 +319,19 @@ export const Login = () => {
       {/* ========================================================================= */}
       {/* RETRO TOP NAVIGATION BAR */}
       {/* ========================================================================= */}
-      <header className="w-full bg-[#0E2233] h-12 px-3 sm:px-6 lg:px-8 flex items-center justify-between border-b border-[#1E3A52] shadow-md z-30 shrink-0">
+      <header className="w-full bg-[#0E2233] h-12 px-4 sm:px-8 flex items-center justify-between border-b border-[#1E3A52] shadow-md z-30 shrink-0">
         {/* Left: TBI Brand mark */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <div className="w-2.5 h-2.5 rounded-full bg-[#E5B558] shadow-[0_0_8px_#E5B558] animate-pulse" />
-          <span className="font-['Barlow_Condensed',sans-serif] font-black text-xl sm:text-2xl tracking-widest text-[#E5B558] uppercase">
+          <span className="font-['Barlow_Condensed',sans-serif] font-black text-2xl tracking-widest text-[#E5B558] uppercase">
             TBI
           </span>
         </div>
 
-        {/* Center: Search Capsule (desktop / tablet) */}
-        <div className="hidden md:flex items-center bg-white rounded-full px-3.5 py-1 w-56 lg:w-80 shadow-inner border border-slate-200">
-          <Search size={13} className="text-slate-400 mr-2 shrink-0" />
-          <input
-            type="text"
-            placeholder="Search focus sectors..."
-            disabled
-            className="w-full text-xs font-sans text-slate-700 bg-transparent outline-none cursor-not-allowed placeholder:text-slate-400"
-          />
-        </div>
-
-        {/* Right: Quick Access & Avatar */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            type="button"
-            onClick={() => setShowDemo(!showDemo)}
-            className="text-[10px] sm:text-xs font-['Space_Mono',monospace] text-[#E5B558] hover:text-white transition px-2 py-1 rounded border border-[#E5B558]/40 hover:border-[#E5B558] bg-[#0E2233]"
-            title="Toggle Quick Role Access"
-          >
-            {showDemo ? 'Hide Keys' : 'Quick Keys'}
-          </button>
-          <div className="w-7 h-7 rounded-full bg-[#183954] border border-[#2B5478] flex items-center justify-center text-slate-200 shadow-sm shrink-0">
-            <UserIcon size={14} />
-          </div>
+        {/* Clean right accent / indicator */}
+        <div className="flex items-center gap-2 text-[11px] font-['Space_Mono',monospace] text-[#8EA0B2] uppercase tracking-wider">
+          <span className="hidden sm:inline">PORTAL AUTHENTICATION</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#10B981]" title="System Operational" />
         </div>
       </header>
 
@@ -548,13 +528,7 @@ export const Login = () => {
 
                 {/* Secondary link */}
                 <p className="mt-4 text-center sm:text-right font-['Barlow_Condensed',sans-serif] font-bold text-base sm:text-xl text-[#B38F43] tracking-wide">
-                  Already have an Account?{' '}
-                  <span
-                    onClick={() => setShowDemo(!showDemo)}
-                    className="text-[#96742B] underline decoration-[#96742B]/50 hover:text-[#7A5B1B] cursor-pointer ml-1"
-                  >
-                    Quick Keys
-                  </span>
+                  Already have an Account?
                 </p>
               </div>
             </form>
