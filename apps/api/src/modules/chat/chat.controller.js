@@ -1,5 +1,5 @@
 const chatService = require('./chat.service');
-const { emitToRoom } = require('../../config/socket');
+const { emitToRoom, closeChatRoom } = require('../../config/socket');
 
 exports.getMyRooms = async (req, res) => {
   try {
@@ -52,7 +52,7 @@ exports.sendMessage = async (req, res) => {
     const message = await chatService.sendMessage(req.params.id, text, req.user);
 
     // Real-time emit to room
-    emitToRoom(`chat:${req.params.id}`, 'chat:new_message', {
+    await emitToRoom(`chat:${req.params.id}`, 'chat:new_message', {
       _id: message._id,
       roomId: message.roomId,
       roomName: message.roomName,
@@ -89,7 +89,7 @@ exports.createOrGetTeamRoom = async (req, res) => {
 exports.deleteRoom = async (req, res) => {
   try {
     const result = await chatService.deleteRoom(req.params.id, req.user);
-    emitToRoom(`chat:${req.params.id}`, 'chat:room_deleted', { roomId: req.params.id });
+    closeChatRoom(req.params.id);
     res.json({ success: true, message: 'Room deleted', data: result });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -99,7 +99,7 @@ exports.deleteRoom = async (req, res) => {
 exports.deleteMessage = async (req, res) => {
   try {
     const message = await chatService.deleteMessage(req.params.id, req.user);
-    emitToRoom(`chat:${message.roomId}`, 'chat:message_deleted', {
+    await emitToRoom(`chat:${message.roomId}`, 'chat:message_deleted', {
       messageId: req.params.id,
       roomId: message.roomId,
     });
@@ -108,4 +108,3 @@ exports.deleteMessage = async (req, res) => {
     res.status(400).json({ success: false, message: err.message });
   }
 };
-
