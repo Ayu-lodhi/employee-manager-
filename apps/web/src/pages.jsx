@@ -19,6 +19,9 @@ import {
   AreaChart, Area,
 } from 'recharts';
 
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = `${BACKEND_URL}/api/v1`;
+
 // ====================================================================
 // AUTH CONTEXT
 // ====================================================================
@@ -47,7 +50,7 @@ export const SocketProvider = ({ children }) => {
     const token = localStorage.getItem('tbi_token');
     if (!token) return;
 
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io(BACKEND_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -274,7 +277,7 @@ export const Login = () => {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/v1/auth/login', {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
