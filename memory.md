@@ -2,7 +2,7 @@
 
 **Read this file first, before scanning the repo.** It is a self-contained, current snapshot of the project — what’s being built, what’s been decided, and what’s still open. Only fall back to the detailed docs (`prd.md`, `architecture.md`, `rules.md`, `phases.md`, `designe.md`, `CHANGELOG-decisions.md`) when this file doesn’t have the detail a task needs. Any agent that consults a detailed doc for something missing here must add a condensed version of what it learned back into this file — see the Update Protocol at the bottom.
 
-*Last updated: 2026-09-17*
+*Last updated: 2026-10-01*
 
 ---
 
@@ -59,6 +59,7 @@ No public signup. All accounts are created by an Admin or Super Admin.
 
 | Date | Decision |
 |---|---|
+| 2026-10-01 | **Provisioning authorization**: active API uses role checks (permission-based RBAC remains a scaffold); creation uses the verified database role, allows Admin to grant student roles and Super Admin all existing roles, and rejects unauthorized grants before side effects |
 | 2026-09-17 | **RBAC: permission-based, not simple role-string**: role-default grants + per-user `ACCESS_GRANT` overrides |
 | 2026-09-17 | **Dropped redundant tier field from auth logic**: single `role` field; `tiers.js` is display-label only |
 | 2026-09-17 | **Geofenced attendance deferred to v2**: browser geolocation unreliable for web v1 |
