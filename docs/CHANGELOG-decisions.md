@@ -94,3 +94,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Require the selected student to be a current team member or lead before the attendance upsert or duplicate-key fallback; add HTTP regression coverage.
 - Reason: Confirmed that a lead could write attendance for unrelated users, affecting personal history and statistics. Existing self check-in establishes member/lead eligibility; administrators have no membership exception. Fix authorized by the security investigation request; authorization changes require human review before merge.
 - Where: `apps/api/src/modules/attendance/attendance.service.js`, `apps/api/src/modules/attendance/__tests__/attendance.test.js`, `memory.md`.
+
+### [2026-10-01] Restrict team discovery contact data
+- What: General team listing/detail responses expose an explicit metadata allowlist to outsiders; only current members, leads, and administrators receive populated rosters. Added HTTP regression tests.
+- Reason: Confirmed that authentication alone exposed member contacts and cached lead names. Preserve student team discovery and administrative roster views using the mounted application's existing member/lead and administrative authority. Fix authorized by the security investigation request; authorization changes require human review before merge.
+- Where: `apps/api/src/modules/teams/teams.service.js`, `teams.controller.js`, `teams.permissions.js`, `teams.routes.js`, `__tests__/teams.test.js`, and `memory.md`.
