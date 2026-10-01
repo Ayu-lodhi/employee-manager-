@@ -66,10 +66,13 @@ app.use((err, req, res, next) => {
 });
 
 console.log('Connecting to MongoDB...');
-mongoose
-  .connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
-  .then(() => console.log('MongoDB Connected'))
-  .catch((err) => console.error('MongoDB Error:', err.message));
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ayushlodhi88_db_user:9IzJqRATQYl1hERt@ac-gkiqwag-shard-00-00.wiv7fca.mongodb.net:27017,ac-gkiqwag-shard-00-01.wiv7fca.mongodb.net:27017,ac-gkiqwag-shard-00-02.wiv7fca.mongodb.net:27017/tbi_db?ssl=true&replicaSet=atlas-6g5sz6-shard-0&authSource=admin&appName=Cluster0';
+if (mongoose.connection.readyState === 0) {
+  mongoose
+    .connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
+    .then(() => console.log('MongoDB Connected'))
+    .catch((err) => console.error('MongoDB Error:', err.message));
+}
 
 const server = http.createServer(app);
 initSocket(server);
