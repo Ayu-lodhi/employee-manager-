@@ -11,7 +11,7 @@ exports.getUsers = async (req, res) => {
 
 exports.addUser = async (req, res) => {
   try {
-    const { user, tempPassword } = await adminService.createUser(req.body, req.user);
+    const { user, tempPassword } = await adminService.createUser(req.body);
     res.status(201).json({
       success: true,
       message: 'User created. Credentials sent via email.',
@@ -19,7 +19,7 @@ exports.addUser = async (req, res) => {
       tempPassword,
     });
   } catch (error) {
-    res.status(error.statusCode || 400).json({ success: false, message: error.message });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 

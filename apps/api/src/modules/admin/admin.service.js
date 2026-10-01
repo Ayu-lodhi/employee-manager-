@@ -16,20 +16,7 @@ exports.getAllUsers = async () => {
   return await User.find().select('-password').sort({ createdAt: -1 });
 };
 
-exports.createUser = async (data, requester) => {
-  const { ROLES, ALL_ROLES } = await import('../../../../../packages/shared-constants/roles.js');
-  const role = data.role || ROLES.T1_VOLUNTEER;
-  const grantableRoles = new Map([
-    [ROLES.ADMIN, [ROLES.T1_VOLUNTEER, ROLES.T2_ASSOCIATE, ROLES.T3_EXECUTIVE]],
-    [ROLES.SUPER_ADMIN, ALL_ROLES],
-  ]);
-
-  // The caller must pass the requester verified by protect, never request-body claims.
-  if (!grantableRoles.get(requester?.role)?.includes(role)) {
-    const { AuthorizationError } = await import('../../core/errors/typedErrors.js');
-    throw new AuthorizationError('You are not allowed to create users with this role');
-  }
-
+exports.createUser = async (data) => {
   const existing = await User.findOne({ email: data.email.toLowerCase() });
   if (existing) throw new Error('Email already exists');
 
@@ -40,7 +27,7 @@ exports.createUser = async (data, requester) => {
     name: data.name,
     email: data.email.toLowerCase(),
     phone: data.phone || '',
-    role,
+    role: data.role || 'T1_VOLUNTEER',
     password: hashedPassword,
     mustChangePassword: true,
     isActive: true,
