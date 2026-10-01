@@ -22,13 +22,13 @@ exports.login = async (email, password) => {
   if (!isValid) throw new Error('Invalid credentials');
 
   const accessToken = jwt.sign(
-    { sub: user._id, role: user.role },
+    { sub: user._id, role: user.role, purpose: 'access' },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRY }
   );
 
   const refreshToken = jwt.sign(
-    { sub: user._id },
+    { sub: user._id, purpose: 'refresh' },
     JWT_SECRET,
     { expiresIn: REFRESH_EXPIRY }
   );

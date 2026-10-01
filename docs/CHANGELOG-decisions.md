@@ -69,3 +69,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - **Reason**: Gracefully recovers from race conditions or duplicate key collisions from stale indexes during attendance marking without failing the operation.
 - **Where**: `apps/api/src/modules/attendance/attendance.service.js`
 
+
+### [2026-10-01] Enforce JWT purpose at resource authentication
+- What: Login signs access/refresh purpose claims; HTTP protect and socket handshakes require access purpose, with regression tests.
+- Reason: Confirmed that a login-issued seven-day refresh token could authenticate as an access token. Enforce signed purpose using the existing key configuration; no refresh endpoint currently exists. Existing tokens without purpose require a new login. Fix authorized by the security investigation request; authentication changes require human review before merge.
+- Where: `apps/api/src/modules/auth/auth.service.js`, `apps/api/src/modules/auth/auth.middleware.js`, `apps/api/src/modules/auth/__tests__/auth.test.js`, `apps/api/src/config/socket.js`, `apps/api/src/config/__tests__/socket.test.js`

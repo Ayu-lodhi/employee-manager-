@@ -39,7 +39,7 @@ test('chat socket authorization and delivery', async (t) => {
   t.mock.method(ChatRoom, 'findById', async (id) => id === roomId ? room : null);
   t.mock.method(Message, 'create', async (data) => ({ ...data, _id: 'message-id' }));
 
-  async function connect(userId, token = jwt.sign({ sub: userId }, secret)) {
+  async function connect(userId, token = jwt.sign({ sub: userId, purpose: 'access' }, secret)) {
     const client = new WebSocket(`ws://127.0.0.1:${server.address().port}/socket.io/?EIO=4&transport=websocket`);
     t.after(() => client.close());
     return await new Promise((resolve, reject) => {
@@ -66,6 +66,13 @@ test('chat socket authorization and delivery', async (t) => {
   await t.test('requires a valid JWT and uses its subject, not the handshake userId', async () => {
     await assert.rejects(connect(otherId, 'invalid-token'), /Invalid or expired token/);
     assert.equal(other.socket.userId, otherId);
+  });
+
+  await t.test('rejects refresh, legacy and unknown-purpose tokens at the handshake', async () => {
+    for (const purpose of ['refresh', undefined, 'unknown']) {
+      const token = jwt.sign({ sub: memberId, purpose }, secret, { expiresIn: '7d' });
+      await assert.rejects(connect(memberId, token), /Invalid or expired token/);
+    }
   });
 
   await t.test('rejects a nonmember whom HTTP reads also reject', async () => {

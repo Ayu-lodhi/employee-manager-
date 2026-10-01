@@ -42,6 +42,9 @@ const initSocket = (httpServer) => {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.purpose !== 'access') {
+        return next(new Error('Invalid or expired token'));
+      }
       socket.userId = decoded.sub;
       socket.userRole = decoded.role;
       socket.userName = decoded.name || 'User';
