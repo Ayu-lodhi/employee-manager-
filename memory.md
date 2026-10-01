@@ -114,3 +114,12 @@ new applications. Legacy records without ownership remain unavailable to T3 and
 require a trusted mapping before status updates; do not infer a team from the
 event. See `docs/database/applications.md`. Fix authorized by the security
 investigation request; authorization changes require human review before merge.
+
+## Team attendance read security — 2026-10-01
+
+Team roster, statistics, history and CSV reads require a current lead/member
+relationship for T3 or an administrative role, matching the attendance page's
+`/teams/me` selection. Services receive the authenticated requester and validate a
+single team ID before access checks and attendance reads. Regression tests cover
+cross-team denial and allowed reads. Fix authorized by the security investigation
+request; authorization changes require human review before merge.

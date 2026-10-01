@@ -89,3 +89,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Validate scalar listing filters, retain the lead's team scope as a separate query condition, and persist required application team ownership with regression coverage.
 - Reason: Confirmed that request filters replaced the authorization predicate and the schema discarded ownership. The security-fix request authorizes this change. Legacy records stay outside T3 listings until ownership is restored from trusted evidence; event-based inference is unsafe. Authorization changes require human review before merge.
 - Where: `apps/api/src/modules/applications/applications.service.js`, `apps/api/src/modules/applications/applications.model.js`, `apps/api/src/modules/applications/__tests__/applications.test.js`, `packages/shared-types/index.js`, `docs/database/applications.md`, `memory.md`.
+
+### [2026-10-01] Enforce team attendance read access
+- **What**: Roster, statistics, history and CSV reads now authorize the authenticated requester before reading attendance or populating member details; team IDs must be scalar ObjectId strings.
+- **Reason**: Confirmed unrelated-team disclosure. Preserve the existing `/teams/me` lead/member policy for T3 and global administrative access. Fix authorized by the security investigation request; authorization changes require human review before merge.
+- **Where**: `apps/api/src/modules/attendance/attendance.service.js`, `attendance.permissions.js`, `attendance.controller.js`, and `__tests__/attendance.test.js`.
