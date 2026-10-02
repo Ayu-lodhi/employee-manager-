@@ -4,6 +4,7 @@ const { createHmac, randomUUID } = require('node:crypto');
 const JWT_SECRET = process.env.JWT_SECRET || 'tbi_super_secret_key_change_in_production_min_32_chars';
 
 exports.requiresMfa = async (role) => {
+  if (process.env.ENFORCE_MFA !== 'true') return false;
   try {
     const { PRIVILEGED_ROLES } = await import('../../../../../packages/shared-constants/roles.js');
     return PRIVILEGED_ROLES.includes(role);

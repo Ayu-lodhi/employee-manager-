@@ -18,12 +18,13 @@ const seed = async () => {
     await User.deleteMany({});
     console.log(' Cleared existing users');
 
+    const bcrypt = require('bcryptjs');
     await User.create([
-      { name: 'Shrey Mehra',     email: 'super@tbi.org',    password: 'super123',    role: 'SUPER_ADMIN',  mustChangePassword: false },
-      { name: 'Rajesh Kumar',    email: 'admin@tbi.org',    password: 'admin123',    role: 'ADMIN',        mustChangePassword: false },
-      { name: 'Mayank',          email: 'mayank@tbi.org',   password: 'mayank123',   role: 'T3_EXECUTIVE', mustChangePassword: false },
-      { name: 'Abhishek Singh',  email: 'abhishek@tbi.org', password: 'abhishek123', role: 'T2_ASSOCIATE', mustChangePassword: false },
-      { name: 'Ayush',           email: 'ayush@tbi.org',    password: 'ayush123',    role: 'T1_VOLUNTEER', mustChangePassword: false },
+      { name: 'Shrey Mehra',     email: 'super@tbi.org',    password: await bcrypt.hash('super123', 12),    role: 'SUPER_ADMIN',  mustChangePassword: false },
+      { name: 'Rajesh Kumar',    email: 'admin@tbi.org',    password: await bcrypt.hash('admin123', 12),    role: 'ADMIN',        mustChangePassword: false },
+      { name: 'Mayank',          email: 'mayank@tbi.org',   password: await bcrypt.hash('mayank123', 12),   role: 'T3_EXECUTIVE', mustChangePassword: false },
+      { name: 'Abhishek Singh',  email: 'abhishek@tbi.org', password: await bcrypt.hash('abhishek123', 12), role: 'T2_ASSOCIATE', mustChangePassword: false },
+      { name: 'Ayush',           email: 'ayush@tbi.org',    password: await bcrypt.hash('ayush123', 12),    role: 'T1_VOLUNTEER', mustChangePassword: false },
     ]);
 
     console.log(' Seeded 5 users:');
