@@ -139,3 +139,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Reject email fields over 254 characters before matching and use separator-exclusive regex components; add CSV parser regression tests.
 - Reason: The security investigation authorized a scoped fix. A 60 KB field with repeated at signs exceeded a one-second execution deadline before preview; server controls run only after parsing.
 - Where: `apps/web/src/pages.jsx`, `apps/web/src/__tests__/bulk-import.test.js`, `memory.md`.
+
+### [2026-10-02] Enforce authoritative team chat access
+- What: Reject team bindings on generic room creation in both server copies; check current team/account records for team-room reads, socket delivery and management. Team initialization replaces legacy ownership and membership with the authorized requester and current roster; manual additions require team eligibility.
+- Reason: Confirmed an unrelated executive could pre-create a tagged room that initialization adopted, retaining message access and deletion authority. The security investigation authorizes this fix; human review is required before merge. Per-operation checks also protect previously poisoned rooms and application-approval auto-joins without a data migration. Uniqueness is not used as an authorization control: every tagged room is checked against its stored team.
+- Where: `apps/api/src/modules/chat/chat.service.js`, `apps/web/server/modules/chat/chat.service.js`, corresponding `__tests__/chat.test.js`, `memory.md`.
