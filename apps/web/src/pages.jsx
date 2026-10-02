@@ -9,6 +9,7 @@ import {
   User as UserIcon, LogOut, Calendar, TrendingUp, UserPlus, Upload,
   UsersRound, Clock, Award, CheckCircle, MessageSquare, Star, Bell,
   Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, Crown, AlertTriangle,
+  Eye, EyeOff, Key,
   Info, Trash2, Construction, MapPin, Timer, BarChart3, ExternalLink, ChevronRight
 } from 'lucide-react';
 import api from './lib/api';
@@ -1169,6 +1170,14 @@ export const UserManagement = () => {
   const [revoking, setRevoking] = useState(false);
   const [deleteModal, setDeleteModal] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [setPasswordModal, setSetPasswordModal] = useState(null);
+  const [targetNewPassword, setTargetNewPassword] = useState('');
+  const [targetConfirmPassword, setTargetConfirmPassword] = useState('');
+  const [showTargetPwd, setShowTargetPwd] = useState(false);
+  const [showTargetConfirmPwd, setShowTargetConfirmPwd] = useState(false);
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [setPasswordError, setSetPasswordError] = useState('');
+  const [setPasswordSuccess, setSetPasswordSuccess] = useState('');
 
   // Fetch users
   const fetchUsers = async () => {
@@ -1217,6 +1226,43 @@ export const UserManagement = () => {
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to reset password');
+    }
+  };
+
+  // Set / Change password directly (Super Admin only)
+  const handleSetUserPassword = async (e) => {
+    e.preventDefault();
+    if (!setPasswordModal) return;
+    setSetPasswordError('');
+    setSetPasswordSuccess('');
+
+    if (targetNewPassword.length < 8) {
+      setSetPasswordError('Password must be at least 8 characters');
+      return;
+    }
+    if (!/[A-Z]/.test(targetNewPassword) || !/[a-z]/.test(targetNewPassword) || !/[0-9]/.test(targetNewPassword) || !/[^A-Za-z0-9]/.test(targetNewPassword)) {
+      setSetPasswordError('Password must contain uppercase, lowercase, number, and special character');
+      return;
+    }
+    if (targetNewPassword !== targetConfirmPassword) {
+      setSetPasswordError('Passwords do not match');
+      return;
+    }
+
+    setSettingPassword(true);
+    try {
+      await api.post(`/admin/users/${setPasswordModal._id}/set-password`, { newPassword: targetNewPassword });
+      setSetPasswordSuccess(`Password successfully changed for ${setPasswordModal.name}!`);
+      setTimeout(() => {
+        setSetPasswordModal(null);
+        setSetPasswordSuccess('');
+        setTargetNewPassword('');
+        setTargetConfirmPassword('');
+      }, 1500);
+    } catch (err) {
+      setSetPasswordError(err.response?.data?.message || err.message || 'Failed to set password');
+    } finally {
+      setSettingPassword(false);
     }
   };
 
@@ -1383,8 +1429,22 @@ export const UserManagement = () => {
                         </button>
                       </div>
                     ) : (
-                      // Active user — show Reset + Revoke
+                      // Active user — show Set Password + Reset + Revoke
                       <div className="flex gap-3 flex-wrap">
+                        {canManageAccess && u.role !== 'SUPER_ADMIN' && (
+                          <button
+                            onClick={() => {
+                              setSetPasswordModal(u);
+                              setTargetNewPassword('');
+                              setTargetConfirmPassword('');
+                              setSetPasswordError('');
+                              setSetPasswordSuccess('');
+                            }}
+                            className="text-blue-600 hover:underline text-xs font-medium"
+                          >
+                            Set Password
+                          </button>
+                        )}
                         <button
                           onClick={() => handleResetPassword(u)}
                           className="text-amber-600 hover:underline text-xs font-medium"
@@ -1576,6 +1636,112 @@ export const UserManagement = () => {
                 <Trash2 size={14} /> {deleting ? 'Deleting...' : 'Delete Permanently'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set / Change Password Modal (Super Admin) */}
+      {setPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSetPasswordModal(null)} />
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <Key className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold truncate">Set User Password</h3>
+                <p className="text-xs text-gray-500 truncate">{setPasswordModal.name} ({setPasswordModal.email})</p>
+              </div>
+            </div>
+
+            {setPasswordSuccess && (
+              <div className="p-3 mb-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                <span>{setPasswordSuccess}</span>
+              </div>
+            )}
+
+            {setPasswordError && (
+              <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                <span>{setPasswordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSetUserPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showTargetPwd ? 'text' : 'password'}
+                    required
+                    value={targetNewPassword}
+                    onChange={(e) => setTargetNewPassword(e.target.value)}
+                    placeholder="Enter new password (min. 8 chars)"
+                    className="w-full h-11 px-3 pr-10 rounded-lg border border-gray-200 outline-none focus:border-blue-500 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTargetPwd(!showTargetPwd)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showTargetPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Confirm New Password</label>
+                <div className="relative">
+                  <input
+                    type={showTargetConfirmPwd ? 'text' : 'password'}
+                    required
+                    value={targetConfirmPassword}
+                    onChange={(e) => setTargetConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    className="w-full h-11 px-3 pr-10 rounded-lg border border-gray-200 outline-none focus:border-blue-500 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTargetConfirmPwd(!showTargetConfirmPwd)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showTargetConfirmPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 text-xs text-gray-500 space-y-1">
+                <p className="font-semibold text-gray-600">Requirements:</p>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                  <span className={targetNewPassword.length >= 8 ? 'text-green-600 font-medium' : ''}>• Min 8 chars</span>
+                  <span className={/[A-Z]/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Uppercase</span>
+                  <span className={/[a-z]/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Lowercase</span>
+                  <span className={/[0-9]/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Number (0-9)</span>
+                  <span className={/[^A-Za-z0-9]/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Special char</span>
+                  <span className={targetNewPassword && targetNewPassword === targetConfirmPassword ? 'text-green-600 font-medium' : ''}>• Passwords match</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSetPasswordModal(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={settingPassword}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 text-sm flex items-center gap-2"
+                >
+                  <Key size={14} />
+                  {settingPassword ? 'Saving...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -5255,6 +5421,15 @@ export const ProfilePage = () => {
     skills: 'React, Node.js, UI/UX',
     availability: 'Weekends, Evenings',
   });
+
+  const [pwdForm, setPwdForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [showOldPwd, setShowOldPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdSuccess, setPwdSuccess] = useState('');
+  const [pwdError, setPwdError] = useState('');
+
   const handleSave = (e) => {
     e.preventDefault();
     setSaving(true);
@@ -5264,12 +5439,51 @@ export const ProfilePage = () => {
       setTimeout(() => setSaved(false), 3000);
     }, 800);
   };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPwdError('');
+    setPwdSuccess('');
+
+    if (pwdForm.newPassword.length < 8) {
+      setPwdError('Password must be at least 8 characters long');
+      return;
+    }
+    if (!/[A-Z]/.test(pwdForm.newPassword) || !/[a-z]/.test(pwdForm.newPassword) || !/[0-9]/.test(pwdForm.newPassword) || !/[^A-Za-z0-9]/.test(pwdForm.newPassword)) {
+      setPwdError('Password must contain an uppercase letter, lowercase letter, number, and special character');
+      return;
+    }
+    if (pwdForm.newPassword !== pwdForm.confirmPassword) {
+      setPwdError('New passwords do not match');
+      return;
+    }
+    if (pwdForm.newPassword === pwdForm.oldPassword) {
+      setPwdError('New password must differ from current password');
+      return;
+    }
+
+    setPwdSaving(true);
+    try {
+      await api.post('/auth/change-password', {
+        oldPassword: pwdForm.oldPassword,
+        newPassword: pwdForm.newPassword,
+      });
+      setPwdSuccess('Password updated successfully!');
+      setPwdForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => setPwdSuccess(''), 4000);
+    } catch (err) {
+      setPwdError(err.response?.data?.message || err.message || 'Failed to update password');
+    } finally {
+      setPwdSaving(false);
+    }
+  };
+
   const cfg = ROLES[user.role];
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold">My Profile</h1>
-        <p className="text-gray-500">Manage your account information</p>
+        <p className="text-gray-500">Manage your account information and security</p>
       </div>
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center gap-5">
@@ -5319,6 +5533,119 @@ export const ProfilePage = () => {
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
             {saved && <span className="text-sm text-green-600 flex items-center gap-1"><CheckCircle size={16} /> Saved successfully</span>}
+          </div>
+        </form>
+      </div>
+
+      {/* Security & Change Password Card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Key className="w-5 h-5 text-blue-600" />
+          <h3 className="font-semibold text-lg">Change Password</h3>
+        </div>
+        <p className="text-xs text-gray-500 mb-5">Update your password to keep your account secure</p>
+
+        {pwdSuccess && (
+          <div className="p-3 mb-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+            <span>{pwdSuccess}</span>
+          </div>
+        )}
+
+        {pwdError && (
+          <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+            <span>{pwdError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Current Password</label>
+            <div className="relative">
+              <input
+                type={showOldPwd ? 'text' : 'password'}
+                required
+                value={pwdForm.oldPassword}
+                onChange={(e) => setPwdForm({ ...pwdForm, oldPassword: e.target.value })}
+                placeholder="Enter your current password"
+                className="w-full h-11 px-3 pr-10 rounded-lg border border-gray-200 outline-none focus:border-blue-500 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowOldPwd(!showOldPwd)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showOldPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1.5">New Password</label>
+              <div className="relative">
+                <input
+                  type={showNewPwd ? 'text' : 'password'}
+                  required
+                  value={pwdForm.newPassword}
+                  onChange={(e) => setPwdForm({ ...pwdForm, newPassword: e.target.value })}
+                  placeholder="At least 8 characters"
+                  className="w-full h-11 px-3 pr-10 rounded-lg border border-gray-200 outline-none focus:border-blue-500 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPwd(!showNewPwd)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showNewPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Confirm New Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPwd ? 'text' : 'password'}
+                  required
+                  value={pwdForm.confirmPassword}
+                  onChange={(e) => setPwdForm({ ...pwdForm, confirmPassword: e.target.value })}
+                  placeholder="Re-enter new password"
+                  className="w-full h-11 px-3 pr-10 rounded-lg border border-gray-200 outline-none focus:border-blue-500 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPwd(!showConfirmPwd)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 text-xs text-gray-500 space-y-1">
+            <p className="font-semibold text-gray-600">Password requirements:</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <span className={pwdForm.newPassword.length >= 8 ? 'text-green-600 font-medium' : ''}>• At least 8 characters</span>
+              <span className={/[A-Z]/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Uppercase letter</span>
+              <span className={/[a-z]/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Lowercase letter</span>
+              <span className={/[0-9]/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Number (0-9)</span>
+              <span className={/[^A-Za-z0-9]/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Special character (!@#$%^&*)</span>
+              <span className={pwdForm.newPassword && pwdForm.newPassword === pwdForm.confirmPassword ? 'text-green-600 font-medium' : ''}>• Passwords match</span>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={pwdSaving}
+              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 transition"
+            >
+              <Key size={16} />
+              {pwdSaving ? 'Updating Password...' : 'Update Password'}
+            </button>
           </div>
         </form>
       </div>
