@@ -30,6 +30,11 @@ const userSchema = new mongoose.Schema({
   availability: { type: String, default: '' },
   bio: { type: String, default: '' },
 
+  // Daily update limit tracking
+  lastProfileUpdatedAt: { type: Date, default: null },
+  lastPasswordUpdatedAt: { type: Date, default: null },
+  lastEmailUpdatedAt: { type: Date, default: null },
+
   // NOTIFICATION PREFERENCES
   notificationPrefs: {
     // Master channel toggles

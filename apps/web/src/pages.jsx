@@ -5688,6 +5688,16 @@ export const ProfilePage = () => {
         <h1 className="text-2xl font-bold">My Profile</h1>
         <p className="text-gray-500">Manage your account information and security</p>
       </div>
+
+      {user.role === 'ADMIN' && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-800 text-sm">
+          <Info className="w-5 h-5 text-amber-600 shrink-0" />
+          <div>
+            <span className="font-semibold">Daily Edit Limit Active:</span> As an Administrator, your profile details, password, and email address can each be updated once per 24 hours.
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center gap-5">
           <div className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ backgroundColor: cfg.color }}>
@@ -5702,6 +5712,14 @@ export const ProfilePage = () => {
       </div>
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="font-semibold mb-5">Account Information</h3>
+
+        {saveError && (
+          <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+            <span>{saveError}</span>
+          </div>
+        )}
+
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>

@@ -76,9 +76,23 @@ exports.getUserById = async (id) => {
   return user;
 };
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+const checkAdminDailyLimit = (user, lastUpdateField, actionName) => {
+  if (user.role === 'ADMIN' && user[lastUpdateField]) {
+    const elapsed = Date.now() - new Date(user[lastUpdateField]).getTime();
+    if (elapsed < ONE_DAY_MS) {
+      const hoursLeft = Math.ceil((ONE_DAY_MS - elapsed) / (60 * 60 * 1000));
+      throw new Error(`Admins can only ${actionName} once per day. Please try again in ${hoursLeft} hour${hoursLeft === 1 ? '' : 's'}.`);
+    }
+  }
+};
+
 exports.updateProfile = async (userId, data) => {
   const user = await User.findById(userId);
   if (!user) throw new Error('User not found');
+
+  checkAdminDailyLimit(user, 'lastProfileUpdatedAt', 'update their profile details');
 
   const allowed = ['name', 'phone', 'skills', 'bio', 'availability'];
   const changes = [];
@@ -90,6 +104,7 @@ exports.updateProfile = async (userId, data) => {
   });
 
   if (changes.length > 0) {
+    user.lastProfileUpdatedAt = new Date();
     await user.save();
     sendProfileUpdatedEmail({
       to: user.email,
@@ -105,6 +120,10 @@ exports.changePassword = async (credential, oldPassword, newPassword) => {
   const user = await repository.findById(credential.sub);
   if (!user?.isActive || credential.authState !== tokens.authState(user)) {
     throw new Error('Credentials changed; sign in again');
+  }
+
+  if (!user.mustChangePassword) {
+    checkAdminDailyLimit(user, 'lastPasswordUpdatedAt', 'change their password');
   }
 
   if (!user.password || !user.password.startsWith('$2')) {
@@ -152,6 +171,8 @@ exports.changeEmail = async (credential, newEmail, currentPassword) => {
   const user = await repository.findById(credential.sub);
   if (!user?.isActive) throw new Error('Account not found or inactive');
 
+  checkAdminDailyLimit(user, 'lastEmailUpdatedAt', 'change their email address');
+
   if (user.email.toLowerCase() === cleanEmail) {
     throw new Error('New email must be different from current email');
   }
@@ -168,6 +189,7 @@ exports.changeEmail = async (credential, newEmail, currentPassword) => {
 
   const oldEmail = user.email;
   user.email = cleanEmail;
+  user.lastEmailUpdatedAt = new Date();
   await user.save();
 
   sendEmailChangedEmail({
