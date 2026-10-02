@@ -119,3 +119,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Match both notification ID and authenticated recipient in the atomic read-state update; return the same 404 for foreign and missing notifications in API and deployed web server copies. Add HTTP regression coverage.
 - Reason: Confirmed authenticated callers could mark another recipient's notification read by ID. Existing authentication and scoped list/bulk updates did not protect the individual update. The security investigation authorizes this fix; authorization changes require human review before merge.
 - Where: `apps/api/src/modules/notifications/notifications.controller.js`, `apps/web/server/modules/notifications/notifications.controller.js`, corresponding `__tests__/notifications.test.js`, `memory.md`.
+
+### [2026-10-02] Prevent simulated delivery log injection
+- What: Keep only fixed email/SMS queue status messages in both notification service copies; add announcement-flow regression coverage for forged lines, control characters, preserved content and delivery preferences.
+- Reason: Confirmed authorized team announcements could inject process-log records through title/message text. The security investigation authorizes the fix. Removing unnecessary recipient/content fields also avoids exposing personal data. The active services have no Winston dependency or implemented shared logger, so this bounded fix retains their existing console sink.
+- Where: `apps/api/src/modules/notifications/notifications.service.js`, `apps/web/server/modules/notifications/notifications.service.js`, corresponding `__tests__/delivery.test.js`, `memory.md`.

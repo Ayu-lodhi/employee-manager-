@@ -161,3 +161,12 @@ missing IDs return the same 404; repeat reads by the owner remain successful.
 HTTP regression tests exercise authentication and Mongoose with synthetic
 collection IO. The security investigation authorizes this fix; authorization
 changes require human review before merge.
+
+## Notification delivery log safety — 2026-10-02
+
+Simulated email/SMS delivery logs now contain only fixed channel/status messages
+in API and deployed web server copies. Recipient and announcement text are omitted
+to prevent record injection and personal-data exposure; notification contents and
+preferences are preserved. Regression tests exercise authorized TEAM announcements.
+The active services lack the documented Winston logger/dependency; this scoped fix
+retains their existing console sink. The security investigation authorizes the fix.
