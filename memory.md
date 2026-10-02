@@ -196,3 +196,14 @@ uses separator-exclusive components to prevent backtracking across at signs or
 domain labels. Parser regression tests cover valid rows, malformed addresses,
 length boundaries and adversarial fields under a VM execution deadline. The
 security investigation authorizes this fix.
+
+## Team chat binding authorization — 2026-10-02
+
+Generic room creation cannot assign `teamId`. Both server copies check current
+team membership/leadership and stored administrative roles for team chat access
+and management, including socket checks and previously poisoned rooms. Team
+initialization replaces stored room membership/ownership with the current roster
+and authorized requester. Manual additions require team eligibility; ordinary
+rooms retain creator-based management. No uniqueness migration is needed for the
+authorization boundary because each tagged room is independently checked.
+The security investigation authorizes the fix; human review is required before merge.
