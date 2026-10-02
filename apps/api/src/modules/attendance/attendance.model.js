@@ -19,7 +19,7 @@ const attendanceSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['present', 'late', 'absent', 'on_leave'],
+    enum: ['present', 'late', 'absent', 'on_leave', 'half_day'],
     default: 'absent',
   },
   method: {

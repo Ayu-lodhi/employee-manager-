@@ -35,6 +35,10 @@ const userSchema = new mongoose.Schema({
   lastPasswordUpdatedAt: { type: Date, default: null },
   lastEmailUpdatedAt: { type: Date, default: null },
 
+  // One-time password reset link
+  passwordResetToken: { type: String, default: null, select: false },
+  passwordResetExpiry: { type: Date, default: null, select: false },
+
   // NOTIFICATION PREFERENCES
   notificationPrefs: {
     // Master channel toggles

@@ -6,6 +6,10 @@ const { createUserLimiter } = require('../../middleware/rateLimit.middleware');
 const { validate, schemas } = require('../../middleware/validate.middleware');
 const { auditLog } = require('../../middleware/audit.middleware');
 
+// PUBLIC — one-time password reset link endpoints (no auth required)
+router.get('/reset-password/verify', adminController.verifyResetToken);
+router.post('/reset-password/complete', adminController.completePasswordReset);
+
 router.use(protect);
 
 // Admin + Super Admin

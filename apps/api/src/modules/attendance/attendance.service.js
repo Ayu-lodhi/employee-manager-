@@ -41,7 +41,7 @@ class AttendanceService {
     } = data;
 
     if (!studentId || !teamId) throw new Error('studentId and teamId are required');
-    if (!['present', 'late', 'absent', 'on_leave'].includes(status)) {
+    if (!['present', 'late', 'absent', 'on_leave', 'half_day'].includes(status)) {
       throw new Error('Invalid status');
     }
 
@@ -240,8 +240,9 @@ class AttendanceService {
     const late = records.filter((r) => r.status === 'late').length;
     const absent = records.filter((r) => r.status === 'absent').length;
     const onLeave = records.filter((r) => r.status === 'on_leave').length;
+    const halfDay = records.filter((r) => r.status === 'half_day').length;
     const notMarked = total - records.length;
-    const attended = present + late;
+    const attended = present + late + halfDay;
     const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
 
     return {
@@ -252,6 +253,7 @@ class AttendanceService {
       late,
       absent,
       onLeave,
+      halfDay,
       notMarked,
       attended,
       percentage,
@@ -285,7 +287,7 @@ class AttendanceService {
       const d = new Date();
       d.setDate(d.getDate() - (days - 1 - i));
       const key = d.toISOString().split('T')[0];
-      byDate[key] = { date: key, present: 0, late: 0, absent: 0, onLeave: 0 };
+      byDate[key] = { date: key, present: 0, late: 0, absent: 0, onLeave: 0, halfDay: 0 };
     }
 
     records.forEach((r) => {
@@ -294,6 +296,7 @@ class AttendanceService {
         else if (r.status === 'late') byDate[r.date].late++;
         else if (r.status === 'absent') byDate[r.date].absent++;
         else if (r.status === 'on_leave') byDate[r.date].onLeave++;
+        else if (r.status === 'half_day') byDate[r.date].halfDay++;
       }
     });
 

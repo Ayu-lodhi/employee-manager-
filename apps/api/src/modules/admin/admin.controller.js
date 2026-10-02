@@ -59,21 +59,41 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
-// RESET PASSWORD — generates new temp password + emails it
+// RESET PASSWORD — sends a one-time reset link to user's email
 exports.resetPassword = async (req, res) => {
   try {
-    const { user, tempPassword, emailSent } = await adminService.resetPassword(req.params.id, req.user?.sub);
-    const responseBody = {
+    const { user, emailSent } = await adminService.resetPassword(req.params.id);
+    res.status(200).json({
       success: true,
       message: emailSent
-        ? `Password reset. New credentials emailed to ${user.email}.`
-        : `Password reset. Email delivery failed — share password manually.`,
-      data: user,
+        ? `Password reset link emailed to ${user.email}. Link expires in 1 hour.`
+        : 'Reset link generated but email delivery failed. Please retry.',
       emailSent,
-    };
-    // C5: Only expose tempPassword when email delivery failed
-    if (!emailSent && tempPassword) responseBody.tempPassword = tempPassword;
-    res.status(200).json(responseBody);
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// PUBLIC: Verify one-time reset token (pre-flight before showing form)
+exports.verifyResetToken = async (req, res) => {
+  try {
+    const { token, id } = req.query;
+    if (!token || !id) return res.status(400).json({ success: false, message: 'Missing token or id' });
+    const info = await adminService.verifyResetToken(id, token);
+    res.status(200).json({ success: true, data: info });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// PUBLIC: Complete password reset via one-time link
+exports.completePasswordReset = async (req, res) => {
+  try {
+    const { token, id, newPassword } = req.body;
+    if (!token || !id) return res.status(400).json({ success: false, message: 'Missing token or id' });
+    await adminService.completePasswordReset(id, token, newPassword);
+    res.status(200).json({ success: true, message: 'Password reset successful. You can now log in.' });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }

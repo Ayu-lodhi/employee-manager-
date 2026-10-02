@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const User = require('./admin.model');
-const { sendWelcomeEmail, sendPasswordResetEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
+const { sendWelcomeEmail, sendPasswordResetLinkEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
 
 const generateDefaultPassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -153,39 +154,79 @@ exports.deleteUser = async (id, adminId) => {
   return user;
 };
 
-// RESET PASSWORD — new temp password + email with one-time use
-exports.resetPassword = async (id, adminId = null) => {
-  const user = await User.findById(id);
+// RESET PASSWORD — generates a ONE-TIME reset link and emails it to the user.
+exports.resetPassword = async (id) => {
+  const user = await User.findById(id).select('+passwordResetToken +passwordResetExpiry');
   if (!user) throw new Error('User not found');
+  if (user.role === 'SUPER_ADMIN') throw new Error('Cannot reset Super Admin password this way');
 
-  // Prevent resetting Super Admin
-  if (user.role === 'SUPER_ADMIN') {
-    throw new Error('Cannot reset Super Admin password this way');
-  }
-
-  // Generate new temp password
-  const tempPassword = generateDefaultPassword();
-  user.passwordChangeStartedAt = null;
-  user.password = await bcrypt.hash(tempPassword, 12);
-  user.mustChangePassword = true;  // force change on next login
+  // Generate a cryptographically secure one-time token (hex, 48 chars)
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  // Store a SHA-256 hash (never store raw tokens in DB)
+  user.passwordResetToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  // Token expires in 1 hour
+  user.passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
-  // Email the temp password
+  const resetUrl = `${LOGIN_URL}/reset-password?token=${rawToken}&id=${String(user._id)}`;
+
+  // Email the link
   let emailSent = false;
   try {
-    const result = await sendPasswordResetEmail({
+    const result = await sendPasswordResetLinkEmail({
       to: user.email,
       name: user.name,
-      tempPassword,
-      loginUrl: LOGIN_URL,
+      resetUrl,
     });
     emailSent = result.success;
   } catch (err) {
-    console.error('Reset email failed:', err.message);
+    console.error('Reset link email failed:', err.message);
   }
 
-  // C5: Only include tempPassword in return value when email failed (caller decides what to do)
-  return { user: user.toObject({ virtuals: false }), tempPassword: emailSent ? undefined : tempPassword, emailSent };
+  return { user: user.toObject({ virtuals: false }), emailSent };
+};
+
+// VERIFY TOKEN — check a one-time reset link token (does NOT consume it yet)
+exports.verifyResetToken = async (id, rawToken) => {
+  const user = await User.findById(id).select('+passwordResetToken +passwordResetExpiry');
+  if (!user) throw new Error('Invalid or expired reset link');
+  if (!user.passwordResetToken || !user.passwordResetExpiry) throw new Error('Invalid or expired reset link');
+  if (new Date() > user.passwordResetExpiry) throw new Error('This reset link has expired. Please ask an admin to send a new one.');
+
+  const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const valid = crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(user.passwordResetToken, 'hex'));
+  if (!valid) throw new Error('Invalid or expired reset link');
+
+  return { name: user.name, email: user.email };
+};
+
+// COMPLETE RESET — set new password and consume the token
+exports.completePasswordReset = async (id, rawToken, newPassword) => {
+  if (typeof newPassword !== 'string' || newPassword.length < 8) throw new Error('Password must be at least 8 characters');
+  if (Buffer.byteLength(newPassword, 'utf8') > 72) throw new Error('Password must not exceed 72 UTF-8 bytes');
+  if (!/[A-Z]/.test(newPassword)) throw new Error('Password must contain an uppercase letter');
+  if (!/[a-z]/.test(newPassword)) throw new Error('Password must contain a lowercase letter');
+  if (!/[0-9]/.test(newPassword)) throw new Error('Password must contain a number');
+  if (!/[^A-Za-z0-9]/.test(newPassword)) throw new Error('Password must contain a special character');
+
+  const user = await User.findById(id).select('+passwordResetToken +passwordResetExpiry');
+  if (!user) throw new Error('Invalid or expired reset link');
+  if (!user.passwordResetToken || !user.passwordResetExpiry) throw new Error('Invalid or expired reset link');
+  if (new Date() > user.passwordResetExpiry) throw new Error('This reset link has expired. Please ask an admin to send a new one.');
+
+  const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const valid = crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(user.passwordResetToken, 'hex'));
+  if (!valid) throw new Error('Invalid or expired reset link');
+
+  // Consume the token immediately (one-time use)
+  user.passwordResetToken = null;
+  user.passwordResetExpiry = null;
+  user.password = await bcrypt.hash(newPassword, 12);
+  user.mustChangePassword = false;
+  user.passwordChangeStartedAt = null;
+  await user.save();
+
+  return { user: user.toObject({ virtuals: false }) };
 };
 
 // H6: setPassword — apply same complexity rules as changePassword, require adminId for audit

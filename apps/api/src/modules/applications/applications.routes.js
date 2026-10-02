@@ -11,8 +11,8 @@ router.get('/', restrictTo('ADMIN', 'SUPER_ADMIN', 'T3_EXECUTIVE'), controller.g
 // Student's own applications
 router.get('/me', controller.getMyApplications);
 
-// T1/T2 apply
-router.post('/', restrictTo('T1_VOLUNTEER', 'T2_ASSOCIATE'), controller.createApplication);
+// Raise approval request (T1/T2/T3/Admin)
+router.post('/', restrictTo('T1_VOLUNTEER', 'T2_ASSOCIATE', 'T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'), controller.createApplication);
 
 // Approve/Reject/Waitlist (T3/Admin)
 router.patch('/:id/status', restrictTo('T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'), controller.updateStatus);

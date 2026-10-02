@@ -6,22 +6,47 @@ const { ValidationError } = require('../../core/errors/typedErrors');
 
 class ApplicationService {
 
-  // Student applies to a team/event
+  // Student/member applies for leave, half-day, or team
   async create(data, user) {
-    const { teamId, role, notes } = data;
-    if (!teamId) throw new Error('Team is required');
+    let { teamId, role, notes, requestType, targetDate, reason } = data;
+    requestType = requestType || (targetDate ? 'leave' : 'event');
+    targetDate = targetDate || new Date().toISOString().split('T')[0];
+    reason = reason || notes || '';
+
+    if (!teamId) {
+      const userTeam = await Team.findOne({
+        $or: [{ members: user.sub }, { leadId: user.sub }],
+      });
+      if (userTeam) {
+        teamId = userTeam._id;
+      } else {
+        throw new Error('Team is required');
+      }
+    }
 
     const team = await Team.findById(teamId);
     if (!team) throw new Error('Team not found');
 
     // Check existing application
-    const existing = await Application.findOne({
-      studentId: user.sub,
-      teamId,
-    });
-    if (existing) throw new Error('You have already applied to this team');
+    if (['leave', 'half_day'].includes(requestType)) {
+      const existing = await Application.findOne({
+        studentId: user.sub,
+        targetDate,
+        status: { $in: ['pending', 'approved'] },
+      });
+      if (existing) {
+        throw new Error(`You already have a ${existing.status} request for ${targetDate}`);
+      }
+    } else {
+      const existing = await Application.findOne({
+        studentId: user.sub,
+        teamId,
+        requestType: { $in: ['event', 'team_join'] },
+      });
+      if (existing) throw new Error('You have already applied to this team');
+    }
 
-    const userDoc = await User.findById(user.sub).select('name email');
+    const userDoc = await User.findById(user.sub).select('name email role');
 
     const app = await Application.create({
       studentId: user.sub,
@@ -31,19 +56,49 @@ class ApplicationService {
       teamName: team.name,
       eventId: team.eventId || null,
       eventTitle: team.eventTitle || '',
-      role: role || 'Team Member',
-      notes: notes || '',
+      role: role || (userDoc?.role === 'T3_EXECUTIVE' ? 'Team Lead' : 'Team Member'),
+      requestType,
+      targetDate,
+      reason,
+      notes: notes || reason || '',
       status: 'pending',
       appliedAt: new Date(),
     });
 
-    // Notify team lead
-    if (team.leadId) {
+    // Notify team lead or admin
+    const reqTypeName = requestType === 'half_day' ? 'Half Day' : (requestType === 'leave' ? 'Leave' : 'Application');
+    const memberName = userDoc ? userDoc.name : (user.name || 'A team member');
+
+    if (['leave', 'half_day'].includes(requestType)) {
+      if (team.leadId && team.leadId.toString() !== user.sub) {
+        await notify(
+          team.leadId,
+          'application',
+          `New ${reqTypeName} Request`,
+          `${memberName} requested ${reqTypeName} for ${targetDate}.${reason ? ` Reason: "${reason}"` : ''}`
+        );
+      } else if (team.leadId && team.leadId.toString() === user.sub) {
+        // T3 raising request for themselves -> notify admins if available
+        try {
+          const admins = await User.find({ role: { $in: ['ADMIN', 'SUPER_ADMIN'] }, isActive: true }).select('_id');
+          if (Array.isArray(admins)) {
+            for (const admin of admins) {
+              await notify(
+                admin._id,
+                'application',
+                `New ${reqTypeName} Request`,
+                `${memberName} requested ${reqTypeName} for ${targetDate}.${reason ? ` Reason: "${reason}"` : ''}`
+              );
+            }
+          }
+        } catch (_) {}
+      }
+    } else if (team.leadId) {
       await notify(
         team.leadId,
         'application',
         'New Application',
-        `${userDoc ? userDoc.name : user.name} applied to your team "${team.name}".`
+        `${memberName} applied to your team "${team.name}".`
       );
     }
 
@@ -68,10 +123,13 @@ class ApplicationService {
       }
     }
     if (filters?.status !== undefined) {
-      if (!['pending', 'approved', 'rejected', 'waitlisted'].includes(filters.status)) {
+      if (!['pending', 'approved', 'rejected', 'denied', 'waitlisted'].includes(filters.status)) {
         throw new ValidationError('Invalid status');
       }
-      query.status = filters.status;
+      query.status = filters.status === 'denied' ? 'rejected' : filters.status;
+    }
+    if (filters?.requestType !== undefined) {
+      query.requestType = filters.requestType;
     }
 
     // T3 only sees applications for their teams
@@ -102,8 +160,10 @@ class ApplicationService {
 
   // Update status
   async updateStatus(id, status, requester, rejectionReason) {
-    const valid = ['approved', 'rejected', 'waitlisted', 'pending'];
+    const valid = ['approved', 'rejected', 'denied', 'waitlisted', 'pending'];
     if (!valid.includes(status)) throw new Error('Invalid status');
+
+    const normalizedStatus = status === 'denied' ? 'rejected' : status;
 
     const app = await Application.findById(id);
     if (!app) throw new Error('Application not found');
@@ -120,15 +180,58 @@ class ApplicationService {
       }
     }
 
-    app.status = status;
+    const reviewerDoc = await User.findById(requesterSub).select('name');
+    const reviewerName = reviewerDoc ? reviewerDoc.name : 'Team Lead';
+
+    app.status = normalizedStatus;
     app.reviewedBy = requesterSub;
+    app.reviewedByName = reviewerName;
     app.reviewedAt = new Date();
-    if (status === 'rejected') app.rejectionReason = rejectionReason || '';
+    if (normalizedStatus === 'rejected') {
+      app.rejectionReason = rejectionReason || 'Request not approved';
+    }
 
     await app.save();
 
-    // On approval → add to team + chat + send notification
-    if (status === 'approved') {
+    // On approval for leave/half_day -> auto mark attendance!
+    if (normalizedStatus === 'approved' && ['leave', 'half_day'].includes(app.requestType)) {
+      const Attendance = require('../attendance/attendance.model');
+      const targetDate = app.targetDate || new Date().toISOString().split('T')[0];
+      const attStatus = app.requestType === 'half_day' ? 'half_day' : 'on_leave';
+      const shiftLabel = app.requestType === 'half_day' ? 'Half Day' : 'Leave';
+      const notes = app.reason
+        ? `Approved ${shiftLabel}: ${app.reason}`
+        : `Approved ${shiftLabel} by ${reviewerName}`;
+
+      try {
+        await Attendance.findOneAndUpdate(
+          { studentId: app.studentId, teamId: app.teamId, date: targetDate },
+          {
+            studentId: app.studentId,
+            studentName: app.studentName,
+            studentEmail: app.studentEmail,
+            teamId: app.teamId,
+            teamName: app.teamName || '',
+            date: targetDate,
+            shiftLabel,
+            status: attStatus,
+            method: 'manual',
+            markedBy: requesterSub,
+            markedByName: reviewerName,
+            notes,
+            durationMinutes: app.requestType === 'half_day' ? 240 : 0,
+            checkInTime: null,
+            checkOutTime: null,
+          },
+          { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+      } catch (attErr) {
+        console.error('Failed to auto-update attendance on approval:', attErr.message);
+      }
+    }
+
+    // On approval for team membership
+    if (normalizedStatus === 'approved' && (!app.requestType || ['event', 'team_join'].includes(app.requestType))) {
       const team = await Team.findById(app.teamId);
       if (team) {
         // Add to team members if not already
@@ -161,16 +264,17 @@ class ApplicationService {
     }
 
     // Notify student
-    const title = status === 'approved'
-      ? 'Application Approved'
-      : status === 'rejected'
-      ? 'Application Rejected'
+    const typeLabel = app.requestType === 'half_day' ? 'Half Day' : (app.requestType === 'leave' ? 'Leave' : 'Application');
+    const title = normalizedStatus === 'approved'
+      ? `${typeLabel} Request Approved`
+      : normalizedStatus === 'rejected'
+      ? `${typeLabel} Request Denied`
       : 'You are on the Waitlist';
 
-    const message = status === 'approved'
-      ? `You've been approved for "${app.teamName || app.eventTitle || 'the team'}". You've been added to the team chat.`
-      : status === 'rejected'
-      ? `Your application for "${app.teamName || app.eventTitle || 'the team'}" was not selected.`
+    const message = normalizedStatus === 'approved'
+      ? `Your ${typeLabel.toLowerCase()} request for ${app.targetDate || 'the team'} has been approved by ${reviewerName}.`
+      : normalizedStatus === 'rejected'
+      ? `Your ${typeLabel.toLowerCase()} request for ${app.targetDate || 'the team'} was denied. Reason: ${app.rejectionReason || 'No reason provided'}`
       : `You've been waitlisted for "${app.teamName || app.eventTitle || 'the team'}".`;
 
     await notify(app.studentId, 'application', title, message);

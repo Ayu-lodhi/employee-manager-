@@ -10,7 +10,8 @@ import {
   UsersRound, Clock, Award, CheckCircle, MessageSquare, Star, Bell,
   Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, Crown, AlertTriangle,
   Eye, EyeOff, Key,
-  Info, Trash2, Construction, MapPin, Timer, BarChart3, ExternalLink, ChevronRight
+  Info, Trash2, Construction, MapPin, Timer, BarChart3, ExternalLink, ChevronRight,
+  FileCheck, Download, Check, AlertCircle
 } from 'lucide-react';
 import api from './lib/api';
 import { io } from 'socket.io-client';
@@ -206,7 +207,7 @@ const MENUS = {
       section: 'MY WORKSPACE', items: [
         { icon: LayoutDashboard, label: 'Dashboard', to: '/t3' },
         { icon: UsersRound, label: 'My Teams', to: '/t3/teams' },
-        { icon: FileText, label: 'Applications', to: '/t3/applications' },
+        { icon: FileCheck, label: 'Approval Requests', to: '/t3/applications' },
         { icon: CheckCircle, label: 'Attendance', to: '/t3/attendance' },
         { icon: Clock, label: 'Timesheets', to: '/timesheets' },
       ]
@@ -231,7 +232,7 @@ const MENUS = {
       section: 'MY WORKSPACE', items: [
         { icon: LayoutDashboard, label: 'Dashboard', to: '/t2' },
         { icon: Calendar, label: 'Browse Events', to: '/t2/events' },
-        { icon: FileText, label: 'My Applications', to: '/t2/applications' },
+        { icon: FileCheck, label: 'Approval Requests', to: '/t2/applications' },
         { icon: Clock, label: 'My Shifts', to: '/t2/shifts' },
         { icon: Clock, label: 'Timesheets', to: '/timesheets' },
       ]
@@ -255,6 +256,7 @@ const MENUS = {
       section: 'MY WORKSPACE', items: [
         { icon: LayoutDashboard, label: 'Dashboard', to: '/t1' },
         { icon: Calendar, label: 'Browse Events', to: '/t1/events' },
+        { icon: FileCheck, label: 'Approval Requests', to: '/t1/applications' },
         { icon: QrCode, label: 'QR Check-In', to: '/t1/checkin' },
         { icon: Award, label: 'Certificates', to: '/t1/certificates' },
         { icon: Clock, label: 'Timesheets', to: '/timesheets' },
@@ -1225,20 +1227,20 @@ export const UserManagement = () => {
     }
   };
 
-  // Reset password (Super Admin only)
+  // Reset password (Super Admin only) — sends one-time link
   const handleResetPassword = async (u) => {
     if (!canManageAccess) return;
-    if (!confirm(`Send a new temporary password to ${u.name}?\n\nTheir current password will become invalid.`)) return;
+    if (!confirm(`Send a secure password reset link to ${u.name}?\n\nA one-time link will be emailed to: ${u.email}\nThe link will expire in 1 hour.`)) return;
     try {
       const res = await api.post(`/admin/users/${u._id}/reset-password`);
-      const { tempPassword, emailSent } = res.data;
+      const { emailSent } = res.data;
       if (emailSent) {
-        alert(`Password reset!\n\nEmail sent to: ${u.email}\n\nBackup temp password:\n${tempPassword}\n\nOne-time use only.`);
+        alert(`Reset link sent!\n\nA secure one-time password reset link has been emailed to:\n${u.email}\n\nThe link expires in 1 hour and can only be used once.`);
       } else {
-        alert(`Password reset. Email failed.\n\nShare manually:\n${tempPassword}`);
+        alert(`Reset link generated but email delivery failed.\n\nPlease try again or contact your email provider.`);
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to reset password');
+      alert(err.response?.data?.message || 'Failed to send reset link');
     }
   };
 
@@ -2925,75 +2927,655 @@ export const MyReviewsPage = () => {
 
 
 // ====================================================================
-// APPLICATIONS — Connected to real backend
+// APPROVAL REQUEST MODALS & COMPONENTS
 // ====================================================================
-export const ApplicationsPage = () => {
-  const [apps, setApps] = useState([]);
-  const [loading, setLoading] = useState(true);
+export const RaiseApprovalModal = ({ isOpen, onClose, onSuccess, initialTeams = [] }) => {
+  const [teams, setTeams] = useState(initialTeams);
+  const [requestType, setRequestType] = useState('leave'); // 'leave' | 'half_day'
+  const [targetDate, setTargetDate] = useState(new Date().toISOString().split('T')[0]);
+  const [teamId, setTeamId] = useState('');
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!isOpen) return;
+    setError('');
+    setReason('');
+    setRequestType('leave');
+    setTargetDate(new Date().toISOString().split('T')[0]);
+
     (async () => {
       try {
-        const res = await api.get('/applications');
-        setApps(res.data.data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
+        const res = await api.get('/teams/my-teams');
+        const list = res.data?.data || res.data || [];
+        setTeams(list);
+        if (list.length > 0) {
+          setTeamId((prev) => prev || list[0]._id);
+        }
+      } catch (err) {
+        console.error('Failed to load teams:', err);
+      }
     })();
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      await api.post('/applications', {
+        requestType,
+        targetDate,
+        teamId: teamId || (teams[0]?._id),
+        reason: reason.trim(), // Optional!
+      });
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 z-10">
+        <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Raise Approval Request</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Submit a leave or half-day request to your team lead</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
+              Request Type
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setRequestType('leave')}
+                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition ${
+                  requestType === 'leave'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm ring-2 ring-purple-200'
+                    : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Full Day Leave</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRequestType('half_day')}
+                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition ${
+                  requestType === 'half_day'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm ring-2 ring-blue-200'
+                    : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>Half Day</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+              Requested Date
+            </label>
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              required
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {teams.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                Team & Lead
+              </label>
+              <select
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              >
+                {teams.map((t) => (
+                  <option key={t._id} value={t._id}>
+                    {t.name} (Lead: {t.leadName || t.leadId?.name || 'T3 Team Lead'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Reason
+              </label>
+              <span className="text-xs text-gray-400 font-normal">Optional (not mandatory)</span>
+            </div>
+            <textarea
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Personal work, urgent emergency, medical checkup (optional)..."
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition disabled:opacity-50 flex items-center gap-2"
+            >
+              {submitting ? 'Submitting...' : 'Submit Request'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export const DenyApprovalModal = ({ isOpen, onClose, onConfirm, app }) => {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setReason('');
+    setError('');
+  }, [isOpen]);
+
+  if (!isOpen || !app) return null;
+
+  const handleConfirm = async (e) => {
+    e.preventDefault();
+    if (!reason.trim()) {
+      setError('Please provide a reason for denying this request');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onConfirm(app._id, reason.trim());
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to deny request');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 z-10">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2 text-red-600">
+            <AlertCircle className="w-5 h-5" />
+            <h2 className="text-lg font-bold text-gray-900">Deny Approval Request</h2>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <p className="text-sm text-gray-600 mt-3">
+          Denying <strong>{app.studentName}</strong>'s {app.requestType === 'half_day' ? 'Half Day' : 'Leave'} request for <strong>{app.targetDate || 'the requested date'}</strong>.
+        </p>
+
+        {error && (
+          <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleConfirm} className="mt-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+              Reason for Denial <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Please explain why this request is denied (e.g., event rehearsal, urgent shift coverage)..."
+              required
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent placeholder:text-gray-400"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition disabled:opacity-50"
+            >
+              {submitting ? 'Denying...' : 'Confirm Denial'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ====================================================================
+// APPROVAL REQUESTS — T3 & Admin Management View
+// ====================================================================
+export const ApplicationsPage = () => {
+  const { user } = useAuth();
+  const [apps, setApps] = useState([]);
+  const [myApps, setMyApps] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [activeTab, setActiveTab] = useState('team'); // 'team' | 'my'
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'leave' | 'half_day'
+  const [loading, setLoading] = useState(true);
+  const [showRaiseModal, setShowRaiseModal] = useState(false);
+  const [denyingApp, setDenyingApp] = useState(null);
+  const [downloading, setDownloading] = useState(false);
+  const [actionSuccess, setActionSuccess] = useState('');
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [teamRes, myRes, teamsRes] = await Promise.all([
+        api.get('/applications'),
+        api.get('/applications/me'),
+        api.get('/teams/my-teams').catch(() => ({ data: { data: [] } })),
+      ]);
+      setApps(teamRes.data?.data || []);
+      setMyApps(myRes.data?.data || []);
+      setTeams(teamsRes.data?.data || teamsRes.data || []);
+    } catch (err) {
+      console.error('Error fetching approval requests:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
-  const updateStatus = async (id, status) => {
+  const updateStatus = async (id, status, rejectionReason = '') => {
     try {
-      await api.patch(`/applications/${id}/status`, { status });
-      setApps(apps.map(a => a._id === id ? { ...a, status } : a));
-    } catch (err) { alert(err.response?.data?.message || 'Failed'); }
+      await api.patch(`/applications/${id}/status`, { status, rejectionReason });
+      setApps((prev) =>
+        prev.map((a) =>
+          a._id === id
+            ? { ...a, status, rejectionReason, reviewedByName: user?.name || 'Team Lead' }
+            : a
+        )
+      );
+      setActionSuccess(
+        status === 'approved'
+          ? 'Request approved! Attendance record updated and notification sent.'
+          : 'Request denied with reason. Employee has been notified.'
+      );
+      setTimeout(() => setActionSuccess(''), 4500);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update request status');
+    }
   };
 
-  const statusColor = {
-    pending: 'bg-amber-100 text-amber-700',
-    approved: 'bg-green-100 text-green-700',
-    rejected: 'bg-red-100 text-red-700',
-    waitlisted: 'bg-blue-100 text-blue-700',
+  const handleDownloadSheet = async () => {
+    const targetTeamId = teams[0]?._id;
+    if (!targetTeamId) {
+      alert('No team found for attendance download.');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const res = await api.get(`/attendance/download?teamId=${targetTeamId}`);
+      const { csv, filename } = res.data.data;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename || `attendance_sheet_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to download attendance sheet');
+    } finally {
+      setDownloading(false);
+    }
   };
 
-  if (loading) return <div className="space-y-6"><Skeleton className="h-8 w-48" /><SkeletonTable rows={3} cols={3} /></div>;
+  const currentList = activeTab === 'team' ? apps : myApps;
+  const filteredApps = currentList.filter((a) => {
+    if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+    if (typeFilter !== 'all' && a.requestType !== typeFilter) return false;
+    return true;
+  });
+
+  const pendingCount = currentList.filter((a) => a.status === 'pending').length;
+  const approvedCount = currentList.filter((a) => a.status === 'approved').length;
+  const deniedCount = currentList.filter((a) => a.status === 'rejected' || a.status === 'denied').length;
+
+  const statusBadge = (status) => {
+    if (status === 'approved') {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">Approved</span>;
+    }
+    if (status === 'rejected' || status === 'denied') {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">Denied</span>;
+    }
+    if (status === 'waitlisted') {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Waitlist</span>;
+    }
+    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Pending</span>;
+  };
+
+  const typeBadge = (type) => {
+    if (type === 'half_day') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <Clock className="w-3 h-3" /> Half Day
+        </span>
+      );
+    }
+    if (type === 'leave') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+          <Calendar className="w-3 h-3" /> Full Day Leave
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+        <FileText className="w-3 h-3" /> Application
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <SkeletonTable rows={4} cols={4} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Applications</h1>
-        <p className="text-gray-500">Review and approve student applications</p>
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Approval Requests</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Review and approve team leave and half-day requests</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {teams.length > 0 && (
+            <button
+              onClick={handleDownloadSheet}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition disabled:opacity-50"
+            >
+              <Download className="w-4 h-4 text-gray-500" />
+              <span>{downloading ? 'Exporting...' : 'Download Attendance Sheet'}</span>
+            </button>
+          )}
+          <button
+            onClick={() => setShowRaiseModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium shadow-sm transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Raise Request</span>
+          </button>
+        </div>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {apps.length === 0 ? (
+
+      {actionSuccess && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span>{actionSuccess}</span>
+          </div>
+          <button onClick={() => setActionSuccess('')} className="text-emerald-600 hover:text-emerald-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-1">
+        <button
+          onClick={() => setActiveTab('team')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${
+            activeTab === 'team'
+              ? 'bg-blue-50 text-blue-600 shadow-sm'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          Team Requests ({apps.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('my')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${
+            activeTab === 'my'
+              ? 'bg-blue-50 text-blue-600 shadow-sm'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          My Raised Requests ({myApps.length})
+        </button>
+      </div>
+
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-gray-500">Total Requests</p>
+          <p className="text-2xl font-bold mt-1 text-gray-900">{currentList.length}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-amber-600">Pending Review</p>
+          <p className="text-2xl font-bold mt-1 text-amber-600">{pendingCount}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-green-600">Approved</p>
+          <p className="text-2xl font-bold mt-1 text-green-600">{approvedCount}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-red-600">Denied</p>
+          <p className="text-2xl font-bold mt-1 text-red-600">{deniedCount}</p>
+        </div>
+      </div>
+
+      {/* Filters Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex flex-wrap items-center gap-1">
+          {[
+            { id: 'all', label: 'All Status' },
+            { id: 'pending', label: 'Pending' },
+            { id: 'approved', label: 'Approved' },
+            { id: 'rejected', label: 'Denied' },
+          ].map((pill) => (
+            <button
+              key={pill.id}
+              onClick={() => setStatusFilter(pill.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                statusFilter === pill.id
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1">
+          {[
+            { id: 'all', label: 'All Types' },
+            { id: 'leave', label: 'Leave' },
+            { id: 'half_day', label: 'Half Day' },
+          ].map((pill) => (
+            <button
+              key={pill.id}
+              onClick={() => setTypeFilter(pill.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                typeFilter === pill.id
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Requests List */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
+        {filteredApps.length === 0 ? (
           <div className="p-12 text-center">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No applications yet</h3>
+            <FileCheck className="w-14 h-14 text-gray-300 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-gray-800">No approval requests yet</h3>
+            <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+              {activeTab === 'team'
+                ? 'When team members submit leave or half-day requests, they will appear here for your review and attendance marking.'
+                : 'You have not submitted any leave or half-day requests. Click "Raise Request" to submit one.'}
+            </p>
           </div>
-        ) : apps.map((a, i) => (
-          <div key={a._id} className={`p-5 flex items-center justify-between ${i > 0 ? 'border-t border-gray-100' : ''}`}>
-            <div className="flex items-center gap-4 flex-1">
-              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                {a.studentName?.charAt(0) || '?'}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">{a.studentName}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor[a.status]}`}>{a.status}</span>
+        ) : (
+          filteredApps.map((a) => (
+            <div key={a._id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50/75 transition">
+              {/* Member & Request Info */}
+              <div className="flex items-start gap-4 flex-1">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-sm flex-shrink-0">
+                  {a.studentName?.charAt(0) || '?'}
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5">{a.studentEmail}</p>
-                <p className="text-sm text-gray-600 mt-1">{a.eventTitle} / {a.role}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-gray-900">{a.studentName}</span>
+                    {typeBadge(a.requestType)}
+                    {statusBadge(a.status)}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {a.studentEmail} • <span className="font-medium text-gray-700">{a.teamName || 'Team'}</span>
+                  </p>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+                    <span className="font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
+                      📅 For Date: {a.targetDate || 'Today'}
+                    </span>
+                    <span className="text-gray-400">
+                      Submitted: {new Date(a.appliedAt || Date.now()).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  {/* Reason (optional) */}
+                  <div className="mt-2 text-xs">
+                    {a.reason ? (
+                      <p className="text-gray-700 bg-gray-50 border border-gray-200/80 px-3 py-1.5 rounded-lg inline-block">
+                        <span className="font-medium text-gray-500">Reason:</span> "{a.reason}"
+                      </p>
+                    ) : (
+                      <span className="text-gray-400 italic">No reason provided (optional)</span>
+                    )}
+                  </div>
+
+                  {/* Review result feedback */}
+                  {a.status === 'approved' && (
+                    <div className="mt-2 text-xs text-emerald-700 flex items-center gap-1.5 font-medium">
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Approved by {a.reviewedByName || 'Team Lead'} • Automatically marked in attendance</span>
+                    </div>
+                  )}
+
+                  {(a.status === 'rejected' || a.status === 'denied') && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800">
+                      <span className="font-semibold">Reason for Denial:</span> {a.rejectionReason || 'No reason specified'}
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Actions for Pending Requests */}
+              {activeTab === 'team' && a.status === 'pending' && (
+                <div className="flex items-center gap-2 self-end md:self-center">
+                  <button
+                    onClick={() => updateStatus(a._id, 'approved')}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 shadow-sm transition"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Approve</span>
+                  </button>
+                  <button
+                    onClick={() => setDenyingApp(a)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 border border-red-300 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-50 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Deny</span>
+                  </button>
+                </div>
+              )}
             </div>
-            {a.status === 'pending' && (
-              <div className="flex gap-2">
-                <button onClick={() => updateStatus(a._id, 'approved')} className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600">Approve</button>
-                <button onClick={() => updateStatus(a._id, 'rejected')} className="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50">Reject</button>
-                <button onClick={() => updateStatus(a._id, 'waitlisted')} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Waitlist</button>
-              </div>
-            )}
-          </div>
-        ))}
+          ))
+        )}
       </div>
+
+      {/* Raise Request Modal */}
+      <RaiseApprovalModal
+        isOpen={showRaiseModal}
+        onClose={() => setShowRaiseModal(false)}
+        onSuccess={() => {
+          fetchData();
+          setActionSuccess('Your approval request has been submitted to your team lead!');
+          setTimeout(() => setActionSuccess(''), 4500);
+        }}
+        initialTeams={teams}
+      />
+
+      {/* Deny Request Modal */}
+      <DenyApprovalModal
+        isOpen={!!denyingApp}
+        app={denyingApp}
+        onClose={() => setDenyingApp(null)}
+        onConfirm={(id, reason) => updateStatus(id, 'rejected', reason)}
+      />
     </div>
   );
 };
@@ -3108,7 +3690,8 @@ export const AttendancePage = () => {
     present: 'bg-green-100 text-green-700',
     late: 'bg-amber-100 text-amber-700',
     absent: 'bg-red-100 text-red-700',
-    on_leave: 'bg-blue-100 text-blue-700',
+    on_leave: 'bg-purple-100 text-purple-700',
+    half_day: 'bg-blue-100 text-blue-700',
     not_marked: 'bg-gray-100 text-gray-500',
   };
 
@@ -3301,7 +3884,8 @@ export const AttendancePage = () => {
                     { value: 'present', label: 'Present', color: 'green' },
                     { value: 'late', label: 'Late', color: 'amber' },
                     { value: 'absent', label: 'Absent', color: 'red' },
-                    { value: 'on_leave', label: 'On Leave', color: 'blue' },
+                    { value: 'on_leave', label: 'On Leave', color: 'purple' },
+                    { value: 'half_day', label: 'Half Day', color: 'blue' },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -4581,61 +5165,309 @@ export const SessionsPage = () => {
 // ====================================================================
 // MY APPLICATIONS
 // ====================================================================
+// ====================================================================
+// MY APPROVAL REQUESTS — Employee Section (T1/T2/T3)
+// ====================================================================
 export const MyApplicationsPage = () => {
-  const apps = [
-    { _id: '1', event: 'Hackathon 2026', role: 'Tech Team', applied: 'Oct 10, 2026', status: 'pending' },
-    { _id: '2', event: 'Startup Pitch Day', role: 'Registration Coordinator', applied: 'Oct 5, 2026', status: 'approved' },
-    { _id: '3', event: 'Design Sprint', role: 'Media Team', applied: 'Sep 28, 2026', status: 'rejected' },
-    { _id: '4', event: 'Annual Tech Fest 2026', role: 'Tech Team', applied: 'Sep 20, 2026', status: 'waitlisted' },
-  ];
-  const statusColor = {
-    pending: 'bg-amber-100 text-amber-700',
-    approved: 'bg-green-100 text-green-700',
-    rejected: 'bg-red-100 text-red-700',
-    waitlisted: 'bg-blue-100 text-blue-700',
+  const { user } = useAuth();
+  const { socket } = useSocket();
+  const [apps, setApps] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [showRaiseModal, setShowRaiseModal] = useState(false);
+  const [successToast, setSuccessToast] = useState('');
+
+  const fetchMyRequests = async () => {
+    try {
+      const [res, teamsRes] = await Promise.all([
+        api.get('/applications/me'),
+        api.get('/teams/my-teams').catch(() => ({ data: { data: [] } })),
+      ]);
+      setApps(res.data?.data || []);
+      setTeams(teamsRes.data?.data || teamsRes.data || []);
+    } catch (err) {
+      console.error('Failed to load my requests:', err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchMyRequests();
+  }, []);
+
+  // Live update when team lead approves/denies or new notification arrives
+  useEffect(() => {
+    if (!socket) return;
+    const handleNotification = (notif) => {
+      if (notif.type === 'application' || notif.type === 'attendance') {
+        fetchMyRequests();
+      }
+    };
+    socket.on('notification:new', handleNotification);
+    return () => socket.off('notification:new', handleNotification);
+  }, [socket]);
+
+  const filtered = apps.filter((a) => {
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'rejected' && !(a.status === 'rejected' || a.status === 'denied')) return false;
+      if (statusFilter !== 'rejected' && a.status !== statusFilter) return false;
+    }
+    if (typeFilter !== 'all' && a.requestType !== typeFilter) return false;
+    return true;
+  });
+
+  const total = apps.length;
+  const pending = apps.filter((a) => a.status === 'pending').length;
+  const approved = apps.filter((a) => a.status === 'approved').length;
+  const rejected = apps.filter((a) => a.status === 'rejected' || a.status === 'denied').length;
+
+  const statusBadge = (status) => {
+    if (status === 'approved') {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">Approved</span>;
+    }
+    if (status === 'rejected' || status === 'denied') {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">Denied</span>;
+    }
+    if (status === 'waitlisted') {
+      return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Waitlist</span>;
+    }
+    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Pending Review</span>;
+  };
+
+  const typeBadge = (type) => {
+    if (type === 'half_day') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <Clock className="w-3 h-3" /> Half Day
+        </span>
+      );
+    }
+    if (type === 'leave') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+          <Calendar className="w-3 h-3" /> Full Day Leave
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+        <FileText className="w-3 h-3" /> Application
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <SkeletonTable rows={4} cols={3} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">My Applications</h1>
-        <p className="text-gray-500">Track all your event applications</p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Approval Requests</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Request leave or half-day and track approval status from your team lead</p>
+        </div>
+        <button
+          onClick={() => setShowRaiseModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium shadow-sm transition"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Raise Request</span>
+        </button>
       </div>
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: 'Total', value: apps.length, color: 'text-gray-900' },
-          { label: 'Pending', value: apps.filter(a => a.status === 'pending').length, color: 'text-amber-600' },
-          { label: 'Approved', value: apps.filter(a => a.status === 'approved').length, color: 'text-green-600' },
-          { label: 'Rejected', value: apps.filter(a => a.status === 'rejected').length, color: 'text-red-600' },
-        ].map((s) => (
-          <div key={s.label} className="bg-white p-4 rounded-xl border border-gray-200">
-            <p className="text-xs text-gray-500">{s.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+
+      {successToast && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span>{successToast}</span>
           </div>
-        ))}
+          <button onClick={() => setSuccessToast('')} className="text-emerald-600 hover:text-emerald-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* KPI Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-gray-500">Total Submitted</p>
+          <p className="text-2xl font-bold mt-1 text-gray-900">{total}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-amber-600">Pending Review</p>
+          <p className="text-2xl font-bold mt-1 text-amber-600">{pending}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-green-600">Approved</p>
+          <p className="text-2xl font-bold mt-1 text-green-600">{approved}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+          <p className="text-xs font-medium text-red-600">Denied</p>
+          <p className="text-2xl font-bold mt-1 text-red-600">{rejected}</p>
+        </div>
       </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex flex-wrap items-center gap-1">
+          {[
+            { id: 'all', label: 'All Status' },
+            { id: 'pending', label: 'Pending' },
+            { id: 'approved', label: 'Approved' },
+            { id: 'rejected', label: 'Denied' },
+          ].map((pill) => (
+            <button
+              key={pill.id}
+              onClick={() => setStatusFilter(pill.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                statusFilter === pill.id
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1">
+          {[
+            { id: 'all', label: 'All Types' },
+            { id: 'leave', label: 'Leave' },
+            { id: 'half_day', label: 'Half Day' },
+          ].map((pill) => (
+            <button
+              key={pill.id}
+              onClick={() => setTypeFilter(pill.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                typeFilter === pill.id
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Requests List */}
       <div className="space-y-3">
-        {apps.map((a) => (
-          <div key={a._id} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between hover:shadow-md transition">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-blue-500" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold">{a.event}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor[a.status]}`}>{a.status}</span>
-                </div>
-                <p className="text-sm text-gray-500 mt-0.5">{a.role}</p>
-                <p className="text-xs text-gray-400 mt-1">Applied {a.applied}</p>
-              </div>
-            </div>
-            {a.status === 'approved' && <button className="text-sm px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">Open Chat</button>}
-            {a.status === 'pending' && <button className="text-sm px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Withdraw</button>}
-            {a.status === 'rejected' && <span className="text-sm text-gray-400">Application closed</span>}
-            {a.status === 'waitlisted' && <span className="text-sm text-blue-600 font-medium">On waitlist</span>}
+        {filtered.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
+            <FileCheck className="w-14 h-14 text-gray-300 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-gray-800">No approval requests</h3>
+            <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+              Need to take a full day off or a half day? Click below to submit a request directly to your T3 team lead.
+            </p>
+            <button
+              onClick={() => setShowRaiseModal(true)}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium shadow-sm transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Raise Request</span>
+            </button>
           </div>
-        ))}
+        ) : (
+          filtered.map((a) => (
+            <div
+              key={a._id}
+              className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                    a.requestType === 'half_day' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
+                  }`}>
+                    {a.requestType === 'half_day' ? <Clock className="w-5 h-5" /> : <Calendar className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-gray-900">
+                        {a.requestType === 'half_day' ? 'Half Day Request' : 'Full Day Leave Request'}
+                      </span>
+                      {typeBadge(a.requestType)}
+                      {statusBadge(a.status)}
+                    </div>
+
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                      <span className="font-medium text-gray-800">
+                        📅 For Date: <strong className="text-gray-900">{a.targetDate || 'Today'}</strong>
+                      </span>
+                      <span>Team: {a.teamName || 'Assigned Team'}</span>
+                      <span>Submitted: {new Date(a.appliedAt || Date.now()).toLocaleDateString()}</span>
+                    </div>
+
+                    {/* Reason */}
+                    <div className="mt-2 text-xs">
+                      {a.reason ? (
+                        <p className="text-gray-700 bg-gray-50 border border-gray-200/80 px-3 py-1.5 rounded-lg inline-block">
+                          <span className="font-medium text-gray-500">Your Reason:</span> "{a.reason}"
+                        </p>
+                      ) : (
+                        <span className="text-gray-400 italic">No reason specified (optional)</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Indicator */}
+                <div className="self-end sm:self-center">
+                  {statusBadge(a.status)}
+                </div>
+              </div>
+
+              {/* Status Outcome Callouts */}
+              {a.status === 'approved' && (
+                <div className="mt-3.5 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50/70 p-2.5 rounded-lg">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>
+                    Approved by <strong>{a.reviewedByName || 'Team Lead'}</strong> • Attendance marked for {a.targetDate}
+                  </span>
+                </div>
+              )}
+
+              {(a.status === 'rejected' || a.status === 'denied') && (
+                <div className="mt-3.5 pt-3 border-t border-gray-100 flex items-start gap-2 text-xs text-red-800 bg-red-50/70 p-2.5 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Request Denied by Lead.</span> Reason: "{a.rejectionReason || 'No reason specified'}"
+                  </div>
+                </div>
+              )}
+
+              {a.status === 'pending' && (
+                <div className="mt-3.5 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-amber-700">
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Awaiting review and decision from your T3 Team Lead.</span>
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
+
+      {/* Raise Request Modal */}
+      <RaiseApprovalModal
+        isOpen={showRaiseModal}
+        onClose={() => setShowRaiseModal(false)}
+        onSuccess={() => {
+          fetchMyRequests();
+          setSuccessToast('Your request has been submitted to your team lead!');
+          setTimeout(() => setSuccessToast(''), 4500);
+        }}
+        initialTeams={teams}
+      />
     </div>
   );
 };
@@ -7523,3 +8355,231 @@ const TimesheetTable = ({ rows, statusColor, showUser, onApprove, onReject, onDe
   </div>
 );
 
+// ====================================================================
+// RESET PASSWORD PAGE — public page accessed via one-time admin link
+// Route: /reset-password?token=xxx&id=xxx
+// ====================================================================
+export const ResetPasswordPage = () => {
+  const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
+  const token = searchParams.get('token');
+  const id = searchParams.get('id');
+
+  const [status, setStatus] = useState('verifying'); // verifying | valid | invalid | success
+  const [userInfo, setUserInfo] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const checks = {
+    length: newPassword.length >= 8,
+    upper: /[A-Z]/.test(newPassword),
+    lower: /[a-z]/.test(newPassword),
+    number: /[0-9]/.test(newPassword),
+    special: /[^A-Za-z0-9]/.test(newPassword),
+    match: newPassword && newPassword === confirmPassword,
+  };
+  const allValid = Object.values(checks).every(Boolean);
+
+  // Verify token on mount
+  React.useEffect(() => {
+    if (!token || !id) {
+      setStatus('invalid');
+      setErrorMsg('This reset link is missing required parameters. Please request a new link from your administrator.');
+      return;
+    }
+    const verify = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/admin/reset-password/verify?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`);
+        const data = await res.json();
+        if (data.success) {
+          setUserInfo(data.data);
+          setStatus('valid');
+        } else {
+          setStatus('invalid');
+          setErrorMsg(data.message || 'This reset link is invalid or has already been used.');
+        }
+      } catch {
+        setStatus('invalid');
+        setErrorMsg('Unable to verify the reset link. Please check your connection and try again.');
+      }
+    };
+    verify();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setFormError('');
+    if (!allValid) { setFormError('Please meet all password requirements.'); return; }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/reset-password/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, id, newPassword }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus('success');
+      } else {
+        setFormError(data.message || 'Failed to reset password. The link may have already been used.');
+      }
+    } catch {
+      setFormError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---- Verifying state ----
+  if (status === 'verifying') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-orange-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 text-sm">Verifying your reset link…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Invalid / expired token ----
+  if (status === 'invalid') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8 text-red-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Invalid or Expired</h1>
+          <p className="text-gray-500 text-sm mb-6 leading-relaxed">{errorMsg}</p>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 mb-6">
+            Reset links expire after <strong>1 hour</strong> and can only be used <strong>once</strong>. Please ask your administrator to send a new reset link.
+          </div>
+          <button onClick={() => navigate('/login')}
+            className="w-full h-11 bg-gray-900 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors">
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Success state ----
+  if (status === 'success') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-green-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Password Reset Successful!</h1>
+          <p className="text-gray-500 text-sm mb-8">
+            Your password has been updated. You can now log in with your new password.
+          </p>
+          <button onClick={() => navigate('/login', { replace: true })}
+            className="w-full h-11 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-colors">
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Valid token — show form ----
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-amber-500 to-red-500 px-8 py-7 text-center">
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold text-white">Reset Your Password</h1>
+            {userInfo && (
+              <p className="text-white/80 text-sm mt-1">
+                Setting new password for <strong>{userInfo.name}</strong>
+              </p>
+            )}
+          </div>
+
+          <div className="px-8 py-7">
+            <div className="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 flex items-start gap-2">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <span>This is a <strong>one-time link</strong>. After submitting, this link will no longer work.</span>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
+                <input
+                  id="reset-new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Create a strong password"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
+                <input
+                  id="reset-confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat your new password"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition"
+                  required
+                />
+              </div>
+
+              {/* Password strength checklist */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: 'length', label: '8+ characters' },
+                  { key: 'upper', label: 'Uppercase letter' },
+                  { key: 'lower', label: 'Lowercase letter' },
+                  { key: 'number', label: 'Number' },
+                  { key: 'special', label: 'Special character' },
+                  { key: 'match', label: 'Passwords match' },
+                ].map((c) => (
+                  <div key={c.key} className={`flex items-center gap-1.5 text-xs ${checks[c.key] ? 'text-green-600' : 'text-gray-400'}`}>
+                    {checks[c.key] ? <CheckCircle size={13} /> : <X size={13} />}
+                    <span>{c.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                  {formError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                id="reset-submit-btn"
+                disabled={loading || !allValid}
+                className="w-full h-11 bg-gradient-to-r from-amber-500 to-red-500 hover:from-amber-600 hover:to-red-600 disabled:opacity-50 text-white font-semibold rounded-lg transition-all"
+              >
+                {loading ? 'Setting Password…' : 'Set New Password'}
+              </button>
+
+              <button type="button" onClick={() => navigate('/login')}
+                className="w-full text-center text-sm text-gray-400 hover:text-gray-600 transition">
+                Cancel — go to Login
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

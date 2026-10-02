@@ -9,7 +9,7 @@ import {
   AdminManagementPage, AuditLogsPage, SessionsPage, AnalyticsPage,
   Chat, NotificationsPage, ReviewsPage, QRCheckIn, Placeholder,
   EventDetailPage, ProfilePage, MyReviewsPage,
-  ChangePasswordPage, PreferencesPage, AnnouncementsPage,
+  ChangePasswordPage, ResetPasswordPage, PreferencesPage, AnnouncementsPage,
   TimesheetPage
 } from './pages';
 
@@ -29,6 +29,7 @@ function App() {
             {/* Public */}
             <Route path="/login" element={<Login />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/" element={<RootRedirect />} />
 
             {/* Super Admin */}
@@ -81,6 +82,8 @@ function App() {
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/preferences" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />
             <Route path="/timesheets" element={<ProtectedRoute><TimesheetPage /></ProtectedRoute>} />
+            <Route path="/admin/applications" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><ApplicationsPage /></ProtectedRoute>} />
+            <Route path="/approval-requests" element={<ProtectedRoute><ApplicationsPage /></ProtectedRoute>} />
 
 
             <Route path="*" element={<Navigate to="/" replace />} />

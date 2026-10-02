@@ -226,9 +226,9 @@ If you did not expect this email, contact your TBI administrator.
 };
 
 // ====================================================================
-// OTHER EMAIL TEMPLATES (extend later)
+// PASSWORD RESET LINK EMAIL — one-time reset link sent by admin action
 // ====================================================================
-const sendPasswordResetEmail = async ({ to, name, tempPassword, loginUrl }) => {
+const sendPasswordResetLinkEmail = async ({ to, name, resetUrl }) => {
   const html = `
     <!DOCTYPE html>
     <html>
@@ -240,8 +240,8 @@ const sendPasswordResetEmail = async ({ to, name, tempPassword, loginUrl }) => {
             <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
               <tr>
                 <td style="background:linear-gradient(135deg,#f59e0b,#ef4444);padding:40px 40px 32px;text-align:center;">
-                  <h1 style="margin:0 0 8px;color:#ffffff;font-size:26px;font-weight:700;">Password Reset</h1>
-                  <p style="margin:0;color:rgba(255,255,255,0.9);font-size:15px;">Your temporary password is ready</p>
+                  <h1 style="margin:0 0 8px;color:#ffffff;font-size:26px;font-weight:700;">Password Reset Request</h1>
+                  <p style="margin:0;color:rgba(255,255,255,0.9);font-size:15px;">An administrator has initiated a password reset for your account</p>
                 </td>
               </tr>
               <tr>
@@ -250,47 +250,39 @@ const sendPasswordResetEmail = async ({ to, name, tempPassword, loginUrl }) => {
                     Hi <strong>${escapeHtml(name)}</strong>,
                   </p>
                   <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
-                    An administrator has reset your account password. Use the temporary password below to sign in.
+                    An administrator has sent you a secure link to reset your password. Click the button below to set a new password for your TBI account.
                   </p>
-                  
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:24px;">
+
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                     <tr>
-                      <td style="padding:24px;">
-                        <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">
-                          New Temporary Password
-                        </p>
-                        <p style="margin:0;font-size:20px;color:#111827;font-weight:700;font-family:'Courier New',monospace;letter-spacing:2px;text-align:center;padding:12px;background:#ffffff;border-radius:6px;border:1px dashed #d1d5db;">
-                          ${tempPassword}
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                  
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:6px;margin-bottom:24px;">
-                    <tr>
-                      <td style="padding:16px;">
-                        <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#92400e;">
-                          One-Time Use Only
-                        </p>
-                        <p style="margin:0;font-size:13px;color:#78350f;line-height:1.5;">
-                          This password can only be used <strong>once</strong>. You will be required to set a new password immediately after signing in.
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                  
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td align="center" style="padding:8px 0 32px;">
-                        <a href="${loginUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">
-                          Sign In Now
+                      <td align="center" style="padding:8px 0;">
+                        <a href="${resetUrl}" style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#ef4444);color:#ffffff;text-decoration:none;padding:16px 40px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.3px;">
+                          &#128274;&nbsp; Reset My Password
                         </a>
                       </td>
                     </tr>
                   </table>
-                  
+
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:6px;margin-bottom:24px;">
+                    <tr>
+                      <td style="padding:16px;">
+                        <p style="margin:0 0 6px;font-size:14px;font-weight:600;color:#92400e;">
+                          &#9888; One-Time Use &amp; Expires in 1 Hour
+                        </p>
+                        <p style="margin:0;font-size:13px;color:#78350f;line-height:1.5;">
+                          This link can only be used <strong>once</strong> and will expire <strong>1 hour</strong> after it was sent. Do not share this link with anyone.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="margin:0 0 16px;font-size:12px;color:#9ca3af;line-height:1.6;">
+                    If the button doesn't work, copy and paste this link into your browser:<br>
+                    <span style="color:#0EA5E9;word-break:break-all;">${resetUrl}</span>
+                  </p>
+
                   <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
-                    If you did not request this reset, contact your TBI administrator immediately.
+                    If you did not expect this email, you can safely ignore it. Your password will not change until you use this link.
                   </p>
                 </td>
               </tr>
@@ -314,17 +306,19 @@ Password Reset - TBI Platform
 
 Hi ${name},
 
-Your password has been reset. Use this temporary password to sign in:
-  ${tempPassword}
+An administrator has sent you a secure one-time link to reset your password.
 
-IMPORTANT: This password is one-time use only. You will be forced to set a new password after signing in.
+Click the link below to set a new password:
+${resetUrl}
 
-Sign in: ${loginUrl}
+IMPORTANT: This link can only be used ONCE and expires in 1 hour. Do not share it.
+
+If you did not expect this email, you can safely ignore it.
   `;
 
   return await sendEmail({
     to,
-    subject: 'Your TBI Password Has Been Reset',
+    subject: 'Password Reset Link — TBI Platform',
     html,
     text,
   });
@@ -651,7 +645,7 @@ You can now use this email to log in to the portal.
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
-  sendPasswordResetEmail,
+  sendPasswordResetLinkEmail,
   sendProfileUpdatedEmail,
   sendPasswordChangedEmail,
   sendEmailChangedEmail,
