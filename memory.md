@@ -170,3 +170,12 @@ to prevent record injection and personal-data exposure; notification contents an
 preferences are preserved. Regression tests exercise authorized TEAM announcements.
 The active services lack the documented Winston logger/dependency; this scoped fix
 retains their existing console sink. The security investigation authorizes the fix.
+
+## Team timesheet listing security — 2026-10-02
+
+Team listing requires a scalar 24-character hexadecimal team ID before lookup,
+then queries timesheets using the authorized team's persisted ID in both server
+copies. Express bracket selectors previously passed through Mongoose and could
+combine led and foreign teams. HTTP regression tests cover selectors, malformed
+IDs, leadership, authentication and valid filtered reads with synthetic collection
+IO. The security investigation authorizes this fix; human review is required before merge.

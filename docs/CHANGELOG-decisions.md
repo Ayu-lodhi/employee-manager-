@@ -124,3 +124,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Keep only fixed email/SMS queue status messages in both notification service copies; add announcement-flow regression coverage for forged lines, control characters, preserved content and delivery preferences.
 - Reason: Confirmed authorized team announcements could inject process-log records through title/message text. The security investigation authorizes the fix. Removing unnecessary recipient/content fields also avoids exposing personal data. The active services have no Winston dependency or implemented shared logger, so this bounded fix retains their existing console sink.
 - Where: `apps/api/src/modules/notifications/notifications.service.js`, `apps/web/server/modules/notifications/notifications.service.js`, corresponding `__tests__/delivery.test.js`, `memory.md`.
+
+### [2026-10-02] Bind team timesheet listing to the authorized team
+- What: Validate a scalar ObjectId before team lookup and use the authorized team's persisted ID for timesheet reads in both server copies; add HTTP/service regression tests.
+- Reason: Confirmed Express bracket selectors and Mongoose operator casting allowed a lead to select foreign-team timesheets after authorization against one led team. The security investigation authorizes this scoped fix; human review is required before merge.
+- Where: `apps/api/src/modules/timesheets/timesheets.service.js`, `apps/web/server/modules/timesheets/timesheets.service.js`, corresponding `__tests__/timesheets.test.js`, `memory.md`.

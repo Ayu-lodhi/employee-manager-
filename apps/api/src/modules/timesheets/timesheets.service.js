@@ -118,13 +118,16 @@ class TimesheetService {
 
   // ⭐ T3 views their team's timesheets
   async getTeamTimesheets(userId, teamId, date) {
+    if (typeof teamId !== 'string' || !/^[a-f\d]{24}$/i.test(teamId)) {
+      throw new ValidationError('Invalid teamId');
+    }
     const team = await Team.findById(teamId);
     if (!team) throw new Error('Team not found');
 
     const isLead = team.leadId && team.leadId.toString() === userId;
     if (!isLead) throw new Error('Only the team lead can view team timesheets');
 
-    const query = { teamId };
+    const query = { teamId: team._id };
     if (date) query.date = date;
 
     return await Timesheet.find(query).sort({ date: -1, userName: 1 }).limit(200);
