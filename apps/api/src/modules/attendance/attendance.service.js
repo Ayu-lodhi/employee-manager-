@@ -1,6 +1,19 @@
 const Attendance = require('./attendance.model');
 const Team = require('../teams/teams.model');
 const User = require('../admin/admin.model');
+const { assertTeamAttendanceAccess } = require('./attendance.permissions');
+const { ValidationError, NotFoundError } = require('../../core/errors/typedErrors');
+
+const getReadableTeam = async (teamId, requester) => {
+  // A single ID keeps the authorized team and the attendance query identical.
+  if (typeof teamId !== 'string' || !/^[a-f\d]{24}$/i.test(teamId)) {
+    throw new ValidationError('Invalid teamId');
+  }
+  const team = await Team.findById(teamId);
+  if (!team) throw new NotFoundError('Team not found');
+  assertTeamAttendanceAccess(team, requester);
+  return team;
+};
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -174,10 +187,10 @@ class AttendanceService {
   }
 
   // Get today's attendance for a team
-  async getTeamAttendance(teamId, date) {
+  async getTeamAttendance(teamId, date, requester) {
     const targetDate = date || today();
-    const team = await Team.findById(teamId).populate('members', 'name email role');
-    if (!team) throw new Error('Team not found');
+    const team = await getReadableTeam(teamId, requester);
+    await team.populate('members', 'name email role');
 
     const existing = await Attendance.find({ teamId, date: targetDate });
 
@@ -212,10 +225,10 @@ class AttendanceService {
   }
 
   // Team attendance stats (percentage, breakdown)
-  async getTeamAttendanceStats(teamId, date) {
+  async getTeamAttendanceStats(teamId, date, requester) {
     const targetDate = date || today();
-    const team = await Team.findById(teamId).populate('members', 'name');
-    if (!team) throw new Error('Team not found');
+    const team = await getReadableTeam(teamId, requester);
+    await team.populate('members', 'name');
 
     const total = team.members.length;
     const records = await Attendance.find({ teamId, date: targetDate });
@@ -243,9 +256,9 @@ class AttendanceService {
   }
 
   // Historical attendance percentage for a team (last N days)
-  async getTeamAttendanceHistory(teamId, days = 7) {
-    const team = await Team.findById(teamId).populate('members', 'name');
-    if (!team) throw new Error('Team not found');
+  async getTeamAttendanceHistory(teamId, days = 7, requester) {
+    const team = await getReadableTeam(teamId, requester);
+    await team.populate('members', 'name');
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - (days - 1));
@@ -348,9 +361,9 @@ class AttendanceService {
   }
 
   // Download attendance sheet as CSV
-  async getAttendanceSheet(teamId, fromDate, toDate) {
-    const team = await Team.findById(teamId).populate('members', 'name email');
-    if (!team) throw new Error('Team not found');
+  async getAttendanceSheet(teamId, fromDate, toDate, requester) {
+    const team = await getReadableTeam(teamId, requester);
+    await team.populate('members', 'name email');
 
     const query = { teamId };
     if (fromDate && toDate) {
