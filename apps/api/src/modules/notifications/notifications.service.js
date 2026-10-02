@@ -11,13 +11,14 @@ const shouldSend = (prefs, channel, type) => {
 };
 
 // Simulated email/SMS queue (replace with real BullMQ + SendGrid/Twilio later)
+// Log only fixed status text: recipient/content data can forge records or expose PII.
 const queueEmail = async (to, subject, body) => {
-  console.log(`[EMAIL QUEUED] to=${to} subject="${subject}"`);
+  console.log('[EMAIL QUEUED]');
   // TODO: emailQueue.add('sendEmail', { to, subject, body });
 };
 
 const queueSMS = async (to, body) => {
-  console.log(`[SMS QUEUED] to=${to} body="${body}"`);
+  console.log('[SMS QUEUED]');
   // TODO: smsQueue.add('sendSMS', { to, body });
 };
 
