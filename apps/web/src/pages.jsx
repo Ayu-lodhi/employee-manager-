@@ -5413,14 +5413,37 @@ export const ProfilePage = () => {
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [form, setForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    phone: '+91 98765 43210',
-    bio: 'Passionate about building products and leading teams.',
-    skills: 'React, Node.js, UI/UX',
-    availability: 'Weekends, Evenings',
+    phone: '',
+    bio: '',
+    skills: '',
+    availability: '',
   });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await api.get('/auth/profile');
+        if (res.data?.data) {
+          const u = res.data.data;
+          setForm({
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phone || '',
+            bio: u.bio || '',
+            skills: u.skills || '',
+            availability: u.availability || '',
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const [pwdForm, setPwdForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [showOldPwd, setShowOldPwd] = useState(false);
@@ -5430,14 +5453,19 @@ export const ProfilePage = () => {
   const [pwdSuccess, setPwdSuccess] = useState('');
   const [pwdError, setPwdError] = useState('');
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+    setSaveError('');
+    try {
+      await api.patch('/auth/profile', form);
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    }, 800);
+      setTimeout(() => setSaved(false), 4000);
+    } catch (err) {
+      setSaveError(err.response?.data?.message || err.message || 'Failed to update details');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleChangePassword = async (e) => {

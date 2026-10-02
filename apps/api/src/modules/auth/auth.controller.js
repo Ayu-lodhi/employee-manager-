@@ -35,6 +35,24 @@ exports.getMe = async (req, res) => {
   }
 };
 
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await authService.getUserById(req.user.sub);
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    res.status(404).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const updated = await authService.updateProfile(req.user.sub, req.body);
+    res.status(200).json({ success: true, message: 'Profile updated successfully', data: updated });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 exports.changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;

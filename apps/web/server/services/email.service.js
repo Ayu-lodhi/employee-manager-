@@ -330,8 +330,172 @@ Sign in: ${loginUrl}
   });
 };
 
+const sendProfileUpdatedEmail = async ({ to, name, updatedFields = [], byAdmin = false }) => {
+  const fieldsFormatted = updatedFields
+    .map((f) => f.charAt(0).toUpperCase() + f.slice(1))
+    .join(', ') || 'Account details';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#2563eb,#1d4ed8);padding:36px 40px 28px;text-align:center;">
+                  <h1 style="margin:0 0 8px;color:#ffffff;font-size:24px;font-weight:700;">Account Details Updated</h1>
+                  <p style="margin:0;color:rgba(255,255,255,0.9);font-size:14px;">Your profile changes have been saved</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:36px 40px;">
+                  <p style="margin:0 0 16px;font-size:16px;color:#111827;line-height:1.6;">
+                    Hi <strong>${escapeHtml(name)}</strong>,
+                  </p>
+                  <p style="margin:0 0 20px;font-size:15px;color:#4b5563;line-height:1.6;">
+                    ${byAdmin ? 'An administrator has updated' : 'You have recently updated'} your profile details on the TBI Platform.
+                  </p>
+                  
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:24px;">
+                    <tr>
+                      <td style="padding:20px;">
+                        <p style="margin:0 0 8px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">
+                          Modified Fields
+                        </p>
+                        <p style="margin:0;font-size:15px;color:#0f172a;font-weight:600;">
+                          ${escapeHtml(fieldsFormatted)}
+                        </p>
+                        <p style="margin:12px 0 0;font-size:13px;color:#64748b;">
+                          Date & Time: ${new Date().toUTCString()}
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
+                    If you did not make or authorize this change, please contact your TBI administrator immediately.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;">
+                  <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                    TBI Workforce Platform — Automated notification. Do not reply.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const text = `
+Account Details Updated - TBI Platform
+
+Hi ${name},
+
+${byAdmin ? 'An administrator has updated' : 'You have recently updated'} your profile details.
+Updated fields: ${fieldsFormatted}
+Timestamp: ${new Date().toUTCString()}
+
+If you did not authorize this change, please contact your administrator.
+  `;
+
+  return await sendEmail({
+    to,
+    subject: 'Your TBI Account Details Have Been Updated',
+    html,
+    text,
+  });
+};
+
+const sendPasswordChangedEmail = async ({ to, name, byAdmin = false }) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#10b981,#059669);padding:36px 40px 28px;text-align:center;">
+                  <h1 style="margin:0 0 8px;color:#ffffff;font-size:24px;font-weight:700;">Password Changed Successfully</h1>
+                  <p style="margin:0;color:rgba(255,255,255,0.9);font-size:14px;">Security notification for your TBI account</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:36px 40px;">
+                  <p style="margin:0 0 16px;font-size:16px;color:#111827;line-height:1.6;">
+                    Hi <strong>${escapeHtml(name)}</strong>,
+                  </p>
+                  <p style="margin:0 0 20px;font-size:15px;color:#4b5563;line-height:1.6;">
+                    The password for your TBI account (<strong>${escapeHtml(to)}</strong>) was ${byAdmin ? 'changed by an administrator' : 'successfully updated'}.
+                  </p>
+                  
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ecfdf5;border-left:4px solid #10b981;border-radius:6px;margin-bottom:24px;">
+                    <tr>
+                      <td style="padding:16px;">
+                        <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#065f46;">
+                          Security Confirmation
+                        </p>
+                        <p style="margin:0;font-size:13px;color:#047857;line-height:1.5;">
+                          Your previous password is no longer valid. You can now use your new password to sign in.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
+                    <strong>Notice:</strong> If you did not make this change, your account may be compromised. Please notify your TBI administrator immediately.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;">
+                  <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                    TBI Workforce Platform — Automated security notification. Do not reply.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const text = `
+Password Changed - TBI Platform
+
+Hi ${name},
+
+The password for your account (${to}) was successfully updated.
+Your previous password is no longer valid.
+
+If you did not perform or authorize this action, please alert your administrator immediately.
+  `;
+
+  return await sendEmail({
+    to,
+    subject: 'Security Alert: Your TBI Password Has Been Changed',
+    html,
+    text,
+  });
+};
+
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
   sendPasswordResetEmail,
+  sendProfileUpdatedEmail,
+  sendPasswordChangedEmail,
 };

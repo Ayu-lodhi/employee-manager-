@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const User = require('./admin.model');
-const { sendWelcomeEmail, sendPasswordResetEmail } = require('../../services/email.service');
+const { sendWelcomeEmail, sendPasswordResetEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail } = require('../../services/email.service');
 
 const generateDefaultPassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -53,6 +53,16 @@ exports.updateUser = async (id, data) => {
 
   const user = await User.findByIdAndUpdate(id, safeData, { new: true }).select('-password');
   if (!user) throw new Error('User not found');
+
+  if (Object.keys(safeData).length > 0) {
+    sendProfileUpdatedEmail({
+      to: user.email,
+      name: user.name,
+      updatedFields: Object.keys(safeData),
+      byAdmin: true,
+    }).catch((err) => console.error('Admin profile update email failed:', err.message));
+  }
+
   return user;
 };
 
@@ -197,5 +207,12 @@ exports.setPassword = async (id, newPassword, adminId) => {
   user.password = await bcrypt.hash(newPassword, 12);
   user.mustChangePassword = false;
   await user.save();
+
+  sendPasswordChangedEmail({
+    to: user.email,
+    name: user.name,
+    byAdmin: true,
+  }).catch((err) => console.error('Admin set-password email failed:', err.message));
+
   return { user: user.toObject({ virtuals: false }) };
 };

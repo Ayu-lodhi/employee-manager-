@@ -4,6 +4,7 @@ const User = require('../admin/admin.model');
 const repository = require('./auth.repository');
 const tokens = require('./auth.tokens');
 const mfa = require('./mfa.service');
+const { sendProfileUpdatedEmail, sendPasswordChangedEmail } = require('../../services/email.service');
 
 exports.login = async (email, password) => {
   if (typeof email !== 'string' || typeof password !== 'string') throw new Error('Invalid credentials');
@@ -75,6 +76,31 @@ exports.getUserById = async (id) => {
   return user;
 };
 
+exports.updateProfile = async (userId, data) => {
+  const user = await User.findById(userId);
+  if (!user) throw new Error('User not found');
+
+  const allowed = ['name', 'phone', 'skills', 'bio', 'availability'];
+  const changes = [];
+  allowed.forEach((k) => {
+    if (data[k] !== undefined && data[k] !== user[k]) {
+      changes.push(k);
+      user[k] = data[k];
+    }
+  });
+
+  if (changes.length > 0) {
+    await user.save();
+    sendProfileUpdatedEmail({
+      to: user.email,
+      name: user.name,
+      updatedFields: changes,
+    }).catch((err) => console.error('Profile update email failed:', err.message));
+  }
+
+  return user.toObject({ virtuals: false });
+};
+
 exports.changePassword = async (credential, oldPassword, newPassword) => {
   const user = await repository.findById(credential.sub);
   if (!user?.isActive || credential.authState !== tokens.authState(user)) {
@@ -108,6 +134,11 @@ exports.changePassword = async (credential, oldPassword, newPassword) => {
   if (await bcrypt.compare(newPassword, user.password)) throw new Error('New password must differ from the current password');
   const updated = await repository.replacePassword(user, await bcrypt.hash(newPassword, 12));
   if (!updated) throw new Error('Credentials changed; sign in again');
+
+  sendPasswordChangedEmail({
+    to: user.email,
+    name: user.name,
+  }).catch((err) => console.error('Password changed email failed:', err.message));
 
   return { success: true };
 };
