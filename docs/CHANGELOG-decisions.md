@@ -104,7 +104,6 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Pass the authenticated requester into membership services, require team leadership or administrative authority, and validate membership and protected team/event roles before cascade writes.
 - Reason: Confirmed unrelated T3 callers could mutate teams, user assignments and event rosters. The security investigation authorizes this fix; human review is required before merge. Preserve the mounted role gate and shared role constants without introducing a broader RBAC migration.
 - Where: apps/api/src/modules/teams/teams.controller.js, teams.service.js, __tests__/teams.test.js; memory.md.
-
 ### [2026-10-01] Restrict event updates to literal editable fields
 - What: Validate event PATCH data against an explicit field/type allowlist at the repository boundary; the active base repository rejects pipeline/operator input and constructs `$set` updates. Add HTTP and repository regression coverage.
 - Reason: Confirmed an authenticated administrator could pass a `$function` pipeline through Mongoose validation to database IO. The security investigation authorizes this fix. Preserve the editor fields (including clearing an unselected head) and lifecycle status; membership, derived counters and audit fields are not generic edits.
@@ -144,3 +143,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Reject team bindings on generic room creation in both server copies; check current team/account records for team-room reads, socket delivery and management. Team initialization replaces legacy ownership and membership with the authorized requester and current roster; manual additions require team eligibility.
 - Reason: Confirmed an unrelated executive could pre-create a tagged room that initialization adopted, retaining message access and deletion authority. The security investigation authorizes this fix; human review is required before merge. Per-operation checks also protect previously poisoned rooms and application-approval auto-joins without a data migration. Uniqueness is not used as an authorization control: every tagged room is checked against its stored team.
 - Where: `apps/api/src/modules/chat/chat.service.js`, `apps/web/server/modules/chat/chat.service.js`, corresponding `__tests__/chat.test.js`, `memory.md`.
+
+### [2026-10-01] Require TLS for SMTP delivery
+- **What**: Require STARTTLS for configured and Ethereal SMTP transports, retaining default certificate verification and failing delivery if TLS cannot be established.
+- **Reason**: Security investigation confirmed plaintext SMTP authentication when STARTTLS was omitted; temporary account passwords use the same transport. Fix authorized by the investigation request.
+- **Where**: `apps/api/src/services/email.service.js`, `apps/api/src/services/__tests__/email.test.js`, `memory.md`

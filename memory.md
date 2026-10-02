@@ -135,7 +135,6 @@ preserves the direct event restriction on adding T3 executives. The mounted role
 gate remains in place; permission middleware and the team repository are unused
 scaffolds in this flow. The security investigation authorizes this fix; human
 review is required before merge.
-
 ## Event update security — 2026-10-01
 
 Event updates validate a nonempty object containing only literal editor fields
@@ -207,3 +206,10 @@ and authorized requester. Manual additions require team eligibility; ordinary
 rooms retain creator-based management. No uniqueness migration is needed for the
 authorization boundary because each tagged room is independently checked.
 The security investigation authorizes the fix; human review is required before merge.
+
+## SMTP transport security — 2026-10-01
+
+Configured and Ethereal SMTP transports require STARTTLS before authentication or
+mail delivery. Certificate verification retains Nodemailer/Node defaults; TLS
+failure returns the existing unsuccessful email result. Local SMTP regression
+tests cover omitted/rejected STARTTLS and rejected EHLO for both modes.
