@@ -109,3 +109,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Validate event PATCH data against an explicit field/type allowlist at the repository boundary; the active base repository rejects pipeline/operator input and constructs `$set` updates. Add HTTP and repository regression coverage.
 - Reason: Confirmed an authenticated administrator could pass a `$function` pipeline through Mongoose validation to database IO. The security investigation authorizes this fix. Preserve the editor fields (including clearing an unselected head) and lifecycle status; membership, derived counters and audit fields are not generic edits.
 - Where: `apps/api/src/core/BaseRepository.js`, `apps/api/src/modules/events/events.repository.js`, `events.validator.js`, `__tests__/events.test.js`, `memory.md`. The common-JS base repository currently has only the event repository as a consumer; the separate scaffold in `core/database/` is unaffected.
+
+### [2026-10-02] Limit new passwords to bcrypt's byte boundary
+- What: Reject new passwords exceeding 72 UTF-8 bytes before composition checks and hashing in self-service replacement and administrative setting, including deployed server copies; add byte-boundary regression tests.
+- Reason: Installed bcryptjs 2.4.3 accepts the 72-byte prefix when required character classes occur only in the discarded suffix. Existing authentication controls do not mitigate this policy bypass. The security investigation authorizes this fix; auth changes require human review before merge.
+- Where: `apps/api/src/modules/{auth,admin}/*.service.js`, `apps/web/server/modules/{auth,admin}/*.service.js`, auth `__tests__/password-bytes.test.js` in both server trees, `memory.md`.
