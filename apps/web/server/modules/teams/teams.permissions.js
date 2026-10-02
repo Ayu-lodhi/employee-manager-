@@ -1,5 +1,8 @@
-import { PERMISSIONS } from '@tbi/shared-constants';
+const PRIVILEGED_ROLES = ['SUPER_ADMIN', 'ADMIN'];
 
-export const TEAMS_PERMISSIONS = Object.freeze({
-  // Granular permissions mapped for teams
-});
+// Match the mounted team's administrative roles and member/lead read access.
+exports.canReadTeamContacts = (team, requester) => Boolean(requester?.sub && (
+  PRIVILEGED_ROLES.includes(requester.role) ||
+  team.leadId?.toString() === requester.sub ||
+  (team.members && team.members.some(memberId => memberId.toString() === requester.sub))
+));

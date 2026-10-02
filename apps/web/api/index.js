@@ -16,9 +16,10 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ayushlodhi88_db_user:9
 
 export default async function handler(req, res) {
   if (initError) {
-    return res.status(500).json({
+    console.error('Server initialization error:', initError);
+    return res.status(503).json({
       success: false,
-      message: 'Server failed to initialize: ' + initError.message,
+      message: 'Service is temporarily unavailable. Please try again shortly.',
     });
   }
 
@@ -34,5 +35,13 @@ export default async function handler(req, res) {
     req.url = '/api' + req.url;
   }
 
-  return app(req, res);
+  try {
+    return app(req, res);
+  } catch (err) {
+    console.error('Unhandled serverless error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'An unexpected error occurred. Please try again shortly.',
+    });
+  }
 }

@@ -299,13 +299,22 @@ export const Login = () => {
       try {
         data = await res.json();
       } catch {
-        throw new Error(`Server error (${res.status}): Please check backend logs`);
+        throw new Error('Unable to connect to the server. Please try again shortly.');
       }
       if (!data.success) throw new Error(data.message || 'Login failed');
       login(data.data.user, data.data.accessToken);
       navigate(ROLES[data.data.user.role].route);
     } catch (err) {
-      setError(err.message || 'Login failed');
+      const raw = err?.message || '';
+      if (/invalid|incorrect|credential|password|email/i.test(raw) && !/server|init|import|syntax|failed/i.test(raw)) {
+        setError('Invalid username or password. Please verify your credentials.');
+      } else if (/rate limit|too many/i.test(raw)) {
+        setError('Too many login attempts. Please wait a moment and try again.');
+      } else if (/inactive|blocked|disabled|suspended/i.test(raw)) {
+        setError('Your account is inactive. Please contact the administrator.');
+      } else {
+        setError('Unable to sign in right now. Please try again in a few moments.');
+      }
     } finally {
       setLoading(false);
     }
@@ -2975,7 +2984,16 @@ export const RaiseApprovalModal = ({ isOpen, onClose, onSuccess, initialTeams = 
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit request');
+      const raw = err.response?.data?.message || err.message || '';
+      if (/already have|duplicate|already applied/i.test(raw)) {
+        setError(raw);
+      } else if (/team.*required/i.test(raw)) {
+        setError('Please select a team before submitting.');
+      } else if (/date.*required/i.test(raw)) {
+        setError('Please choose a valid date for your request.');
+      } else {
+        setError('Unable to submit your request at this time. Please try again shortly.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -3129,7 +3147,12 @@ export const DenyApprovalModal = ({ isOpen, onClose, onConfirm, app }) => {
       await onConfirm(app._id, reason.trim());
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to deny request');
+      const raw = err.response?.data?.message || err.message || '';
+      if (/not authorized/i.test(raw)) {
+        setError('You are not authorized to review this request.');
+      } else {
+        setError('Unable to process request denial. Please try again shortly.');
+      }
     } finally {
       setSubmitting(false);
     }
