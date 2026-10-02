@@ -231,3 +231,10 @@ relationship for T3 or an administrative role, matching the attendance page's
 single team ID before access checks and attendance reads. Regression tests cover
 cross-team denial and allowed reads. Fix authorized by the security investigation
 request; authorization changes require human review before merge.
+
+## Attendance history interval limit — 2026-10-01
+
+Team attendance history accepts integer intervals from 1 to 30 days, defaulting
+to seven only when omitted. The service validates raw query input before database
+access and row generation, including direct calls. This bounds synchronous work;
+the existing UI's seven-day history remains supported.

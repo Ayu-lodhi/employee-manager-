@@ -4,6 +4,9 @@ const User = require('../admin/admin.model');
 const { assertTeamAttendanceAccess } = require('./attendance.permissions');
 const { ValidationError, NotFoundError } = require('../../core/errors/typedErrors');
 
+// Bound history generation to the module's 30-day reporting window.
+const MAX_TEAM_HISTORY_DAYS = 30;
+
 const getReadableTeam = async (teamId, requester) => {
   // A single ID keeps the authorized team and the attendance query identical.
   if (typeof teamId !== 'string' || !/^[a-f\d]{24}$/i.test(teamId)) {
@@ -257,6 +260,13 @@ class AttendanceService {
 
   // Historical attendance percentage for a team (last N days)
   async getTeamAttendanceHistory(teamId, days = 7, requester) {
+    if (typeof days === 'string') {
+      days = /^\d+$/.test(days) ? Number(days) : NaN;
+    }
+    if (!Number.isInteger(days) || days < 1 || days > MAX_TEAM_HISTORY_DAYS) {
+      throw new ValidationError(`days must be an integer between 1 and ${MAX_TEAM_HISTORY_DAYS}`);
+    }
+
     const team = await getReadableTeam(teamId, requester);
     await team.populate('members', 'name');
 
