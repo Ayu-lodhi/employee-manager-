@@ -18,6 +18,7 @@ router.post('/users/:id/revoke', restrictTo('SUPER_ADMIN'), auditLog('ACCESS_REV
 router.post('/users/:id/reactivate', restrictTo('SUPER_ADMIN'), auditLog('ACCESS_REACTIVATED'), adminController.reactivateUser);
 router.post('/users/:id/reset-password', restrictTo('SUPER_ADMIN'), auditLog('PASSWORD_RESET'), adminController.resetPassword);
 router.post('/users/:id/set-password', restrictTo('SUPER_ADMIN'), auditLog('PASSWORD_SET'), adminController.setPassword);
+router.post('/users/:id/change-email', restrictTo('SUPER_ADMIN'), auditLog('EMAIL_CHANGED'), adminController.changeEmail);
 router.delete('/users/:id', restrictTo('SUPER_ADMIN'), auditLog('USER_DELETED'), adminController.deleteUser);
 
 module.exports = router;

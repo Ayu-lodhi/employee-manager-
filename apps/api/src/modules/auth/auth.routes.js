@@ -9,6 +9,7 @@ router.post('/mfa/verify', authController.verifyMfa);
 router.get('/me', protect, authController.getMe);
 router.get('/profile', protect, authController.getProfile);
 router.patch('/profile', protect, authController.updateProfile);
+router.post('/change-email', protect, authController.changeEmail);
 router.post('/change-password', protectPasswordChange, authController.changePassword);
 
 module.exports = router;

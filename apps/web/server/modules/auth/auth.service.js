@@ -4,7 +4,7 @@ const User = require('../admin/admin.model');
 const repository = require('./auth.repository');
 const tokens = require('./auth.tokens');
 const mfa = require('./mfa.service');
-const { sendProfileUpdatedEmail, sendPasswordChangedEmail } = require('../../services/email.service');
+const { sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
 
 exports.login = async (email, password) => {
   if (typeof email !== 'string' || typeof password !== 'string') throw new Error('Invalid credentials');
@@ -141,4 +141,49 @@ exports.changePassword = async (credential, oldPassword, newPassword) => {
   }).catch((err) => console.error('Password changed email failed:', err.message));
 
   return { success: true };
+};
+
+exports.changeEmail = async (credential, newEmail, currentPassword) => {
+  if (typeof newEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim())) {
+    throw new Error('Please enter a valid email address');
+  }
+  const cleanEmail = newEmail.trim().toLowerCase();
+
+  const user = await repository.findById(credential.sub);
+  if (!user?.isActive) throw new Error('Account not found or inactive');
+
+  if (user.email.toLowerCase() === cleanEmail) {
+    throw new Error('New email must be different from current email');
+  }
+
+  if (typeof currentPassword !== 'string' || !user.password || !user.password.startsWith('$2') ||
+      !(await bcrypt.compare(currentPassword, user.password))) {
+    throw new Error('Current password is incorrect');
+  }
+
+  const existing = await repository.findByEmail(cleanEmail);
+  if (existing && String(existing._id) !== String(user._id)) {
+    throw new Error('This email address is already in use by another account');
+  }
+
+  const oldEmail = user.email;
+  user.email = cleanEmail;
+  await user.save();
+
+  sendEmailChangedEmail({
+    oldEmail,
+    newEmail: cleanEmail,
+    name: user.name,
+    byAdmin: false,
+  }).catch((err) => console.error('Change email notification failed:', err.message));
+
+  return {
+    email: user.email,
+    user: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  };
 };

@@ -110,8 +110,16 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('tbi_token');
   };
 
+  const updateUser = (updatedFields) => {
+    setUser((prev) => {
+      const next = { ...prev, ...updatedFields };
+      localStorage.setItem('tbi_user', JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, initializing }}>
+    <AuthContext.Provider value={{ user, login, logout, initializing, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -1178,6 +1186,11 @@ export const UserManagement = () => {
   const [settingPassword, setSettingPassword] = useState(false);
   const [setPasswordError, setSetPasswordError] = useState('');
   const [setPasswordSuccess, setSetPasswordSuccess] = useState('');
+  const [changeEmailModal, setChangeEmailModal] = useState(null);
+  const [targetNewEmail, setTargetNewEmail] = useState('');
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [changeEmailError, setChangeEmailError] = useState('');
+  const [changeEmailSuccess, setChangeEmailSuccess] = useState('');
 
   // Fetch users
   const fetchUsers = async () => {
@@ -1263,6 +1276,35 @@ export const UserManagement = () => {
       setSetPasswordError(err.response?.data?.message || err.message || 'Failed to set password');
     } finally {
       setSettingPassword(false);
+    }
+  };
+
+  // Change user email (Super Admin only)
+  const handleAdminChangeEmail = async (e) => {
+    e.preventDefault();
+    if (!changeEmailModal) return;
+    setChangeEmailError('');
+    setChangeEmailSuccess('');
+
+    if (!targetNewEmail || !targetNewEmail.includes('@')) {
+      setChangeEmailError('Please enter a valid email address');
+      return;
+    }
+
+    setChangingEmail(true);
+    try {
+      const res = await api.post(`/admin/users/${changeEmailModal._id}/change-email`, { newEmail: targetNewEmail });
+      setUsers(users.map((u) => u._id === changeEmailModal._id ? { ...u, email: res.data.data.email } : u));
+      setChangeEmailSuccess(`Email successfully updated to ${res.data.data.email}!`);
+      setTimeout(() => {
+        setChangeEmailModal(null);
+        setChangeEmailSuccess('');
+        setTargetNewEmail('');
+      }, 1500);
+    } catch (err) {
+      setChangeEmailError(err.response?.data?.message || err.message || 'Failed to update email');
+    } finally {
+      setChangingEmail(false);
     }
   };
 
@@ -1432,18 +1474,31 @@ export const UserManagement = () => {
                       // Active user — show Set Password + Reset + Revoke
                       <div className="flex gap-3 flex-wrap">
                         {canManageAccess && u.role !== 'SUPER_ADMIN' && (
-                          <button
-                            onClick={() => {
-                              setSetPasswordModal(u);
-                              setTargetNewPassword('');
-                              setTargetConfirmPassword('');
-                              setSetPasswordError('');
-                              setSetPasswordSuccess('');
-                            }}
-                            className="text-blue-600 hover:underline text-xs font-medium"
-                          >
-                            Set Password
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                setSetPasswordModal(u);
+                                setTargetNewPassword('');
+                                setTargetConfirmPassword('');
+                                setSetPasswordError('');
+                                setSetPasswordSuccess('');
+                              }}
+                              className="text-blue-600 hover:underline text-xs font-medium"
+                            >
+                              Set Password
+                            </button>
+                            <button
+                              onClick={() => {
+                                setChangeEmailModal(u);
+                                setTargetNewEmail(u.email);
+                                setChangeEmailError('');
+                                setChangeEmailSuccess('');
+                              }}
+                              className="text-purple-600 hover:underline text-xs font-medium"
+                            >
+                              Change Email
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={() => handleResetPassword(u)}
@@ -1739,6 +1794,81 @@ export const UserManagement = () => {
                 >
                   <Key size={14} />
                   {settingPassword ? 'Saving...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Change User Email Modal (Super Admin) */}
+      {changeEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setChangeEmailModal(null)} />
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <Mail className="w-5 h-5 text-purple-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold truncate">Change User Email</h3>
+                <p className="text-xs text-gray-500 truncate">{changeEmailModal.name}</p>
+              </div>
+            </div>
+
+            {changeEmailSuccess && (
+              <div className="p-3 mb-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                <span>{changeEmailSuccess}</span>
+              </div>
+            )}
+
+            {changeEmailError && (
+              <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                <span>{changeEmailError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminChangeEmail} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Current Email</label>
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-sm font-mono text-gray-600">
+                  {changeEmailModal.email}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">New Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={targetNewEmail}
+                  onChange={(e) => setTargetNewEmail(e.target.value)}
+                  placeholder="name@domain.com"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-purple-500 text-sm"
+                />
+              </div>
+
+              <div className="p-3 bg-purple-50 rounded-lg border border-purple-100 text-xs text-purple-700">
+                <p className="font-semibold mb-1">Important Notice:</p>
+                <p>An automated security notification will be dispatched to both the previous email and the new email address.</p>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setChangeEmailModal(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={changingEmail}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 text-sm flex items-center gap-2"
+                >
+                  <Mail size={14} />
+                  {changingEmail ? 'Updating...' : 'Update Email'}
                 </button>
               </div>
             </form>
@@ -5410,7 +5540,7 @@ export const EventDetailPage = () => {
 // PROFILE
 // ====================================================================
 export const ProfilePage = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -5422,6 +5552,51 @@ export const ProfilePage = () => {
     skills: '',
     availability: '',
   });
+
+  const [emailModal, setEmailModal] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [showEmailPwd, setShowEmailPwd] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState('');
+  const [emailError, setEmailError] = useState('');
+
+  const handleChangeEmail = async (e) => {
+    e.preventDefault();
+    setEmailError('');
+    setEmailSuccess('');
+
+    if (!newEmail || !newEmail.includes('@')) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+    if (newEmail.trim().toLowerCase() === (form.email || '').toLowerCase()) {
+      setEmailError('New email must be different from current email');
+      return;
+    }
+
+    setEmailSaving(true);
+    try {
+      const res = await api.post('/auth/change-email', {
+        newEmail: newEmail.trim(),
+        currentPassword: emailPassword,
+      });
+      const updatedEmail = res.data.data.email;
+      setForm((prev) => ({ ...prev, email: updatedEmail }));
+      if (updateUser) updateUser({ email: updatedEmail });
+      setEmailSuccess('Email updated successfully! Security alerts have been dispatched to both addresses.');
+      setTimeout(() => {
+        setEmailModal(false);
+        setEmailSuccess('');
+        setNewEmail('');
+        setEmailPassword('');
+      }, 2000);
+    } catch (err) {
+      setEmailError(err.response?.data?.message || err.message || 'Failed to update email');
+    } finally {
+      setEmailSaving(false);
+    }
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -5534,8 +5709,23 @@ export const ProfilePage = () => {
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Email</label>
-              <input value={form.email} disabled className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none bg-gray-50 text-gray-500" />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium">Email</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailModal(true);
+                    setNewEmail('');
+                    setEmailPassword('');
+                    setEmailError('');
+                    setEmailSuccess('');
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-semibold hover:underline flex items-center gap-1"
+                >
+                  <Mail size={13} /> Change Email
+                </button>
+              </div>
+              <input value={form.email} disabled className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none bg-gray-50 text-gray-600 font-mono text-sm" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -5677,6 +5867,104 @@ export const ProfilePage = () => {
           </div>
         </form>
       </div>
+
+      {/* Change Email Modal */}
+      {emailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEmailModal(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <Mail className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold truncate">Change Email Address</h3>
+                <p className="text-xs text-gray-500">Update your primary login email</p>
+              </div>
+            </div>
+
+            {emailSuccess && (
+              <div className="p-3 mb-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                <span>{emailSuccess}</span>
+              </div>
+            )}
+
+            {emailError && (
+              <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                <span>{emailError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangeEmail} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Current Email</label>
+                <div className="p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-sm font-mono text-gray-600">
+                  {form.email}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">New Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="newemail@domain.com"
+                  className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Current Password *</label>
+                <div className="relative">
+                  <input
+                    type={showEmailPwd ? 'text' : 'password'}
+                    required
+                    value={emailPassword}
+                    onChange={(e) => setEmailPassword(e.target.value)}
+                    placeholder="Enter current password to verify"
+                    className="w-full h-11 px-3 pr-10 rounded-lg border border-gray-200 outline-none focus:border-blue-500 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailPwd(!showEmailPwd)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showEmailPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Required to verify your identity</p>
+              </div>
+
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-xs text-blue-700">
+                <p className="font-semibold mb-1">Security Notice:</p>
+                <p>Notification emails will be automatically sent to both your old and new email addresses confirming this update.</p>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEmailModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={emailSaving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 text-sm flex items-center gap-2"
+                >
+                  <Mail size={14} />
+                  {emailSaving ? 'Updating...' : 'Update Email Address'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

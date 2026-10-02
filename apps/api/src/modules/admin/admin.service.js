@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { disconnectUserSockets } = require('../../config/socket');
 const User = require('./admin.model');
-const { sendWelcomeEmail, sendPasswordResetEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail } = require('../../services/email.service');
+const { sendWelcomeEmail, sendPasswordResetEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
 
 const generateDefaultPassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -217,4 +217,35 @@ exports.setPassword = async (id, newPassword, adminId) => {
   }).catch((err) => console.error('Admin set-password email failed:', err.message));
 
   return { user: user.toObject({ virtuals: false }) };
+};
+
+exports.changeEmail = async (id, newEmail, adminId) => {
+  if (typeof newEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim())) {
+    throw new Error('Please enter a valid email address');
+  }
+  const cleanEmail = newEmail.trim().toLowerCase();
+
+  const user = await User.findById(id);
+  if (!user) throw new Error('User not found');
+  if (user.email.toLowerCase() === cleanEmail) {
+    throw new Error('New email must be different from current email');
+  }
+
+  const existing = await User.findOne({ email: cleanEmail });
+  if (existing && String(existing._id) !== String(user._id)) {
+    throw new Error('This email address is already in use by another account');
+  }
+
+  const oldEmail = user.email;
+  user.email = cleanEmail;
+  await user.save();
+
+  sendEmailChangedEmail({
+    oldEmail,
+    newEmail: cleanEmail,
+    name: user.name,
+    byAdmin: true,
+  }).catch((err) => console.error('Admin change email notification failed:', err.message));
+
+  return user.toObject({ virtuals: false });
 };

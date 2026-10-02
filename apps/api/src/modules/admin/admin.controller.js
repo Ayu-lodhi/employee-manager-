@@ -109,3 +109,17 @@ exports.reactivateUser = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
+
+exports.changeEmail = async (req, res) => {
+  try {
+    const { newEmail } = req.body;
+    const user = await adminService.changeEmail(req.params.id, newEmail, req.user.sub);
+    res.status(200).json({
+      success: true,
+      message: 'Email updated successfully.',
+      data: user,
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

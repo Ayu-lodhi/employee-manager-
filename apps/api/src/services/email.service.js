@@ -492,10 +492,167 @@ If you did not perform or authorize this action, please alert your administrator
   });
 };
 
+// ====================================================================
+// EMAIL ADDRESS CHANGED NOTIFICATION
+// ====================================================================
+const sendEmailChangedEmail = async ({ oldEmail, newEmail, name, byAdmin = false }) => {
+  // 1. Alert to OLD email address
+  const oldHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#f59e0b,#ef4444);padding:36px 40px;text-align:center;">
+                  <h1 style="margin:0 0 8px;color:#ffffff;font-size:24px;font-weight:700;">Account Email Changed</h1>
+                  <p style="margin:0;color:rgba(255,255,255,0.95);font-size:14px;">Important security notification for your TBI account</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:36px 40px;">
+                  <p style="margin:0 0 16px;font-size:16px;color:#111827;line-height:1.6;">
+                    Hi <strong>${escapeHtml(name)}</strong>,
+                  </p>
+                  <p style="margin:0 0 20px;font-size:15px;color:#4b5563;line-height:1.6;">
+                    The email address associated with your TBI Workforce account was ${byAdmin ? 'changed by an administrator' : 'recently updated'}.
+                  </p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:6px;margin-bottom:24px;">
+                    <tr>
+                      <td style="padding:16px;">
+                        <p style="margin:0 0 6px;font-size:14px;color:#991b1b;">
+                          <strong>Previous Email:</strong> ${escapeHtml(oldEmail)}
+                        </p>
+                        <p style="margin:0;font-size:14px;color:#991b1b;">
+                          <strong>New Email:</strong> ${escapeHtml(newEmail)}
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
+                    <strong>Notice:</strong> This email address (${escapeHtml(oldEmail)}) will no longer be able to log in to this account. If you did not make or authorize this change, please contact your administrator immediately.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;">
+                  <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                    TBI Workforce Platform — Automated security notification. Do not reply.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const oldText = `
+Account Email Changed - TBI Platform
+
+Hi ${name},
+
+The email address for your TBI account was changed from ${oldEmail} to ${newEmail}${byAdmin ? ' by an administrator' : ''}.
+This email (${oldEmail}) will no longer be able to log in.
+
+If you did not authorize this change, please contact your administrator immediately.
+  `;
+
+  // 2. Notification to NEW email address
+  const newHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.07);">
+              <tr>
+                <td style="background:linear-gradient(135deg,#0EA5E9,#6366F1);padding:36px 40px;text-align:center;">
+                  <h1 style="margin:0 0 8px;color:#ffffff;font-size:24px;font-weight:700;">Email Address Confirmed</h1>
+                  <p style="margin:0;color:rgba(255,255,255,0.9);font-size:14px;">Your TBI account email has been updated</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:36px 40px;">
+                  <p style="margin:0 0 16px;font-size:16px;color:#111827;line-height:1.6;">
+                    Hi <strong>${escapeHtml(name)}</strong>,
+                  </p>
+                  <p style="margin:0 0 20px;font-size:15px;color:#4b5563;line-height:1.6;">
+                    Your TBI Workforce account email address has been successfully set to <strong>${escapeHtml(newEmail)}</strong>${byAdmin ? ' by an administrator' : ''}.
+                  </p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border-left:4px solid #3b82f6;border-radius:6px;margin-bottom:24px;">
+                    <tr>
+                      <td style="padding:16px;">
+                        <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.5;">
+                          You can now use <strong>${escapeHtml(newEmail)}</strong> with your existing password to log in.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
+                    If you did not authorize this change, please inform your administrator immediately.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;">
+                  <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
+                    TBI Workforce Platform — Automated security notification. Do not reply.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const newText = `
+Email Address Confirmed - TBI Platform
+
+Hi ${name},
+
+Your TBI account email address has been successfully updated to: ${newEmail}.
+You can now use this email to log in to the portal.
+  `;
+
+  // Send to both old and new email addresses
+  const promises = [];
+  if (oldEmail) {
+    promises.push(sendEmail({
+      to: oldEmail,
+      subject: 'Security Alert: Your TBI Account Email Was Changed',
+      html: oldHtml,
+      text: oldText,
+    }));
+  }
+  if (newEmail) {
+    promises.push(sendEmail({
+      to: newEmail,
+      subject: 'TBI Platform: Your Account Email Has Been Set',
+      html: newHtml,
+      text: newText,
+    }));
+  }
+
+  const results = await Promise.allSettled(promises);
+  return { success: results.some((r) => r.status === 'fulfilled' && r.value?.success) };
+};
+
 module.exports = {
   sendEmail,
   sendWelcomeEmail,
   sendPasswordResetEmail,
   sendProfileUpdatedEmail,
   sendPasswordChangedEmail,
+  sendEmailChangedEmail,
 };

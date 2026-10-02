@@ -53,6 +53,16 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+exports.changeEmail = async (req, res) => {
+  try {
+    const { newEmail, currentPassword } = req.body;
+    const result = await authService.changeEmail(req.user, newEmail, currentPassword);
+    res.status(200).json({ success: true, message: 'Email updated successfully', data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 exports.changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
