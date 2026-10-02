@@ -28,6 +28,26 @@ const isAllowedOrigin = (origin) => {
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 };
 
+// Reuse the mounted HTTP policy, including account state, credentials and MFA.
+const authorizeSocket = async (socket) => {
+  const target = io?.sockets?.sockets?.get?.(socket.id) || socket;
+  try {
+    if (!target.connected) return false;
+    const { authenticateToken } = require('../modules/auth/auth.middleware');
+    await authenticateToken(target.handshake?.auth?.token);
+    // Authentication performs asynchronous reads; expiry may pass while waiting.
+    if (target.connected && Date.now() < target.accessExpiresAt) return true;
+  } catch {
+    // Account lookup failures must also stop protected delivery.
+  }
+  target.disconnect(true);
+  if (target !== socket && typeof socket.disconnect === 'function') {
+    socket.disconnect(true);
+  }
+  return false;
+};
+
+
 const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
@@ -49,6 +69,10 @@ const initSocket = (httpServer) => {
     try {
       const { authenticateToken } = require('../modules/auth/auth.middleware');
       const decoded = await authenticateToken(token);
+      if (!Number.isFinite(decoded.exp) || decoded.exp * 1000 <= Date.now()) {
+        throw new Error('Access token must have a future expiry');
+      }
+      socket.accessExpiresAt = decoded.exp * 1000;
       socket.userId = decoded.sub;
       socket.userRole = decoded.role;
       socket.userName = decoded.name || 'User';
@@ -63,13 +87,25 @@ const initSocket = (httpServer) => {
 
     socket.join(`user:${socket.userId}`);
 
+    let expiryTimer;
+    const expire = () => {
+      const remaining = socket.accessExpiresAt - Date.now();
+      if (remaining <= 0) return socket.disconnect(true);
+      // Node timers are limited to a signed 32-bit delay.
+      expiryTimer = setTimeout(expire, Math.min(remaining, 2147483647));
+      expiryTimer.unref();
+    };
+    expire();
+    // Cover revocation while the handshake was in flight, before room registration.
+    void authorizeSocket(socket);
+
     const pendingJoins = new Map();
     socket.on('chat:join', async (roomId) => {
       const id = normalizeRoomId(roomId);
       if (!id) return;
       const request = Symbol();
       pendingJoins.set(id, request);
-      const allowed = await canAccessRoom(id, socket.userId);
+      const allowed = await canAccessRoom(id, socket.userId) && await authorizeSocket(socket);
       if (pendingJoins.get(id) !== request) return;
       pendingJoins.delete(id);
       if (allowed && socket.connected) {
@@ -88,6 +124,8 @@ const initSocket = (httpServer) => {
     });
 
     socket.on('disconnect', () => {
+      clearTimeout(expiryTimer);
+      pendingJoins.clear();
       console.log(`Socket disconnected: ${socket.userName}`);
     });
   });
@@ -100,9 +138,17 @@ const getIO = () => {
   return io;
 };
 
-const emitToUser = (userId, event, data) => {
+const disconnectUserSockets = (userId) => {
   if (!io || !userId) return;
-  io.to(`user:${userId.toString()}`).emit(event, data);
+  io.in(`user:${userId.toString()}`).disconnectSockets(true);
+};
+
+const emitToUser = async (userId, event, data) => {
+  if (!io || !userId) return;
+  const sockets = await io.in(`user:${userId.toString()}`).fetchSockets();
+  await Promise.all(sockets.map(async (socket) => {
+    if (await authorizeSocket(socket)) socket.emit(event, data);
+  }));
 };
 
 const emitToRoom = async (roomId, event, data) => {
@@ -113,7 +159,7 @@ const emitToRoom = async (roomId, event, data) => {
   const sockets = await io.in(room).fetchSockets();
   await Promise.all(sockets.map(async (socket) => {
     // Recheck stored access so an existing subscription cannot outlive access.
-    if (await canAccessRoom(id, socket.userId)) {
+    if (await canAccessRoom(id, socket.userId) && await authorizeSocket(socket)) {
       if (socket.rooms.has(room)) socket.emit(event, data);
     } else {
       await socket.leave(room);
@@ -121,23 +167,32 @@ const emitToRoom = async (roomId, event, data) => {
   }));
 };
 
-const closeChatRoom = (roomId) => {
+const closeChatRoom = async (roomId) => {
   const id = normalizeRoomId(roomId);
   if (!io || !id) return;
   const room = `chat:${id}`;
   // The room no longer exists. Send only its identifier, then evict subscribers.
-  io.to(room).emit('chat:room_deleted', { roomId: id });
-  io.in(room).socketsLeave(room);
+  const sockets = await io.in(room).fetchSockets();
+  await Promise.all(sockets.map(async (socket) => {
+    if (await authorizeSocket(socket) && socket.rooms.has(room)) {
+      socket.emit('chat:room_deleted', { roomId: id });
+    }
+    await socket.leave(room);
+  }));
 };
 
-const emitToAll = (event, data) => {
+const emitToAll = async (event, data) => {
   if (!io) return;
-  io.emit(event, data);
+  const sockets = await io.fetchSockets();
+  await Promise.all(sockets.map(async (socket) => {
+    if (await authorizeSocket(socket)) socket.emit(event, data);
+  }));
 };
 
 module.exports = {
   initSocket,
   getIO,
+  disconnectUserSockets,
   emitToUser,
   emitToRoom,
   closeChatRoom,

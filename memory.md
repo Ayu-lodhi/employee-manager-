@@ -106,7 +106,6 @@ review before merge; corresponding regression tests belong in `__tests__/`.
 The MFA branch incorporates main's token-purpose fix (PR #4). Both regression
 suites are retained; ordinary-user token-purpose tests use a nonprivileged fixture,
 and MFA tests continue to cover administrative access after TOTP verification.
-
 ## Application listing security — 2026-10-01
 
 Application listing now validates scalar identifier/status filters and intersects
@@ -238,3 +237,14 @@ Team attendance history accepts integer intervals from 1 to 30 days, defaulting
 to seven only when omitted. The service validates raw query input before database
 access and row generation, including direct calls. This bounds synchronous work;
 the existing UI's seven-day history remains supported.
+
+## Socket session enforcement — 2026-10-01
+
+The mounted API disconnects user sockets after successful administrative revocation
+and at access-token expiry. Socket subscriptions and broadcasts reuse the mounted
+HTTP account/credential/MFA policy; private notifications await authorization.
+The active gateway uses Socket.IO's in-memory adapter. The Redis-based
+`core/session/sessionTerminator.js` is unmounted scaffolding, so the mounted
+revocation service invokes the gateway's disconnect helper after saving the account.
+Regression tests cover retained sockets, notifications, expiry, and pending joins.
+Authentication changes require human review before merge.

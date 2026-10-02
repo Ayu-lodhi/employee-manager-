@@ -89,7 +89,7 @@ exports.createOrGetTeamRoom = async (req, res) => {
 exports.deleteRoom = async (req, res) => {
   try {
     const result = await chatService.deleteRoom(req.params.id, req.user);
-    closeChatRoom(req.params.id);
+    await closeChatRoom(req.params.id);
     res.json({ success: true, message: 'Room deleted', data: result });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });

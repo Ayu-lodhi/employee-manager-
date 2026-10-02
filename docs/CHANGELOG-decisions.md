@@ -84,7 +84,6 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Resolved overlap with main while retaining MFA enforcement, access-only HTTP/socket authentication, and both regression suites.
 - Reason: PR #4 and PR #5 independently changed the same authentication paths. Shared MFA token validation already enforces the token-purpose requirement.
 - Where: Auth service/middleware/tests, Socket.io authentication/tests, this changelog, and memory.md.
-
 ### [2026-10-01] Preserve application listing team authorization
 - What: Validate scalar listing filters, retain the lead's team scope as a separate query condition, and persist required application team ownership with regression coverage.
 - Reason: Confirmed that request filters replaced the authorization predicate and the schema discarded ownership. The security-fix request authorizes this change. Legacy records stay outside T3 listings until ownership is restored from trusted evidence; event-based inference is unsafe. Authorization changes require human review before merge.
@@ -162,3 +161,9 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Validate raw history intervals in the service as integers from 1 to 30 before querying or generating rows; retain the seven-day default and add service/HTTP regressions.
 - Reason: Confirmed that authorized callers could request unbounded synchronous work. A 30-day cap matches the attendance module's longer reporting defaults and preserves the UI's seven-day request. Fix authorized by the security investigation request.
 - Where: `apps/api/src/modules/attendance/attendance.controller.js`, `apps/api/src/modules/attendance/attendance.service.js`, `apps/api/src/modules/attendance/__tests__/attendance.test.js`, `memory.md`.
+
+### [2026-10-01] Enforce socket session revocation and expiry
+- What: Disconnect the mounted API's user sockets after successful revocation and at access-token expiry; reapply shared account/credential/MFA authentication before subscriptions and broadcasts, including private notifications.
+- Reason: Investigation confirmed existing handshake and chat account checks, but retained sockets could receive notifications after revocation and messages after token expiry. User authorized the scoped security fix.
+- Where: `apps/api/src/config/socket.js`, its `__tests__/`, `modules/admin/admin.service.js`, `modules/notifications/notifications.service.js`, and `modules/chat/chat.controller.js` under `apps/api/src/`.
+- Review: Authentication changes require human review before merge. The mounted CommonJS API uses the in-memory Socket.IO adapter; the Redis-based `core/session/sessionTerminator.js` is an unmounted scaffold with unavailable imports. Revocation disconnects local sockets, and every protected delivery rechecks persisted account state.

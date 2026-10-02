@@ -197,7 +197,7 @@ test('chat socket authorization and delivery', async (t) => {
   await t.test('room deletion sends only its ID and clears subscriptions', async () => {
     await join(member);
     room = null;
-    closeChatRoom(roomId);
+    await closeChatRoom(roomId);
     assert.deepEqual(member.events.at(-1), ['chat:room_deleted', { roomId }]);
     assert.equal(subscribed(member), false);
     const count = member.events.length;
