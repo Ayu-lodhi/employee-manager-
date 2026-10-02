@@ -115,7 +115,6 @@ new applications. Legacy records without ownership remain unavailable to T3 and
 require a trusted mapping before status updates; do not infer a team from the
 event. See `docs/database/applications.md`. Fix authorized by the security
 investigation request; authorization changes require human review before merge.
-
 ## Mandatory password replacement — 2026-10-01
 
 Temporary login now atomically records `passwordChangeStartedAt` and cannot be
@@ -213,3 +212,12 @@ Configured and Ethereal SMTP transports require STARTTLS before authentication o
 mail delivery. Certificate verification retains Nodemailer/Node defaults; TLS
 failure returns the existing unsuccessful email result. Local SMTP regression
 tests cover omitted/rejected STARTTLS and rejected EHLO for both modes.
+
+## Team discovery contact security — 2026-10-01
+
+General team list/detail responses now return only explicit team metadata to
+outsiders, omitting members, lead IDs, cached lead names, and chat room IDs.
+Current members/leads and administrators retain contact rosters, with authority
+checked before population. This follows the mounted application's existing
+administrative roles and membership checks; the scaffold permission middleware
+is not mounted. Authorization changes require human review before merge.

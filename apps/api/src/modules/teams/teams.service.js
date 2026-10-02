@@ -3,6 +3,7 @@ const User = require('../admin/admin.model');
 const Event = require('../events/events.model');
 const { notify } = require('../notifications/notifications.service');
 const { AuthorizationError, ValidationError } = require('../../core/errors/typedErrors');
+const { canReadTeamContacts } = require('./teams.permissions');
 const ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   ADMIN: 'ADMIN',
@@ -21,19 +22,35 @@ const requireMembershipManager = (team, requester) => {
   return isAdmin;
 };
 
-exports.getAllTeams = async () => {
-  return await Team.find()
-    .populate('members', 'name email role')
-    .populate('leadId', 'name email role')
-    .sort({ createdAt: -1 });
+
+const metadataFields = [
+  '_id', 'name', 'eventId', 'eventTitle', 'description', 'memberCount', 'chatActive', 'createdAt',
+];
+
+const projectTeamsForRequester = async (teams, requester) => {
+  // Check current membership before resolving any contact references.
+  const authorized = new Set(teams.filter(team => canReadTeamContacts(team, requester)));
+  if (authorized.size) {
+    await Team.populate([...authorized], [
+      { path: 'members', select: 'name email role' },
+      { path: 'leadId', select: 'name email role' },
+    ]);
+  }
+  // An allowlist also excludes cached leadName, raw user IDs and chatRoomId.
+  return teams.map(team => authorized.has(team) ? team :
+    Object.fromEntries(metadataFields.map(field => [field, team[field]])));
 };
 
-exports.getTeamById = async (id) => {
-  const team = await Team.findById(id)
-    .populate('members', 'name email role')
-    .populate('leadId', 'name email role');
+exports.getAllTeams = async (requester) => {
+  const teams = await Team.find().sort({ createdAt: -1 });
+  return projectTeamsForRequester(teams, requester);
+};
+
+exports.getTeamById = async (id, requester) => {
+  const team = await Team.findById(id);
   if (!team) throw new Error('Team not found');
-  return team;
+  const [result] = await projectTeamsForRequester([team], requester);
+  return result;
 };
 
 exports.getMyTeams = async (userId) => {

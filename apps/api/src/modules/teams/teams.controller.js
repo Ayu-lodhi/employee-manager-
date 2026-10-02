@@ -2,7 +2,7 @@ const teamService = require('./teams.service');
 
 exports.getTeams = async (req, res) => {
   try {
-    const teams = await teamService.getAllTeams();
+    const teams = await teamService.getAllTeams(req.user);
     res.json({ success: true, data: teams });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -11,7 +11,7 @@ exports.getTeams = async (req, res) => {
 
 exports.getTeam = async (req, res) => {
   try {
-    const team = await teamService.getTeamById(req.params.id);
+    const team = await teamService.getTeamById(req.params.id, req.user);
     res.json({ success: true, data: team });
   } catch (error) {
     res.status(404).json({ success: false, message: error.message });

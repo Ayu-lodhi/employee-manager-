@@ -5,7 +5,7 @@ const { protect, restrictTo } = require('../auth/auth.middleware');
 
 router.use(protect);
 
-// List all teams (Admin)
+// Discover teams; contact rosters are restricted by the service.
 router.get('/', teamController.getTeams);
 
 // T3's own teams
