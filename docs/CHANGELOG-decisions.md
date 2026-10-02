@@ -129,3 +129,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Validate a scalar ObjectId before team lookup and use the authorized team's persisted ID for timesheet reads in both server copies; add HTTP/service regression tests.
 - Reason: Confirmed Express bracket selectors and Mongoose operator casting allowed a lead to select foreign-team timesheets after authorization against one led team. The security investigation authorizes this scoped fix; human review is required before merge.
 - Where: `apps/api/src/modules/timesheets/timesheets.service.js`, `apps/web/server/modules/timesheets/timesheets.service.js`, corresponding `__tests__/timesheets.test.js`, `memory.md`.
+
+### [2026-10-02] Escape profile names in credential email HTML
+- What: Encode profile names in password-reset and welcome HTML in both server copies, with regression coverage.
+- Reason: The security investigation confirmed ADMIN-editable names could inject markup into later credential emails. Encode at the HTML sink to preserve stored names and plain-text output; fix authorized by the investigation request.
+- Where: `apps/api/src/services/email.service.js`, `apps/web/server/services/email.service.js`, corresponding `__tests__/email.test.js`, `memory.md`.

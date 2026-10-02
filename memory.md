@@ -179,3 +179,12 @@ copies. Express bracket selectors previously passed through Mongoose and could
 combine led and foreign teams. HTTP regression tests cover selectors, malformed
 IDs, leadership, authentication and valid filtered reads with synthetic collection
 IO. The security investigation authorizes this fix; human review is required before merge.
+
+## Credential email profile encoding — 2026-10-02
+
+Password-reset and welcome templates encode profile names at HTML insertion in
+both API and deployed web server copies. ADMIN profile edits allow names containing
+markup, so credential emails must treat stored names as untrusted text. Stored
+names and plain-text emails retain their original values. Local Nodemailer JSON
+transport regression tests cover malicious links, punctuation, Unicode and entities.
+The security investigation authorizes this fix.

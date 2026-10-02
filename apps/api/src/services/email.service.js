@@ -1,5 +1,13 @@
 const nodemailer = require('nodemailer');
 
+// Encode profile text where it enters HTML, preserving stored and plain-text names.
+const escapeHtml = (value) => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 // ====================================================================
 // Email Service — Nodemailer with two modes:
 //   1. TEST: Uses Ethereal (fake SMTP that captures emails)
@@ -110,7 +118,7 @@ const sendWelcomeEmail = async ({ to, name, role, tempPassword, loginUrl }) => {
               <tr>
                 <td style="padding:40px;">
                   <p style="margin:0 0 20px;font-size:16px;color:#111827;line-height:1.6;">
-                    Hi <strong>${name}</strong>,
+                    Hi <strong>${escapeHtml(name)}</strong>,
                   </p>
                   <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
                     An administrator has created an account for you on the TBI Workforce Platform. 
@@ -237,7 +245,7 @@ const sendPasswordResetEmail = async ({ to, name, tempPassword, loginUrl }) => {
               <tr>
                 <td style="padding:40px;">
                   <p style="margin:0 0 20px;font-size:16px;color:#111827;line-height:1.6;">
-                    Hi <strong>${name}</strong>,
+                    Hi <strong>${escapeHtml(name)}</strong>,
                   </p>
                   <p style="margin:0 0 24px;font-size:15px;color:#4b5563;line-height:1.6;">
                     An administrator has reset your account password. Use the temporary password below to sign in.
