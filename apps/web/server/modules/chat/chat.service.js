@@ -2,7 +2,12 @@ const ChatRoom = require('./chatRoom.model');
 const Message = require('./chat.model');
 const User = require('../admin/admin.model');
 const Team = require('../teams/teams.model');
-const { PRIVILEGED_ROLES } = require('../../../../../packages/shared-constants/roles.js');
+let PRIVILEGED_ROLES = ['SUPER_ADMIN', 'ADMIN'];
+import('../../../../../packages/shared-constants/roles.js')
+  .then((m) => {
+    if (m?.PRIVILEGED_ROLES) PRIVILEGED_ROLES = m.PRIVILEGED_ROLES;
+  })
+  .catch(() => {});
 const { AuthorizationError, ValidationError } = require('../../core/errors/typedErrors');
 const { notify } = require('../notifications/notifications.service');
 
