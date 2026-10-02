@@ -144,3 +144,11 @@ at the event repository boundary, including service aliases. The active common-J
 base repository (currently used only by events) rejects pipelines/operator keys
 and constructs `$set`; Mongoose `runValidators` alone does not stop pipelines.
 The security investigation authorizes this fix, with HTTP regression coverage.
+
+## Password byte boundary — 2026-10-02
+
+Self-service password changes (including mandatory replacement) and administrative
+password setting reject more than 72 UTF-8 bytes before composition validation and
+bcrypt hashing. Both API and deployed web server copies enforce this boundary;
+regression tests cover ASCII and Unicode input. Existing password login is unchanged.
+The security investigation authorizes the fix; human review is required before merge.

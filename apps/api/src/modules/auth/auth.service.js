@@ -96,6 +96,10 @@ exports.changePassword = async (credential, oldPassword, newPassword) => {
   if (typeof newPassword !== 'string' || newPassword.length < 8) {
     throw new Error('Password must be at least 8 characters');
   }
+  // bcrypt only uses the first 72 UTF-8 bytes of a password.
+  if (Buffer.byteLength(newPassword, 'utf8') > 72) {
+    throw new Error('Password must not exceed 72 UTF-8 bytes');
+  }
   if (!/[A-Z]/.test(newPassword)) throw new Error('Password must contain an uppercase letter');
   if (!/[a-z]/.test(newPassword)) throw new Error('Password must contain a lowercase letter');
   if (!/[0-9]/.test(newPassword)) throw new Error('Password must contain a number');
