@@ -114,3 +114,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Reject new passwords exceeding 72 UTF-8 bytes before composition checks and hashing in self-service replacement and administrative setting, including deployed server copies; add byte-boundary regression tests.
 - Reason: Installed bcryptjs 2.4.3 accepts the 72-byte prefix when required character classes occur only in the discarded suffix. Existing authentication controls do not mitigate this policy bypass. The security investigation authorizes this fix; auth changes require human review before merge.
 - Where: `apps/api/src/modules/{auth,admin}/*.service.js`, `apps/web/server/modules/{auth,admin}/*.service.js`, auth `__tests__/password-bytes.test.js` in both server trees, `memory.md`.
+
+### [2026-10-02] Restrict notification read updates to the recipient
+- What: Match both notification ID and authenticated recipient in the atomic read-state update; return the same 404 for foreign and missing notifications in API and deployed web server copies. Add HTTP regression coverage.
+- Reason: Confirmed authenticated callers could mark another recipient's notification read by ID. Existing authentication and scoped list/bulk updates did not protect the individual update. The security investigation authorizes this fix; authorization changes require human review before merge.
+- Where: `apps/api/src/modules/notifications/notifications.controller.js`, `apps/web/server/modules/notifications/notifications.controller.js`, corresponding `__tests__/notifications.test.js`, `memory.md`.

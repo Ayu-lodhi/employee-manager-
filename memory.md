@@ -152,3 +152,12 @@ password setting reject more than 72 UTF-8 bytes before composition validation a
 bcrypt hashing. Both API and deployed web server copies enforce this boundary;
 regression tests cover ASCII and Unicode input. Existing password login is unchanged.
 The security investigation authorizes the fix; human review is required before merge.
+
+## Notification read ownership — 2026-10-02
+
+Individual read-state updates now atomically match the notification ID and the
+verified token subject in both API and deployed web server copies. Foreign and
+missing IDs return the same 404; repeat reads by the owner remain successful.
+HTTP regression tests exercise authentication and Mongoose with synthetic
+collection IO. The security investigation authorizes this fix; authorization
+changes require human review before merge.
