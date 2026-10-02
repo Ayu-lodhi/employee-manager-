@@ -3677,7 +3677,10 @@ export const BulkImportPage = () => {
       const rowErrors = [];
       if (!row.name) rowErrors.push('Missing name');
       if (!row.email) rowErrors.push('Missing email');
-      if (row.email && !/^\S+@\S+\.\S+$/.test(row.email)) rowErrors.push('Invalid email');
+      // Bound work before matching; email components cannot consume their separators.
+      if (row.email && (row.email.length > 254 || !/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(row.email))) {
+        rowErrors.push('Invalid email');
+      }
       if (!row.role) rowErrors.push('Missing role');
       if (row.role && !['T1_VOLUNTEER', 'T2_ASSOCIATE', 'T3_EXECUTIVE'].includes(row.role.toUpperCase())) {
         rowErrors.push('Invalid role');

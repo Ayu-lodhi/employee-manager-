@@ -134,3 +134,8 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - What: Encode profile names in password-reset and welcome HTML in both server copies, with regression coverage.
 - Reason: The security investigation confirmed ADMIN-editable names could inject markup into later credential emails. Encode at the HTML sink to preserve stored names and plain-text output; fix authorized by the investigation request.
 - Where: `apps/api/src/services/email.service.js`, `apps/web/server/services/email.service.js`, corresponding `__tests__/email.test.js`, `memory.md`.
+
+### [2026-10-02] Bound bulk-import email validation
+- What: Reject email fields over 254 characters before matching and use separator-exclusive regex components; add CSV parser regression tests.
+- Reason: The security investigation authorized a scoped fix. A 60 KB field with repeated at signs exceeded a one-second execution deadline before preview; server controls run only after parsing.
+- Where: `apps/web/src/pages.jsx`, `apps/web/src/__tests__/bulk-import.test.js`, `memory.md`.

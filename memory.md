@@ -188,3 +188,11 @@ markup, so credential emails must treat stored names as untrusted text. Stored
 names and plain-text emails retain their original values. Local Nodemailer JSON
 transport regression tests cover malicious links, punctuation, Unicode and entities.
 The security investigation authorizes this fix.
+
+## Bulk-import email validation — 2026-10-02
+
+CSV preview rejects email fields over 254 characters before regex matching and
+uses separator-exclusive components to prevent backtracking across at signs or
+domain labels. Parser regression tests cover valid rows, malformed addresses,
+length boundaries and adversarial fields under a VM execution deadline. The
+security investigation authorizes this fix.
