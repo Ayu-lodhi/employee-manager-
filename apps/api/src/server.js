@@ -10,6 +10,8 @@ const mongoose = require('mongoose');
 const securityMiddleware = require('./middleware/security.middleware');
 const { globalLimiter } = require('./middleware/rateLimit.middleware');
 const { initSocket } = require('./config/socket');
+const compression = require('compression');
+const { noCache, publicCache } = require('./middleware/cacheControl.middleware');
 
 const app = express();
 
@@ -33,8 +35,12 @@ app.use(cors({
   },
   credentials: true,
 }));
+app.use(compression());
 app.use(securityMiddleware);
 app.use(globalLimiter);
+
+// Enforce no-cache by default across all authenticated and API routes
+app.use('/api', noCache);
 
 app.use('/api/v1/auth', require('./modules/auth/auth.routes'));
 app.use('/api/v1/admin', require('./modules/admin/admin.routes'));
@@ -52,7 +58,7 @@ app.use('/api/v1/preferences', require('./modules/users/preferences.routes'));
 app.use('/api/v1/announcements', require('./modules/announcements/announcements.routes'));
 app.use('/api/v1/timesheets', require('./modules/timesheets/timesheets.routes'));
 
-app.get('/', (req, res) => {
+app.get('/', publicCache(120), (req, res) => {
   res.json({
     message: 'TBI API running',
     version: '3.0.0',
