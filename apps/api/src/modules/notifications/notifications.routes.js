@@ -8,5 +8,6 @@ router.use(protect);
 router.get('/', controller.getMyNotifications);
 router.patch('/:id/read', controller.markAsRead);
 router.patch('/read-all', controller.markAllRead);
+router.patch('/read-type/:type', controller.markTypeRead);
 
 module.exports = router;

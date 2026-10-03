@@ -3,7 +3,7 @@
 // ====================================================================
 
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, NavLink, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ScrollText, Monitor, Settings, Shield, FileText,
   User as UserIcon, LogOut, Calendar, TrendingUp, UserPlus, Upload,
@@ -49,7 +49,7 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    const token = localStorage.getItem('tbi_token');
+    const token = typeof window !== 'undefined' ? (sessionStorage.getItem('tbi_token') || localStorage.getItem('tbi_token')) : null;
     if (!token) return;
 
     const newSocket = io(BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin : ''), {
@@ -82,18 +82,53 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
 
-  // Restore session from localStorage on mount
+  // Restore session from sessionStorage on mount (tab-isolated)
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem('tbi_user');
-      const storedToken = localStorage.getItem('tbi_token');
+      // If URL explicitly requests a fresh session, clear this tab's auth
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('new_session') === 'true') {
+          sessionStorage.removeItem('tbi_user');
+          sessionStorage.removeItem('tbi_token');
+          localStorage.removeItem('tbi_user');
+          localStorage.removeItem('tbi_token');
+          setInitializing(false);
+          return;
+        }
+      }
+
+      let storedUser = typeof window !== 'undefined' ? sessionStorage.getItem('tbi_user') : null;
+      let storedToken = typeof window !== 'undefined' ? sessionStorage.getItem('tbi_token') : null;
+
+      // Backward compatibility: migrate legacy single-session from localStorage to current tab's sessionStorage
+      if (!storedUser || !storedToken) {
+        const legacyUser = typeof window !== 'undefined' ? localStorage.getItem('tbi_user') : null;
+        const legacyToken = typeof window !== 'undefined' ? localStorage.getItem('tbi_token') : null;
+        if (legacyUser && legacyToken) {
+          storedUser = legacyUser;
+          storedToken = legacyToken;
+          sessionStorage.setItem('tbi_user', legacyUser);
+          sessionStorage.setItem('tbi_token', legacyToken);
+        }
+        // Remove from localStorage so subsequent new tabs start fresh with independent sessions
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('tbi_user');
+          localStorage.removeItem('tbi_token');
+        }
+      }
+
       if (storedUser && storedToken) {
         setUser(JSON.parse(storedUser));
       }
     } catch (err) {
       console.error('Failed to restore session:', err);
-      localStorage.removeItem('tbi_user');
-      localStorage.removeItem('tbi_token');
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('tbi_user');
+        sessionStorage.removeItem('tbi_token');
+        localStorage.removeItem('tbi_user');
+        localStorage.removeItem('tbi_token');
+      }
     } finally {
       setInitializing(false);
     }
@@ -101,20 +136,31 @@ export const AuthProvider = ({ children }) => {
 
   const login = (u, t) => {
     setUser(u);
-    localStorage.setItem('tbi_user', JSON.stringify(u));
-    localStorage.setItem('tbi_token', t);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('tbi_user', JSON.stringify(u));
+      sessionStorage.setItem('tbi_token', t);
+      // Clean localStorage so new tabs are not automatically forced into this account
+      localStorage.removeItem('tbi_user');
+      localStorage.removeItem('tbi_token');
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('tbi_user');
-    localStorage.removeItem('tbi_token');
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('tbi_user');
+      sessionStorage.removeItem('tbi_token');
+      localStorage.removeItem('tbi_user');
+      localStorage.removeItem('tbi_token');
+    }
   };
 
   const updateUser = (updatedFields) => {
     setUser((prev) => {
       const next = { ...prev, ...updatedFields };
-      localStorage.setItem('tbi_user', JSON.stringify(next));
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('tbi_user', JSON.stringify(next));
+      }
       return next;
     });
   };
@@ -159,6 +205,8 @@ const MENUS = {
       section: 'OPERATIONS', items: [
         { icon: Calendar, label: 'Events', to: '/admin/events' },
         { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
+        { icon: FileCheck, label: 'Approval Requests', to: '/admin/applications' },
+        { icon: MessageSquare, label: 'Team Chats', to: '/chat' },
         { icon: Bell, label: 'Announcements', to: '/announcements' },
         { icon: Clock, label: 'Timesheets', to: '/timesheets' },
       ]
@@ -191,6 +239,8 @@ const MENUS = {
       section: 'OPERATIONS', items: [
         { icon: Calendar, label: 'Events', to: '/admin/events' },
         { icon: UsersRound, label: 'Teams', to: '/admin/teams' },
+        { icon: FileCheck, label: 'Approval Requests', to: '/admin/applications' },
+        { icon: MessageSquare, label: 'Team Chats', to: '/chat' },
         { icon: Bell, label: 'Announcements', to: '/announcements' },
         { icon: Clock, label: 'Timesheets', to: '/timesheets' },
       ]
@@ -264,7 +314,7 @@ const MENUS = {
     },
     {
       section: 'COMMUNICATION', items: [
-        { icon: MessageSquare, label: 'Team Chats', to: '/chat', badge: 2 },
+        { icon: MessageSquare, label: 'Team Chats', to: '/chat' },
         { icon: Star, label: 'My Reviews', to: '/t1/reviews' },
         { icon: UserIcon, label: 'My Profile', to: '/profile' },
         { icon: Settings, label: 'Preferences', to: '/preferences' },
@@ -528,8 +578,119 @@ export const Sidebar = () => {
   const { user, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const socket = useSocket();
   const cfg = ROLES[user.role];
   const menus = MENUS[user.role];
+
+  // Dynamic notification counts
+  const [badges, setBadges] = useState({
+    applications: 0,
+    chat: 0,
+    announcements: 0,
+  });
+
+  const fetchBadges = async () => {
+    if (!user) return;
+    try {
+      // 1. Fetch unread notifications
+      const notifsRes = await api.get('/notifications');
+      const notifs = notifsRes.data?.data || [];
+      const unread = notifs.filter((n) => !n.isRead);
+
+      const unreadChat = unread.filter((n) => n.type === 'chat').length;
+      const unreadApp = unread.filter((n) => n.type === 'application').length;
+      const unreadAnn = unread.filter((n) => n.type === 'announcement').length;
+
+      // 2. For managers (T3, Admin, Super Admin), fetch pending applications count
+      let pendingAppsCount = 0;
+      if (['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+        try {
+          const appRes = await api.get('/applications');
+          const apps = appRes.data?.data || [];
+          pendingAppsCount = apps.filter((a) => a.status === 'pending').length;
+        } catch (_) {}
+      }
+
+      setBadges({
+        // For managers, pending applications waiting for review is paramount, plus unread updates
+        applications: ['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)
+          ? (pendingAppsCount > 0 ? pendingAppsCount : unreadApp)
+          : unreadApp,
+        chat: unreadChat,
+        announcements: unreadAnn,
+      });
+    } catch (_) {
+      // silent
+    }
+  };
+
+  useEffect(() => {
+    fetchBadges();
+    const interval = setInterval(fetchBadges, 30000);
+    const handleCustomRefresh = () => fetchBadges();
+    window.addEventListener('app:badge-refresh', handleCustomRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('app:badge-refresh', handleCustomRefresh);
+    };
+  }, [user]);
+
+  // When route changes: if user navigates to /chat, mark chat notifications as read
+  useEffect(() => {
+    if (location.pathname === '/chat' && badges.chat > 0) {
+      api.patch('/notifications/read-type/chat').catch(() => {});
+      setBadges((prev) => ({ ...prev, chat: 0 }));
+    }
+    fetchBadges();
+  }, [location.pathname]);
+
+  // Real-time socket events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewNotif = (notif) => {
+      setBadges((prev) => {
+        const next = { ...prev };
+        if (notif.type === 'chat') {
+          if (location.pathname !== '/chat') {
+            next.chat = (next.chat || 0) + 1;
+          }
+        } else if (notif.type === 'application') {
+          next.applications = (next.applications || 0) + 1;
+        } else if (notif.type === 'announcement') {
+          next.announcements = (next.announcements || 0) + 1;
+        }
+        return next;
+      });
+    };
+
+    const handleChatMsg = () => {
+      if (location.pathname !== '/chat') {
+        setBadges((prev) => ({ ...prev, chat: (prev.chat || 0) + 1 }));
+      }
+    };
+
+    socket.on('notification:new', handleNewNotif);
+    socket.on('chat:new_message', handleChatMsg);
+    return () => {
+      socket.off('notification:new', handleNewNotif);
+      socket.off('chat:new_message', handleChatMsg);
+    };
+  }, [socket, location.pathname]);
+
+  const getItemBadge = (item) => {
+    if (item.to && item.to.includes('applications')) {
+      return badges.applications;
+    }
+    if (item.to === '/chat') {
+      return badges.chat;
+    }
+    if (item.to === '/announcements') {
+      return badges.announcements;
+    }
+    return item.badge || 0;
+  };
 
   return (
     <aside className={`h-screen flex flex-col border-r border-white/10 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}
@@ -539,7 +700,7 @@ export const Sidebar = () => {
           <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: cfg.color }} />
           {!collapsed && <span className="text-white font-bold text-lg">TBI</span>}
         </div>
-        <button onClick={() => setCollapsed(!collapsed)} className="text-gray-400 hover:text-white">
+        <button onClick={() => setCollapsed(!collapsed)} className="text-gray-400 hover:text-white" title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
           <ChevronLeft className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
         </button>
       </div>
@@ -562,17 +723,48 @@ export const Sidebar = () => {
         {menus.map((sec) => (
           <div key={sec.section}>
             {!collapsed && <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 px-3 pt-5 pb-2">{sec.section}</p>}
-            {sec.items.map((item) => (
-              <NavLink key={item.to} to={item.to} end
-                className={({ isActive }) => `flex items-center gap-3 h-10 px-3 rounded-lg text-sm transition-colors ${isActive ? 'text-white' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
-                style={({ isActive }) => isActive ? { backgroundColor: `${cfg.color}25`, borderLeft: `3px solid ${cfg.color}` } : {}}>
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span className="flex-1">{item.label}</span>}
-                {item.badge && !collapsed && (
-                  <span className="text-white text-[10px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: cfg.color }}>{item.badge}</span>
-                )}
-              </NavLink>
-            ))}
+            {sec.items.map((item) => {
+              const badgeCount = getItemBadge(item);
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 h-10 px-3 rounded-lg text-sm transition-all duration-150 relative group ${
+                      isActive
+                        ? 'text-white font-medium shadow-sm'
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    }`
+                  }
+                  style={({ isActive }) =>
+                    isActive
+                      ? {
+                          backgroundColor: `${cfg.color}25`,
+                          borderLeft: `3px solid ${cfg.color}`,
+                        }
+                      : {}
+                  }
+                >
+                  <div className="relative flex-shrink-0">
+                    <item.icon className="w-5 h-5" />
+                    {/* Collapsed view indicator dot */}
+                    {collapsed && badgeCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-slate-900 animate-pulse" />
+                    )}
+                  </div>
+                  {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+                  {!collapsed && badgeCount > 0 && (
+                    <span
+                      title={`${badgeCount} item${badgeCount > 1 ? 's' : ''}`}
+                      className="min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center bg-rose-500 shadow-sm shadow-rose-900/40 animate-pulse flex-shrink-0"
+                    >
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
         ))}
       </nav>
@@ -624,7 +816,16 @@ export const Topbar = () => {
         <Search className="w-5 h-5 text-gray-400" />
         <input type="text" placeholder="Search..." className="flex-1 bg-transparent border-none outline-none text-sm" />
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => window.open('/login?new_session=true', '_blank')}
+          title="Open a separate independent session in a new browser tab to sign into another account simultaneously"
+          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer"
+        >
+          <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
+          <span>New Session Tab</span>
+        </button>
         <button onClick={() => navigate('/notifications')} className="relative p-2 rounded-lg hover:bg-gray-100">
           <Bell className="w-5 h-5 text-gray-600" />
           {unreadCount > 0 && (
@@ -1909,35 +2110,103 @@ export const Chat = () => {
   const [form, setForm] = useState({ name: '', description: '', memberIds: [] });
   const [memberSearch, setMemberSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [teams, setTeams] = useState([]);
+  const [selectedTeamFilter, setSelectedTeamFilter] = useState('all');
+  const [selectedTeamFilterAdd, setSelectedTeamFilterAdd] = useState('all');
 
   const canCreateRoom = ['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role);
 
-  // Fetch eligible users based on role
+  // Fetch eligible users based on role and map team affiliations
   const fetchEligibleUsers = async () => {
     try {
+      // 1. Fetch teams
+      let teamsList = [];
+      try {
+        const teamsEndpoint = ['ADMIN', 'SUPER_ADMIN'].includes(user.role) ? '/teams' : '/teams/me';
+        const teamsRes = await api.get(teamsEndpoint);
+        teamsList = teamsRes.data?.data || teamsRes.data || [];
+        if (!Array.isArray(teamsList)) teamsList = [];
+      } catch (err) {
+        try {
+          const fallback = await api.get('/teams');
+          teamsList = fallback.data?.data || fallback.data || [];
+        } catch (_) {}
+      }
+      setTeams(teamsList);
+
+      // 2. Fetch users based on role
+      const userMap = new Map();
+
       if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
         const res = await api.get('/admin/users');
-        setEligibleUsers(res.data.data);
+        const rawUsers = res.data?.data || [];
+        rawUsers.forEach((u) => {
+          if (u._id && u._id.toString() !== user._id.toString()) {
+            userMap.set(u._id.toString(), { ...u, teamNames: [], teamIds: [] });
+          }
+        });
       } else if (user.role === 'T3_EXECUTIVE') {
-        // T3 only sees members from their teams + events
         const [teamRes, eventRes] = await Promise.all([
-          api.get('/teams/me/members'),
-          api.get('/teams/me/event-members'),
+          api.get('/teams/me/members').catch(() => ({ data: { data: [] } })),
+          api.get('/teams/me/event-members').catch(() => ({ data: { data: [] } })),
         ]);
 
-        // Merge + dedupe
-        const merged = new Map();
-        [...teamRes.data.data, ...eventRes.data.data].forEach((u) => {
-          merged.set(u._id, u);
+        [...(teamRes.data?.data || []), ...(eventRes.data?.data || [])].forEach((u) => {
+          if (u._id && u._id.toString() !== user._id.toString()) {
+            userMap.set(u._id.toString(), { ...u, teamNames: [], teamIds: [] });
+          }
         });
-
-        // Remove self
-        merged.delete(user._id);
-
-        setEligibleUsers(Array.from(merged.values()));
-      } else {
-        setEligibleUsers([]);
       }
+
+      // Map team memberships onto users and ensure every team member is captured
+      teamsList.forEach((t) => {
+        const tIdStr = (t._id || '').toString();
+        if (Array.isArray(t.members)) {
+          t.members.forEach((m) => {
+            const mId = (m?._id || m || '').toString();
+            if (!mId || mId === user._id.toString()) return;
+            if (userMap.has(mId)) {
+              const u = userMap.get(mId);
+              if (!u.teamIds.includes(tIdStr)) {
+                u.teamIds.push(tIdStr);
+                u.teamNames.push(t.name);
+              }
+            } else if (typeof m === 'object' && m.name) {
+              userMap.set(mId, {
+                _id: mId,
+                name: m.name,
+                email: m.email || '',
+                role: m.role || 'T1_VOLUNTEER',
+                teamNames: [t.name],
+                teamIds: [tIdStr],
+              });
+            }
+          });
+        }
+        if (t.leadId) {
+          const leadId = (t.leadId?._id || t.leadId || '').toString();
+          if (leadId && leadId !== user._id.toString()) {
+            if (userMap.has(leadId)) {
+              const u = userMap.get(leadId);
+              if (!u.teamIds.includes(tIdStr)) {
+                u.teamIds.push(tIdStr);
+                u.teamNames.push(t.name);
+              }
+            } else if (typeof t.leadId === 'object' && t.leadId.name) {
+              userMap.set(leadId, {
+                _id: leadId,
+                name: t.leadId.name,
+                email: t.leadId.email || '',
+                role: t.leadId.role || 'T3_EXECUTIVE',
+                teamNames: [t.name],
+                teamIds: [tIdStr],
+              });
+            }
+          }
+        }
+      });
+
+      setEligibleUsers(Array.from(userMap.values()));
     } catch (err) {
       console.error('Failed to load eligible users:', err);
     }
@@ -2077,21 +2346,33 @@ export const Chat = () => {
     }
   };
 
-  // Filter eligible users
-  const filterUsers = (excludeIds = []) => {
+  // Filter eligible users with team filter support
+  const filterUsers = (excludeIds = [], teamFilter = 'all') => {
     return eligibleUsers
-      .filter((u) => !excludeIds.includes(u._id))
+      .filter((u) => !excludeIds.map(String).includes(u._id.toString()))
+      .filter((u) => {
+        if (!teamFilter || teamFilter === 'all') return true;
+        return (u.teamIds || []).map(String).includes(teamFilter.toString());
+      })
       .filter((u) =>
-        u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-        u.email.toLowerCase().includes(memberSearch.toLowerCase())
+        (u.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(memberSearch.toLowerCase())
       );
   };
 
-  const usersForCreate = filterUsers([user._id]);
+  const usersForCreate = filterUsers([user._id], selectedTeamFilter);
 
   const usersForAdd = selectedRoom
-    ? filterUsers([user._id, ...(selectedRoom.members || []).map((m) => m._id)])
+    ? filterUsers(
+        [user._id, ...(selectedRoom.members || []).map((m) => m._id || m)],
+        selectedTeamFilterAdd
+      )
     : [];
+
+  const getTeamMemberCount = (teamId) => {
+    if (teamId === 'all') return eligibleUsers.length;
+    return eligibleUsers.filter((u) => (u.teamIds || []).map(String).includes(teamId.toString())).length;
+  };
 
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-4">
@@ -2229,57 +2510,222 @@ export const Chat = () => {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium">Add Members</label>
-                  <button type="button" onClick={fetchEligibleUsers} className="text-xs text-blue-500 hover:underline">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <label className="text-sm font-semibold text-gray-800">Add Members</label>
+                    <p className="text-xs text-gray-500">Filter team-wise or pick individual members</p>
+                  </div>
+                  <button type="button" onClick={fetchEligibleUsers} className="text-xs text-blue-600 hover:underline font-medium">
                     Refresh
                   </button>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 mb-2">
-                  <div className="flex items-center gap-2">
-                    <Search size={16} className="text-gray-400" />
-                    <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
-                      placeholder="Search users..."
-                      className="flex-1 bg-transparent border-none outline-none text-sm" />
+
+                {/* Team Selection Bar */}
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 mb-3 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                      <UsersRound size={14} className="text-blue-600" /> Filter by Team:
+                    </span>
+                    <select
+                      value={selectedTeamFilter}
+                      onChange={(e) => setSelectedTeamFilter(e.target.value)}
+                      className="text-xs h-9 px-3 rounded-lg border border-gray-300 bg-white font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 sm:max-w-xs"
+                    >
+                      <option value="all">👥 All Available Members ({eligibleUsers.length})</option>
+                      {teams.map((t) => (
+                        <option key={t._id} value={t._id}>
+                          🏢 {t.name} ({getTeamMemberCount(t._id)} members)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Team Filter Banner */}
+                  {selectedTeamFilter !== 'all' && (
+                    <div className="flex items-center justify-between bg-blue-50/70 border border-blue-200 rounded-lg px-3 py-2 text-xs">
+                      <div className="min-w-0 pr-2">
+                        <span className="font-semibold text-blue-900 truncate block">
+                          Team: {teams.find((t) => t._id === selectedTeamFilter)?.name}
+                        </span>
+                        <span className="text-blue-700 text-[11px]">
+                          Showing only members in this team ({usersForCreate.length})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {usersForCreate.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const visibleIds = usersForCreate.map((u) => u._id);
+                              const allSelected = visibleIds.every((id) => form.memberIds.includes(id));
+                              if (allSelected) {
+                                setForm((f) => ({
+                                  ...f,
+                                  memberIds: f.memberIds.filter((id) => !visibleIds.includes(id)),
+                                }));
+                              } else {
+                                setForm((f) => ({
+                                  ...f,
+                                  memberIds: Array.from(new Set([...f.memberIds, ...visibleIds])),
+                                }));
+                              }
+                            }}
+                            className="px-2.5 py-1 bg-blue-600 text-white rounded-md text-xs font-medium hover:bg-blue-700 transition"
+                          >
+                            {usersForCreate.length > 0 && usersForCreate.every((u) => form.memberIds.includes(u._id))
+                              ? 'Deselect Team'
+                              : 'Select Entire Team'}
+                          </button>
+                        )}
+                        {!form.name && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const tName = teams.find((t) => t._id === selectedTeamFilter)?.name;
+                              if (tName) setForm((f) => ({ ...f, name: `${tName} Chat` }));
+                            }}
+                            className="px-2 py-1 bg-white border border-blue-300 text-blue-700 rounded-md text-xs hover:bg-blue-50 transition"
+                            title="Auto-fill room name"
+                          >
+                            Use as Room Name
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Search box */}
+                  <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 px-3 py-2">
+                    <Search size={15} className="text-gray-400" />
+                    <input
+                      type="text"
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder={
+                        selectedTeamFilter === 'all'
+                          ? 'Search individual users by name or email...'
+                          : `Search in this team...`
+                      }
+                      className="flex-1 bg-transparent border-none outline-none text-xs"
+                    />
+                    {memberSearch && (
+                      <button type="button" onClick={() => setMemberSearch('')} className="text-gray-400 hover:text-gray-600">
+                        <X size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                {/* Selected members chips */}
+                {form.memberIds.length > 0 && (
+                  <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-2.5 mb-2.5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-semibold text-blue-900">
+                        Selected Members ({form.memberIds.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, memberIds: [] }))}
+                        className="text-[11px] text-blue-600 hover:underline font-medium"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                      {form.memberIds.map((id) => {
+                        const u = eligibleUsers.find((user) => user._id === id);
+                        if (!u) return null;
+                        return (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-white text-blue-800 border border-blue-200 font-medium shadow-2xs"
+                          >
+                            <span className="max-w-[130px] truncate">{u.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => toggleMember(id)}
+                              className="hover:text-red-500 rounded-full"
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Members list */}
+                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white">
                   {usersForCreate.length === 0 ? (
                     <div className="p-6 text-center">
                       <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm font-medium text-gray-700">No members found</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
                         {eligibleUsers.length === 0
                           ? user.role === 'T3_EXECUTIVE'
-                            ? 'No team members yet. Ask Admin to add you to a team.'
+                            ? 'No team members yet. Ask Admin to assign you to a team.'
                             : 'No users available'
+                          : selectedTeamFilter !== 'all'
+                          ? 'No other members found in this team'
                           : 'No users match your search'}
                       </p>
                     </div>
-                  ) : usersForCreate.map((u) => (
-                    <label key={u._id} className="flex items-center gap-3 p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer">
-                      <input type="checkbox" checked={form.memberIds.includes(u._id)}
-                        onChange={() => toggleMember(u._id)} className="w-4 h-4" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{u.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
-                      </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${u.role === 'T1_VOLUNTEER' ? 'bg-green-100 text-green-700' :
-                        u.role === 'T2_ASSOCIATE' ? 'bg-blue-100 text-blue-700' :
-                          'bg-purple-100 text-purple-700'
-                        }`}>{u.role.replace('_', ' ')}</span>
-                    </label>
-                  ))}
+                  ) : (
+                    usersForCreate.map((u) => {
+                      const isChecked = form.memberIds.includes(u._id);
+                      return (
+                        <label
+                          key={u._id}
+                          className={`flex items-center gap-3 p-3 transition cursor-pointer ${
+                            isChecked ? 'bg-blue-50/40' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleMember(u._id)}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                          />
+                          <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {u.name?.charAt(0) || 'U'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-gray-900 truncate">{u.name}</p>
+                              {u.teamNames && u.teamNames.length > 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded font-normal truncate max-w-[120px]">
+                                  {u.teamNames.join(', ')}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                          </div>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                              u.role === 'T1_VOLUNTEER'
+                                ? 'bg-green-100 text-green-700'
+                                : u.role === 'T2_ASSOCIATE'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-purple-100 text-purple-700'
+                            }`}
+                          >
+                            {u.role ? u.role.replace('_', ' ') : 'Member'}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
                 {form.memberIds.length > 0 && (
-                  <p className="text-xs text-blue-600 mt-1">{form.memberIds.length} member(s) selected</p>
+                  <p className="text-xs text-blue-600 mt-1 font-medium">{form.memberIds.length} member(s) selected</p>
                 )}
               </div>
 
               <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setCreateModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+                <button type="button" onClick={() => setCreateModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
                 <button type="submit" disabled={saving}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50">
+                  className="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 text-sm shadow-sm">
                   {saving ? 'Creating...' : 'Create Room'}
                 </button>
               </div>
@@ -2301,12 +2747,43 @@ export const Chat = () => {
               <button onClick={() => setAddMemberModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-3 mb-4">
-              <div className="flex items-center gap-2">
-                <Search size={16} className="text-gray-400" />
-                <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)}
-                  placeholder="Search users..."
-                  className="flex-1 bg-transparent border-none outline-none text-sm" />
+            {/* Filter by Team */}
+            <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 mb-3 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                  <UsersRound size={14} className="text-blue-600" /> Filter by Team:
+                </span>
+                <select
+                  value={selectedTeamFilterAdd}
+                  onChange={(e) => setSelectedTeamFilterAdd(e.target.value)}
+                  className="text-xs h-9 px-3 rounded-lg border border-gray-300 bg-white font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 sm:max-w-xs"
+                >
+                  <option value="all">👥 All Available Members</option>
+                  {teams.map((t) => (
+                    <option key={t._id} value={t._id}>
+                      🏢 {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 px-3 py-1.5">
+                <Search size={15} className="text-gray-400" />
+                <input
+                  type="text"
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder={
+                    selectedTeamFilterAdd === 'all'
+                      ? 'Search individual users by name or email...'
+                      : `Search in this team...`
+                  }
+                  className="flex-1 bg-transparent border-none outline-none text-xs"
+                />
+                {memberSearch && (
+                  <button type="button" onClick={() => setMemberSearch('')} className="text-gray-400 hover:text-gray-600">
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2314,34 +2791,48 @@ export const Chat = () => {
               {usersForAdd.length === 0 ? (
                 <div className="p-6 text-center">
                   <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm font-medium text-gray-700">No members available</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
                     {eligibleUsers.length === 0
                       ? 'No team members available'
+                      : selectedTeamFilterAdd !== 'all'
+                      ? 'All members of this team are already in the room'
                       : 'All available members already in this room'}
                   </p>
                 </div>
-              ) : usersForAdd.map((u) => (
-                <div key={u._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {u.name.charAt(0)}
+              ) : (
+                usersForAdd.map((u) => (
+                  <div key={u._id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {u.name?.charAt(0) || 'U'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{u.name}</p>
+                          {u.teamNames && u.teamNames.length > 0 && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded truncate max-w-[120px]">
+                              {u.teamNames.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{u.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{u.email}</p>
-                    </div>
+                    <button
+                      onClick={() => addMemberToRoom(u._id)}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 flex-shrink-0 ml-2 shadow-2xs"
+                    >
+                      Add
+                    </button>
                   </div>
-                  <button onClick={() => addMemberToRoom(u._id)}
-                    className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 flex-shrink-0 ml-2">
-                    Add
-                  </button>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
               <span className="text-xs text-gray-500">Current: {selectedRoom.memberCount} members</span>
-              <button onClick={() => setAddMemberModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">
+              <button onClick={() => setAddMemberModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">
                 Done
               </button>
             </div>
@@ -3274,6 +3765,7 @@ export const ApplicationsPage = () => {
           ? 'Request approved! Attendance record updated and notification sent.'
           : 'Request denied with reason. Employee has been notified.'
       );
+      window.dispatchEvent(new CustomEvent('app:badge-refresh'));
       setTimeout(() => setActionSuccess(''), 4500);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update request status');
@@ -4003,6 +4495,8 @@ export const CertificatesPage = () => {
 // NOTIFICATIONS
 // ====================================================================
 export const NotificationsPage = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const socket = useSocket();
   const [notifs, setNotifs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -4046,14 +4540,41 @@ export const NotificationsPage = () => {
     } catch (err) { console.error(err); }
   };
 
+  const handleNotifClick = async (n) => {
+    if (!n.isRead) {
+      await markRead(n._id);
+    }
+    if (n.linkTo) {
+      navigate(n.linkTo);
+      return;
+    }
+    if (n.type === 'application') {
+      const appRoute =
+        user?.role === 'T3_EXECUTIVE'
+          ? '/t3/applications'
+          : ['ADMIN', 'SUPER_ADMIN'].includes(user?.role)
+          ? '/admin/applications'
+          : user?.role === 'T2_ASSOCIATE'
+          ? '/t2/applications'
+          : '/t1/applications';
+      navigate(appRoute);
+    } else if (n.type === 'chat') {
+      navigate('/chat');
+    } else if (n.type === 'announcement') {
+      navigate('/announcements');
+    } else if (n.type === 'attendance') {
+      navigate(user?.role === 'T3_EXECUTIVE' ? '/t3/attendance' : '/attendance');
+    }
+  };
+
   const filtered = filter === 'all' ? notifs : notifs.filter((n) => !n.isRead);
   const unread = notifs.filter((n) => !n.isRead).length;
 
   const iconFor = (type) => {
-    if (type === 'application') return <FileText className="w-5 h-5 text-blue-500" />;
-    if (type === 'chat') return <MessageSquare className="w-5 h-5 text-green-500" />;
+    if (type === 'application') return <FileCheck className="w-5 h-5 text-purple-600" />;
+    if (type === 'chat') return <MessageSquare className="w-5 h-5 text-emerald-600" />;
     if (type === 'certificate') return <Award className="w-5 h-5 text-amber-500" />;
-    if (type === 'attendance') return <CheckCircle className="w-5 h-5 text-purple-500" />;
+    if (type === 'attendance') return <CheckCircle className="w-5 h-5 text-blue-500" />;
     if (type === 'announcement') return <Bell className="w-5 h-5 text-indigo-600" />;
     if (type === 'event') return <Calendar className="w-5 h-5 text-cyan-500" />;
     if (type === 'review') return <Star className="w-5 h-5 text-yellow-500" />;
@@ -4092,38 +4613,56 @@ export const NotificationsPage = () => {
           <p className="text-gray-500">{filter === 'unread' ? "You're all caught up" : 'Activities will appear here'}</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {filtered.map((n, i) => {
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
+          {filtered.map((n) => {
             const isAnn = isAnnouncement(n.type);
             return (
               <div
                 key={n._id}
-                onClick={() => !n.isRead && markRead(n._id)}
-                className={`p-4 flex gap-4 items-start cursor-pointer transition ${i > 0 ? 'border-t border-gray-100' : ''
-                  } ${isAnn
+                onClick={() => handleNotifClick(n)}
+                className={`p-4 flex gap-4 items-start cursor-pointer transition group ${
+                  isAnn
                     ? !n.isRead
-                      ? 'bg-indigo-50 border-l-4 border-l-indigo-500 hover:bg-indigo-100'
-                      : 'bg-indigo-50/30 border-l-4 border-l-indigo-200 hover:bg-indigo-50/60'
+                      ? 'bg-indigo-50/70 border-l-4 border-l-indigo-500 hover:bg-indigo-100/70'
+                      : 'bg-indigo-50/20 hover:bg-indigo-50/50'
                     : !n.isRead
-                      ? 'bg-blue-50/30 hover:bg-blue-50/50'
-                      : 'hover:bg-gray-50'
-                  }`}
+                    ? 'bg-blue-50/40 border-l-4 border-l-blue-500 hover:bg-blue-50/70'
+                    : 'hover:bg-gray-50'
+                }`}
               >
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isAnn ? 'bg-indigo-100' : 'bg-gray-100'
-                  }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  n.type === 'application' ? 'bg-purple-100' :
+                  n.type === 'chat' ? 'bg-emerald-100' :
+                  isAnn ? 'bg-indigo-100' : 'bg-gray-100'
+                }`}>
                   {iconFor(n.type)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className={`text-sm ${n.isRead ? 'font-normal' : 'font-semibold'} ${isAnn ? 'text-indigo-900' : ''}`}>
-                      {n.title}
-                    </p>
-                    {isAnn && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
-                        ANNOUNCEMENT
-                      </span>
-                    )}
-                    {!n.isRead && <span className={`w-2 h-2 rounded-full ${isAnn ? 'bg-indigo-500' : 'bg-blue-500'}`} />}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-sm ${n.isRead ? 'font-normal text-gray-800' : 'font-semibold text-gray-900'} ${isAnn ? 'text-indigo-900' : ''}`}>
+                        {n.title}
+                      </p>
+                      {isAnn && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                          ANNOUNCEMENT
+                        </span>
+                      )}
+                      {n.type === 'application' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">
+                          APPROVAL
+                        </span>
+                      )}
+                      {n.type === 'chat' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
+                          CHAT
+                        </span>
+                      )}
+                      {!n.isRead && <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-200" />}
+                    </div>
+                    <span className="text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity font-medium flex items-center gap-0.5">
+                      Open <ChevronRight size={14} />
+                    </span>
                   </div>
                   <p className={`text-sm mt-0.5 ${isAnn ? 'text-indigo-800' : 'text-gray-600'}`}>
                     {n.message}

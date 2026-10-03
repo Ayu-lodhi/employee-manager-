@@ -183,6 +183,23 @@ class ChatService {
     room.lastMessageAt = new Date();
     await room.save();
 
+    // Notify other room members about the new message
+    if (Array.isArray(room.members)) {
+      const senderDisplayName = user.name || 'Team member';
+      const previewText = text.trim().length > 60 ? `${text.trim().substring(0, 57)}...` : text.trim();
+      for (const memberId of room.members) {
+        if (memberId && memberId.toString() !== user.sub) {
+          notify(
+            memberId.toString(),
+            'chat',
+            `New message in ${room.name}`,
+            `${senderDisplayName}: ${previewText}`,
+            '/chat'
+          ).catch((e) => console.error('Chat notification failed:', e.message));
+        }
+      }
+    }
+
     return message;
   }
 

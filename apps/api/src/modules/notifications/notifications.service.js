@@ -23,7 +23,7 @@ const queueSMS = async (to, body) => {
 };
 
 // Create + emit single notification
-exports.notify = async (userId, type, title, message) => {
+exports.notify = async (userId, type, title, message, linkTo = '') => {
   try {
     const user = await User.findById(userId).select('email phone notificationPrefs');
     if (!user) return null;
@@ -33,12 +33,13 @@ exports.notify = async (userId, type, title, message) => {
 
     // 1. In-app notification
     if (shouldSend(prefs, 'inApp', type)) {
-      notif = await Notification.create({ userId, type, title, message });
+      notif = await Notification.create({ userId, type, title, message, linkTo });
       await emitToUser(userId, 'notification:new', {
         _id: notif._id,
         type: notif.type,
         title: notif.title,
         message: notif.message,
+        linkTo: notif.linkTo || linkTo,
         isRead: false,
         createdAt: notif.createdAt,
       });
@@ -61,11 +62,11 @@ exports.notify = async (userId, type, title, message) => {
 };
 
 // Notify many users
-exports.notifyMany = async (userIds, type, title, message) => {
+exports.notifyMany = async (userIds, type, title, message, linkTo = '') => {
   try {
     const results = [];
     for (const userId of userIds) {
-      const r = await exports.notify(userId, type, title, message);
+      const r = await exports.notify(userId, type, title, message, linkTo);
       if (r) results.push(r);
     }
     return results;
@@ -75,10 +76,10 @@ exports.notifyMany = async (userIds, type, title, message) => {
 };
 
 // Notify all users except the actor
-exports.notifyAll = async (excludeUserId, type, title, message, User) => {
+exports.notifyAll = async (excludeUserId, type, title, message, linkTo = '', UserModel = User) => {
   try {
-    const users = await User.find({ _id: { $ne: excludeUserId }, isActive: true }).select('_id');
-    return await exports.notifyMany(users.map((u) => u._id), type, title, message);
+    const users = await UserModel.find({ _id: { $ne: excludeUserId }, isActive: true }).select('_id');
+    return await exports.notifyMany(users.map((u) => u._id), type, title, message, linkTo);
   } catch (err) {
     console.error('NotifyAll failed:', err.message);
   }

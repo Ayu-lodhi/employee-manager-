@@ -72,34 +72,53 @@ class ApplicationService {
     if (['leave', 'half_day'].includes(requestType)) {
       if (team.leadId && team.leadId.toString() !== user.sub) {
         await notify(
-          team.leadId,
+          team.leadId.toString(),
           'application',
           `New ${reqTypeName} Request`,
-          `${memberName} requested ${reqTypeName} for ${targetDate}.${reason ? ` Reason: "${reason}"` : ''}`
+          `${memberName} requested ${reqTypeName} for ${targetDate}.${reason ? ` Reason: "${reason}"` : ''}`,
+          '/t3/applications'
         );
-      } else if (team.leadId && team.leadId.toString() === user.sub) {
-        // T3 raising request for themselves -> notify admins if available
+      } else {
+        // T3 raising request for themselves or team has no lead -> notify admins
         try {
           const admins = await User.find({ role: { $in: ['ADMIN', 'SUPER_ADMIN'] }, isActive: true }).select('_id');
           if (Array.isArray(admins)) {
             for (const admin of admins) {
               await notify(
-                admin._id,
+                admin._id.toString(),
                 'application',
                 `New ${reqTypeName} Request`,
-                `${memberName} requested ${reqTypeName} for ${targetDate}.${reason ? ` Reason: "${reason}"` : ''}`
+                `${memberName} requested ${reqTypeName} for ${targetDate}.${reason ? ` Reason: "${reason}"` : ''}`,
+                '/admin/applications'
               );
             }
           }
         } catch (_) {}
       }
-    } else if (team.leadId) {
+    } else if (team.leadId && team.leadId.toString() !== user.sub) {
       await notify(
-        team.leadId,
+        team.leadId.toString(),
         'application',
         'New Application',
-        `${memberName} applied to your team "${team.name}".`
+        `${memberName} applied to your team "${team.name}".`,
+        '/t3/applications'
       );
+    } else {
+      // General team application without assigned lead or lead applied -> notify admins
+      try {
+        const admins = await User.find({ role: { $in: ['ADMIN', 'SUPER_ADMIN'] }, isActive: true }).select('_id');
+        if (Array.isArray(admins)) {
+          for (const admin of admins) {
+            await notify(
+              admin._id.toString(),
+              'application',
+              'New Application',
+              `${memberName} applied to "${team.name}".`,
+              '/admin/applications'
+            );
+          }
+        }
+      } catch (_) {}
     }
 
     return app;
@@ -277,7 +296,15 @@ class ApplicationService {
       ? `Your ${typeLabel.toLowerCase()} request for ${app.targetDate || 'the team'} was denied. Reason: ${app.rejectionReason || 'No reason provided'}`
       : `You've been waitlisted for "${app.teamName || app.eventTitle || 'the team'}".`;
 
-    await notify(app.studentId, 'application', title, message);
+    // Determine destination route based on role if student has one
+    let targetRoute = '/t1/applications';
+    try {
+      const applicantUser = await User.findById(app.studentId).select('role');
+      if (applicantUser?.role === 'T2_ASSOCIATE') targetRoute = '/t2/applications';
+      else if (applicantUser?.role === 'T3_EXECUTIVE') targetRoute = '/t3/applications';
+    } catch (_) {}
+
+    await notify(app.studentId.toString(), 'application', title, message, targetRoute);
 
     return app;
   }
