@@ -71,7 +71,18 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ayushlodhi88_db_user:9
 if (mongoose.connection.readyState === 0) {
   mongoose
     .connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
-    .then(() => console.log('MongoDB Connected'))
+    .then(async () => {
+      console.log('MongoDB Connected');
+      try {
+        const Attendance = require('./modules/attendance/attendance.model');
+        const AttendanceLink = require('./modules/attendance/attendanceLink.model');
+        await Attendance.syncIndexes();
+        await AttendanceLink.syncIndexes();
+        console.log('Attendance & AttendanceLink indexes synced');
+      } catch (idxErr) {
+        console.warn('Index sync warning:', idxErr.message);
+      }
+    })
     .catch((err) => console.error('MongoDB Error:', err.message));
 }
 

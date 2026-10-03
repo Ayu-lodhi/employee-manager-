@@ -10,7 +10,7 @@ import {
   Chat, NotificationsPage, ReviewsPage, QRCheckIn, Placeholder,
   EventDetailPage, ProfilePage, MyReviewsPage,
   ChangePasswordPage, ResetPasswordPage, PreferencesPage, AnnouncementsPage,
-  TimesheetPage
+  TimesheetPage, AttendPage
 } from './pages';
 
 const RootRedirect = () => {
@@ -26,10 +26,11 @@ function App() {
       <AuthProvider>
         <SocketProvider>
           <Routes>
-            {/* Public */}
+            {/* Public / Auth */}
             <Route path="/login" element={<Login />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/attend/:token" element={<AttendPage />} />
             <Route path="/" element={<RootRedirect />} />
 
             {/* Super Admin */}

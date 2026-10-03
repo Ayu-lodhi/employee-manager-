@@ -11,7 +11,7 @@ import {
   Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, Crown, AlertTriangle,
   Eye, EyeOff, Key,
   Info, Trash2, Construction, MapPin, Timer, BarChart3, ExternalLink, ChevronRight,
-  FileCheck, Download, Check, AlertCircle
+  FileCheck, Download, Check, AlertCircle, Copy, RefreshCw, Radio, CheckCircle2, XCircle
 } from 'lucide-react';
 import api from './lib/api';
 import { io } from 'socket.io-client';
@@ -4100,6 +4100,23 @@ export const ApplicationsPage = () => {
 // ====================================================================
 export const AttendancePage = () => {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('t3_link'); // 't3_link' or 'roster'
+
+  // --- T3 Link & QR Generator State ---
+  const [durationMinutes, setDurationMinutes] = useState(10);
+  const [generating, setGenerating] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState(null);
+  const [countdownMs, setCountdownMs] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [genError, setGenError] = useState('');
+
+  // --- T3 Today Attendance Panel State ---
+  const [panelData, setPanelData] = useState(null);
+  const [loadingPanel, setLoadingPanel] = useState(true);
+  const [panelError, setPanelError] = useState('');
+
+  // --- Team Roster State ---
   const [teams, setTeams] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -4107,25 +4124,113 @@ export const AttendancePage = () => {
   const [teamInfo, setTeamInfo] = useState(null);
   const [stats, setStats] = useState(null);
   const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingRoster, setLoadingRoster] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showQR, setShowQR] = useState(false);
   const [manualModal, setManualModal] = useState(null);
   const [manualForm, setManualForm] = useState({ status: 'present', notes: '' });
   const [downloading, setDownloading] = useState(false);
 
-  // Load T3's teams
+  // Fetch T3 Today Panel Data
+  const fetchPanelData = async () => {
+    try {
+      const res = await api.get('/attendance/t3/panel');
+      setPanelData(res.data.data);
+      setPanelError('');
+    } catch (err) {
+      console.warn('Failed to fetch T3 panel:', err.message);
+      setPanelError(err.response?.data?.message || err.message);
+    } finally {
+      setLoadingPanel(false);
+    }
+  };
+
+  // Poll panel data every 12 seconds
+  useEffect(() => {
+    fetchPanelData();
+    const interval = setInterval(fetchPanelData, 12000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Live countdown timer for active generated link
+  useEffect(() => {
+    if (!generatedLink?.expiresAt || !generatedLink.active) {
+      setCountdownMs(null);
+      return;
+    }
+
+    const tick = () => {
+      const left = Math.max(0, new Date(generatedLink.expiresAt).getTime() - Date.now());
+      setCountdownMs(left);
+      if (left === 0) {
+        setGeneratedLink((prev) => prev ? { ...prev, active: false } : null);
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [generatedLink?.expiresAt, generatedLink?.active]);
+
+  // Handle generating new link & QR
+  const handleGenerateLink = async (e) => {
+    e?.preventDefault();
+    setGenerating(true);
+    setGenError('');
+    try {
+      const res = await api.post('/attendance/link/generate', { minutes: durationMinutes });
+      setGeneratedLink(res.data.data);
+      setCopied(false);
+      // Refresh panel in case stats changed
+      fetchPanelData();
+    } catch (err) {
+      setGenError(err.response?.data?.message || err.message || 'Failed to generate link');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Handle manual deactivation
+  const handleDeactivate = async () => {
+    if (!generatedLink?.token || deactivating) return;
+    setDeactivating(true);
+    try {
+      await api.post(`/attendance/link/${generatedLink.token}/deactivate`, {});
+      setGeneratedLink((prev) => prev ? { ...prev, active: false } : null);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to deactivate link');
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
+  // Copy link helper
+  const handleCopyLink = () => {
+    if (!generatedLink?.url) return;
+    navigator.clipboard.writeText(generatedLink.url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const formatCountdown = (ms) => {
+    if (ms == null) return '00:00';
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  // Load T3's teams for roster view
   useEffect(() => {
     (async () => {
       try {
         const res = await api.get('/teams/me');
-        const list = res.data.data;
+        const list = res.data.data || [];
         setTeams(list);
         if (list.length > 0) setSelectedTeamId(list[0]._id);
       } catch (err) {
         console.error(err);
       } finally {
-        setLoading(false);
+        setLoadingRoster(false);
       }
     })();
   }, []);
@@ -4139,18 +4244,20 @@ export const AttendancePage = () => {
         api.get(`/attendance/team/stats?teamId=${selectedTeamId}&date=${selectedDate}`),
         api.get(`/attendance/team/history?teamId=${selectedTeamId}&days=7`),
       ]);
-      setRoster(attRes.data.data.roster);
-      setTeamInfo(attRes.data.data.team);
-      setStats(statsRes.data.data);
-      setHistory(histRes.data.data.history);
+      setRoster(attRes.data.data.roster || []);
+      setTeamInfo(attRes.data.data.team || null);
+      setStats(statsRes.data.data || null);
+      setHistory(histRes.data.data.history || []);
     } catch (err) {
       console.error(err);
     }
   };
 
   useEffect(() => {
-    loadTeamData();
-  }, [selectedTeamId, selectedDate]);
+    if (activeTab === 'roster') {
+      loadTeamData();
+    }
+  }, [selectedTeamId, selectedDate, activeTab]);
 
   // Manual mark
   const submitManual = async (e) => {
@@ -4181,7 +4288,6 @@ export const AttendancePage = () => {
     try {
       const res = await api.get(`/attendance/download?teamId=${selectedTeamId}`);
       const { csv, filename } = res.data.data;
-
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -4198,9 +4304,6 @@ export const AttendancePage = () => {
     }
   };
 
-  // Generate QR token (frontend-only demo — students enter it manually)
-  const generateQRToken = () => `TBI-${Math.random().toString(36).substring(2, 8).toUpperCase()}-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
-
   const statusColor = {
     present: 'bg-green-100 text-green-700',
     late: 'bg-amber-100 text-amber-700',
@@ -4210,171 +4313,516 @@ export const AttendancePage = () => {
     not_marked: 'bg-gray-100 text-gray-500',
   };
 
-  if (loading) return <SkeletonTable rows={5} cols={5} />;
-
-  if (teams.length === 0) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Attendance</h1>
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <UsersRound className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No teams assigned to you</h3>
-          <p className="text-sm text-gray-500">Ask an Admin to make you a Team Lead first.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-3">
+      {/* Header with Navigation Tabs */}
+      <div className="flex flex-wrap justify-between items-center gap-4 border-b border-gray-200 pb-4">
         <div>
-          <h1 className="text-2xl font-bold">Attendance</h1>
-          <p className="text-gray-500">Mark attendance and track team presence</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-900">Attendance</h1>
+            <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200">
+              T3 Executive
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 mt-0.5">Time-limited link and QR code attendance manager</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowQR(!showQR)} className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 flex items-center gap-2 text-sm">
-            <QrCode size={16} /> {showQR ? 'Hide QR' : 'Generate QR'}
+
+        {/* Tab Switcher */}
+        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+          <button
+            type="button"
+            onClick={() => setActiveTab('t3_link')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${
+              activeTab === 't3_link'
+                ? 'bg-white text-indigo-700 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <QrCode className="w-4 h-4" />
+            <span>Time-Limited Link & QR</span>
           </button>
-          <button onClick={downloadCSV} disabled={downloading} className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm">
-            <Upload size={16} className="rotate-180" /> {downloading ? 'Downloading...' : 'Download CSV'}
+          <button
+            type="button"
+            onClick={() => setActiveTab('roster')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${
+              activeTab === 'roster'
+                ? 'bg-white text-indigo-700 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <UsersRound className="w-4 h-4" />
+            <span>Team Roster & Records</span>
           </button>
         </div>
       </div>
 
-      {/* Team + Date Selector */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Team</label>
-            <select value={selectedTeamId} onChange={(e) => setSelectedTeamId(e.target.value)} className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500">
-              {teams.map((t) => (
-                <option key={t._id} value={t._id}>{t.name}{t.eventTitle ? ` — ${t.eventTitle}` : ''}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Date</label>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500" />
-          </div>
-        </div>
-      </div>
-
-      {/* QR Display */}
-      {showQR && (
-        <div className="bg-white rounded-xl border border-purple-200 p-6 flex flex-col items-center">
-          <div className="w-48 h-48 bg-purple-50 border-2 border-dashed border-purple-300 rounded-lg flex items-center justify-center mb-4">
-            <QrCode className="w-24 h-24 text-purple-500" />
-          </div>
-          <p className="text-xs text-gray-500 mb-2">Students can check-in with this code:</p>
-          <p className="text-lg font-mono font-bold text-purple-700 tracking-wider bg-purple-50 px-4 py-2 rounded-lg">
-            {generateQRToken()}
-          </p>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs text-gray-500">Attendance Rate</p>
-            <p className="text-3xl font-bold mt-1 text-blue-600">{stats.percentage}%</p>
-            <p className="text-xs text-gray-400 mt-1">{stats.attended} of {stats.totalMembers} present</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs text-gray-500">Present</p>
-            <p className="text-3xl font-bold mt-1 text-green-600">{stats.present}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs text-gray-500">Late</p>
-            <p className="text-3xl font-bold mt-1 text-amber-600">{stats.late}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs text-gray-500">Absent</p>
-            <p className="text-3xl font-bold mt-1 text-red-600">{stats.absent}</p>
-          </div>
-        </div>
-      )}
-
-      {/* 7-Day History Chart */}
-      {history.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold mb-4">Last 7 Days — Attendance %</h3>
-          <div className="flex items-end gap-2 h-32">
-            {history.map((d) => (
-              <div key={d.date} className="flex-1 flex flex-col items-center justify-end">
-                <div
-                  className={`w-full rounded-t transition-all ${d.percentage >= 75 ? 'bg-green-500' : d.percentage >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-                  style={{ height: `${Math.max(d.percentage, 3)}%` }}
-                  title={`${d.date}: ${d.percentage}%`}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-gray-500 mt-2">
-            {history.map((d) => (
-              <span key={d.date}>{new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Roster Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="font-semibold">Team Roster — {teamInfo?.name}</h3>
-          <p className="text-xs text-gray-500">{roster.length} members</p>
-        </div>
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Member</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check In</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Method</th>
-              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {roster.map((r) => (
-              <tr key={r.studentId} className="hover:bg-gray-50">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                      {r.studentName.charAt(0)}
+      {/* ========================================================================= */}
+      {/* TAB 1: TIME-LIMITED ATTENDANCE LINK & QR + LIVE T3 PANEL (TODAY) */}
+      {/* ========================================================================= */}
+      {activeTab === 't3_link' && (
+        <div className="space-y-6">
+          {/* Top Grid: Generator Card + Live Status Card */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: Generator Form */}
+            <div className="lg:col-span-5 bg-white rounded-2xl border border-gray-200 p-6 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                      <Timer className="w-4 h-4" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{r.studentName}</p>
-                      <p className="text-xs text-gray-500">{r.studentEmail}</p>
+                    <h2 className="text-base font-bold text-slate-800">Generate Session QR</h2>
+                  </div>
+                  <span className="text-xs font-mono font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                    Max 120m
+                  </span>
+                </div>
+
+                <p className="text-xs text-gray-500 mb-5 leading-relaxed">
+                  Creates a secure time-bounded URL and QR code. Valid only during the active window. Attendees must log in to submit attendance.
+                </p>
+
+                {genError && (
+                  <div className="p-3 mb-4 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{genError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleGenerateLink} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase mb-1.5">
+                      Valid Duration (Minutes)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={durationMinutes}
+                        onChange={(e) => setDurationMinutes(Math.max(1, Math.min(120, parseInt(e.target.value) || 1)))}
+                        className="w-full h-11 px-3.5 rounded-xl border border-gray-300 outline-none focus:border-indigo-500 font-semibold text-slate-800"
+                      />
+                      <div className="flex gap-1">
+                        {[5, 10, 15, 30].map((mins) => (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => setDurationMinutes(mins)}
+                            className={`px-2.5 py-2 text-xs font-semibold rounded-lg border transition ${
+                              durationMinutes === mins
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                            }`}
+                          >
+                            {mins}m
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[r.status]}`}>
-                    {r.status.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500">
-                  {r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
-                </td>
-                <td className="px-6 py-4 text-xs text-gray-400 uppercase">{r.method || '—'}</td>
-                <td className="px-6 py-4">
+
                   <button
-                    onClick={() => { setManualModal(r); setManualForm({ status: r.status === 'not_marked' ? 'present' : r.status, notes: '' }); }}
-                    className="text-xs text-blue-600 hover:underline font-medium"
+                    type="submit"
+                    disabled={generating}
+                    className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition duration-150 disabled:opacity-50 flex items-center justify-center gap-2 text-sm cursor-pointer"
                   >
-                    {r.status === 'not_marked' ? 'Mark' : 'Update'}
+                    {generating ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <QrCode className="w-4 h-4" />
+                        <span>Generate Active Link & QR</span>
+                      </>
+                    )}
                   </button>
-                </td>
-              </tr>
-            ))}
-            {roster.length === 0 && (
-              <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">No members in this team yet</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                </form>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+                <span>Timezone: Asia/Kolkata</span>
+                <span>Team: T3 Only</span>
+              </div>
+            </div>
+
+            {/* Right: Active QR Code & Live Countdown */}
+            <div className="lg:col-span-7 bg-white rounded-2xl border border-gray-200 p-6 shadow-xs flex flex-col items-center justify-center min-h-[360px]">
+              {generatedLink ? (
+                <div className="w-full flex flex-col items-center text-center">
+                  {/* Status Banner */}
+                  <div className="w-full flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-200 mb-5">
+                    <div className="flex items-center gap-2 text-left">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">T3 Session Active</p>
+                        <p className="text-[11px] text-gray-500">
+                          Expires: {new Date(generatedLink.expiresAt).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    {generatedLink.active && countdownMs > 0 ? (
+                      <div className="text-right">
+                        <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg">
+                          ⏳ {formatCountdown(countdownMs)} remaining
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
+                        EXPIRED
+                      </span>
+                    )}
+                  </div>
+
+                  {/* QR Display or Expired State */}
+                  {generatedLink.active && countdownMs > 0 ? (
+                    <div className="flex flex-col items-center animate-fade-in">
+                      <div className="p-3 bg-white border-2 border-indigo-600 rounded-2xl shadow-md mb-3">
+                        <img
+                          src={generatedLink.qrCode}
+                          alt="Attendance QR Code"
+                          className="w-56 h-56 object-contain"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mb-4">Scan with camera to open attendance page</p>
+
+                      {/* Link URL with Copy */}
+                      <div className="w-full max-w-md flex items-center gap-2 p-1.5 bg-gray-50 rounded-xl border border-gray-200 mb-4">
+                        <input
+                          type="text"
+                          readOnly
+                          value={generatedLink.url}
+                          className="flex-1 bg-transparent px-2 text-xs font-mono text-gray-700 outline-none select-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCopyLink}
+                          className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100 flex items-center gap-1.5 shadow-xs transition"
+                        >
+                          {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copied ? 'Copied!' : 'Copy'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.open(generatedLink.url, '_blank')}
+                          className="px-2.5 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition"
+                          title="Open in new tab"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Deactivate Button */}
+                      <button
+                        type="button"
+                        onClick={handleDeactivate}
+                        disabled={deactivating}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition disabled:opacity-50 cursor-pointer"
+                      >
+                        {deactivating ? 'Deactivating...' : 'Deactivate Link Early'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="py-12 px-6 flex flex-col items-center">
+                      <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 mb-3">
+                        <XCircle className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-800">Attendance Window Closed</h3>
+                      <p className="text-xs text-gray-500 mt-1 max-w-sm">
+                        This session link and QR code have expired or been deactivated. Generate a new session link above.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleGenerateLink}
+                        className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition"
+                      >
+                        Generate New Session
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-4 text-gray-400">
+                  <div className="w-20 h-20 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center mx-auto mb-3">
+                    <QrCode className="w-10 h-10 text-gray-300" />
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-600">No Active Session Link</h3>
+                  <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
+                    Select the validity minutes on the left and click "Generate Active Link & QR" to begin.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* T3 ATTENDANCE PANEL (TODAY) — AUTO-POLLS EVERY 12 SECONDS */}
+          {/* ========================================================================= */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-xs space-y-6">
+            {/* Panel Top Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-lg font-bold text-slate-900">Today's T3 Attendance Panel</h2>
+                  <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Live (12s auto-refresh)</span>
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Date: {panelData?.date || new Date().toISOString().split('T')[0]} (Asia/Kolkata)
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchPanelData}
+                disabled={loadingPanel}
+                className="px-3.5 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 flex items-center gap-1.5 transition"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingPanel ? 'animate-spin' : ''}`} />
+                <span>Refresh Now</span>
+              </button>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-xs font-medium text-slate-500">Total T3 Members</p>
+                <p className="text-3xl font-extrabold text-slate-900 mt-1">{panelData?.totalCount ?? '—'}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Active team roster</p>
+              </div>
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                <p className="text-xs font-medium text-emerald-700">Present Today</p>
+                <p className="text-3xl font-extrabold text-emerald-600 mt-1">{panelData?.presentCount ?? '0'}</p>
+                <p className="text-[11px] text-emerald-600/80 mt-0.5">Verified check-ins</p>
+              </div>
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200">
+                <p className="text-xs font-medium text-rose-700">Absent / Pending</p>
+                <p className="text-3xl font-extrabold text-rose-600 mt-1">{panelData?.absentCount ?? '0'}</p>
+                <p className="text-[11px] text-rose-600/80 mt-0.5">Yet to mark attendance</p>
+              </div>
+            </div>
+
+            {/* Two Side-by-Side Panels: Present vs Absent Members */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+              {/* Present Members Table */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="px-4 py-3 bg-emerald-50/70 border-b border-gray-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <h3 className="text-sm font-bold text-emerald-950">Present Members ({panelData?.presentMembers?.length || 0})</h3>
+                  </div>
+                  <span className="text-[11px] text-emerald-700 font-medium">Sorted by time</span>
+                </div>
+
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                  {panelData?.presentMembers?.map((m, idx) => (
+                    <div key={m.id || idx} className="p-3.5 flex items-center justify-between hover:bg-gray-50 transition">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center text-xs">
+                          {m.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">{m.name}</p>
+                          <p className="text-[11px] text-gray-400">{m.email}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-100 text-emerald-800">
+                          {m.markedAt ? new Date(m.markedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Marked'}
+                        </span>
+                        <p className="text-[10px] text-gray-400 mt-0.5 uppercase">{m.method || 'link'}</p>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!panelData?.presentMembers || panelData.presentMembers.length === 0) && (
+                    <div className="py-8 text-center text-xs text-gray-400">
+                      No check-ins recorded yet for today.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Absent Members List */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="px-4 py-3 bg-rose-50/70 border-b border-gray-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                    <h3 className="text-sm font-bold text-rose-950">Absent Members ({panelData?.absentMembers?.length || 0})</h3>
+                  </div>
+                  <span className="text-[11px] text-rose-700 font-medium">Pending today</span>
+                </div>
+
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                  {panelData?.absentMembers?.map((m, idx) => (
+                    <div key={m.userId || idx} className="p-3.5 flex items-center justify-between hover:bg-gray-50 transition">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-700 font-bold flex items-center justify-center text-xs">
+                          {m.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">{m.name}</p>
+                          <p className="text-[11px] text-gray-400">{m.email}</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 text-rose-700">
+                        Absent
+                      </span>
+                    </div>
+                  ))}
+
+                  {(!panelData?.absentMembers || panelData.absentMembers.length === 0) && (
+                    <div className="py-8 text-center text-xs text-emerald-600 font-medium">
+                      ✓ All T3 members have checked in today!
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: TEAM ROSTER & RECORDS (EXISTING VIEW) */}
+      {/* ========================================================================= */}
+      {activeTab === 'roster' && (
+        <div className="space-y-6">
+          {teams.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+              <UsersRound className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No event teams assigned</h3>
+              <p className="text-sm text-gray-500">Ask an Admin to assign you as a Team Lead to manage event rosters.</p>
+            </div>
+          ) : (
+            <>
+              {/* Header Actions */}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={downloadCSV}
+                  disabled={downloading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm"
+                >
+                  <Upload size={16} className="rotate-180" /> {downloading ? 'Downloading...' : 'Download CSV'}
+                </button>
+              </div>
+
+              {/* Team + Date Selector */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Team</label>
+                    <select
+                      value={selectedTeamId}
+                      onChange={(e) => setSelectedTeamId(e.target.value)}
+                      className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+                    >
+                      {teams.map((t) => (
+                        <option key={t._id} value={t._id}>{t.name}{t.eventTitle ? ` — ${t.eventTitle}` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Date</label>
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-full h-11 px-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Cards */}
+              {stats && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <p className="text-xs text-gray-500">Attendance Rate</p>
+                    <p className="text-3xl font-bold mt-1 text-blue-600">{stats.percentage}%</p>
+                    <p className="text-xs text-gray-400 mt-1">{stats.attended} of {stats.totalMembers} present</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <p className="text-xs text-gray-500">Present</p>
+                    <p className="text-3xl font-bold mt-1 text-green-600">{stats.present}</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <p className="text-xs text-gray-500">Late</p>
+                    <p className="text-3xl font-bold mt-1 text-amber-600">{stats.late}</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <p className="text-xs text-gray-500">Absent</p>
+                    <p className="text-3xl font-bold mt-1 text-red-600">{stats.absent}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Roster Table */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                  <h3 className="font-semibold">Team Roster — {teamInfo?.name}</h3>
+                  <p className="text-xs text-gray-500">{roster.length} members</p>
+                </div>
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Member</th>
+                      <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Check In</th>
+                      <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Method</th>
+                      <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {roster.map((r) => (
+                      <tr key={r.studentId} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                              {r.studentName.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{r.studentName}</p>
+                              <p className="text-xs text-gray-500">{r.studentEmail}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor[r.status]}`}>
+                            {r.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-gray-400 uppercase">{r.method || '—'}</td>
+                        <td className="px-6 py-4">
+                          <button
+                            type="button"
+                            onClick={() => { setManualModal(r); setManualForm({ status: r.status === 'not_marked' ? 'present' : r.status, notes: '' }); }}
+                            className="text-xs text-blue-600 hover:underline font-medium cursor-pointer"
+                          >
+                            {r.status === 'not_marked' ? 'Mark' : 'Update'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {roster.length === 0 && (
+                      <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">No members in this team yet</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Manual Mark Modal */}
       {manualModal && (
@@ -4406,10 +4854,11 @@ export const AttendancePage = () => {
                       key={opt.value}
                       type="button"
                       onClick={() => setManualForm({ ...manualForm, status: opt.value })}
-                      className={`p-3 rounded-lg border-2 text-sm font-medium transition ${manualForm.status === opt.value
+                      className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
+                        manualForm.status === opt.value
                           ? `border-${opt.color}-500 bg-${opt.color}-50`
                           : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                      }`}
                     >
                       {opt.label}
                     </button>
@@ -4419,9 +4868,13 @@ export const AttendancePage = () => {
 
               <div>
                 <label className="block text-sm font-medium mb-1.5">Notes (optional)</label>
-                <textarea rows={2} value={manualForm.notes} onChange={(e) => setManualForm({ ...manualForm, notes: e.target.value })}
+                <textarea
+                  rows={2}
+                  value={manualForm.notes}
+                  onChange={(e) => setManualForm({ ...manualForm, notes: e.target.value })}
                   placeholder="Reason, etc."
-                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500" />
+                  className="w-full p-3 rounded-lg border border-gray-200 outline-none resize-none focus:border-blue-500"
+                />
               </div>
 
               <div className="flex gap-3 justify-end">
@@ -4437,6 +4890,253 @@ export const AttendancePage = () => {
     </div>
   );
 };
+
+// ====================================================================
+// ATTEND PAGE — Public/Protected landing page for QR/Link attendance (/attend/:token)
+// "Do NOT mark attendance on a GET request, because link previews can trigger it."
+// ====================================================================
+export const AttendPage = () => {
+  const { token } = useParams();
+  const { user, initializing } = useAuth();
+  const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [linkInfo, setLinkInfo] = useState(null);
+  const [error, setError] = useState('');
+  const [marking, setMarking] = useState(false);
+  const [successData, setSuccessData] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(null);
+
+  const fetchLink = async () => {
+    if (!token) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.get(`/attendance/link/${token}`);
+      setLinkInfo(res.data.data);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Invalid or expired attendance link');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!initializing) {
+      if (user) {
+        fetchLink();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [token, user, initializing]);
+
+  // Live countdown timer
+  useEffect(() => {
+    if (!linkInfo?.expiresAt) return;
+    const tick = () => {
+      const remaining = Math.max(0, new Date(linkInfo.expiresAt).getTime() - Date.now());
+      setTimeLeft(remaining);
+      if (remaining === 0 && linkInfo.active) {
+        setLinkInfo((prev) => prev ? { ...prev, active: false, status: 'expired' } : null);
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [linkInfo?.expiresAt]);
+
+  const handleMarkAttendance = async () => {
+    if (marking) return;
+    setMarking(true);
+    setError('');
+    try {
+      const res = await api.post(`/attendance/link/${token}/mark`, {});
+      setSuccessData(res.data.data);
+      // Refresh status
+      await fetchLink();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to mark attendance');
+    } finally {
+      setMarking(false);
+    }
+  };
+
+  const formatRemaining = (ms) => {
+    if (ms == null) return '...';
+    if (ms <= 0) return '00:00';
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  if (initializing || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-600">Verifying attendance link...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is not logged in, prompt login
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-8 h-8 text-indigo-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Login Required</h2>
+          <p className="text-sm text-slate-600 mb-6">
+            You must be logged into your account to mark your attendance.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition shadow-md cursor-pointer"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isExpired = linkInfo ? (!linkInfo.active || (timeLeft != null && timeLeft <= 0)) : false;
+  const isNotStarted = linkInfo?.status === 'not_started';
+  const isAlreadyMarked = linkInfo?.alreadyMarked || !!successData;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-6 text-white text-center relative">
+          <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center mx-auto mb-3 shadow-inner">
+            <Clock className="w-7 h-7 text-indigo-400" />
+          </div>
+          <span className="text-xs uppercase tracking-widest font-mono text-indigo-300 font-bold">
+            {linkInfo?.team || 'T3'} Attendance Portal
+          </span>
+          <h1 className="text-xl font-bold mt-1">Time-Limited Check-in</h1>
+          <p className="text-xs text-slate-300 mt-1">Date: {linkInfo?.date || new Date().toISOString().split('T')[0]}</p>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-5">
+          {/* User ID card */}
+          <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+            <div>
+              <p className="text-xs text-slate-500 font-medium">Logged in as</p>
+              <p className="text-sm font-bold text-slate-800">{user.name}</p>
+              <p className="text-xs text-slate-500">{user.email}</p>
+            </div>
+            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+              {user.role}
+            </span>
+          </div>
+
+          {/* Feedback Alerts */}
+          {error && (
+            <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-800">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="text-xs font-medium leading-relaxed">
+                <p className="font-bold">Cannot Mark Attendance</p>
+                <p>{error}</p>
+              </div>
+            </div>
+          )}
+
+          {successData && (
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-800">
+              <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="text-xs font-medium leading-relaxed">
+                <p className="font-bold">Attendance Verified!</p>
+                <p>Your attendance for today was recorded at {new Date(successData.markedAt || Date.now()).toLocaleTimeString()}.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Status Details */}
+          {linkInfo && (
+            <div className="space-y-3">
+              {/* Countdown or status pill */}
+              <div className="text-center p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Session Status</p>
+                {isExpired ? (
+                  <div className="mt-1">
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                      EXPIRED / INACTIVE
+                    </span>
+                    <p className="text-xs text-slate-400 mt-1.5">This session window has closed.</p>
+                  </div>
+                ) : isNotStarted ? (
+                  <div className="mt-1">
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                      NOT STARTED YET
+                    </span>
+                    <p className="text-xs text-slate-500 mt-1.5">Starts at: {new Date(linkInfo.startsAt).toLocaleTimeString()}</p>
+                  </div>
+                ) : (
+                  <div className="mt-1">
+                    <div className="text-3xl font-mono font-black text-indigo-600 tracking-wider">
+                      {formatRemaining(timeLeft)}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">Remaining until link expires at {new Date(linkInfo.expiresAt).toLocaleTimeString()}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Already marked indicator */}
+              {isAlreadyMarked && (
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center text-xs font-semibold text-emerald-700 flex items-center justify-center gap-1.5">
+                  <Check className="w-4 h-4" />
+                  <span>You have already marked attendance for today!</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="pt-2">
+            {!isAlreadyMarked && !isExpired && !isNotStarted && (
+              <button
+                type="button"
+                onClick={handleMarkAttendance}
+                disabled={marking}
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl transition duration-150 shadow-lg shadow-emerald-900/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer text-base"
+              >
+                {marking ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Verifying on Server...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    <span>Mark My Attendance</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => navigate('/t3/attendance')}
+              className="w-full mt-2.5 py-2.5 px-4 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+            >
+              Go to T3 Dashboard / Panel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // ====================================================================
 // CERTIFICATES PAGE — For T1/T2/T3 only

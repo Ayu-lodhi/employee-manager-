@@ -53,3 +53,53 @@ exports.restrictTo = (...allowedRoles) => {
     next();
   };
 };
+
+// Team-based access control
+exports.requireTeam = (teamName) => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Not authenticated' });
+    }
+
+    const role = req.user.role || '';
+    const isTeamMatch =
+      (teamName === 'T3' && (role === 'T3_EXECUTIVE' || role === 'T3')) ||
+      (req.user.team && req.user.team.toUpperCase() === teamName.toUpperCase());
+
+    if (isTeamMatch) {
+      return next();
+    }
+
+    // Check if user has teamId assigned to a team named teamName
+    if (req.user.teamId) {
+      try {
+        const Team = require('../teams/teams.model');
+        const team = await Team.findById(req.user.teamId);
+        if (team && (team.name.toUpperCase().includes(teamName.toUpperCase()) || team.name.toUpperCase() === teamName.toUpperCase())) {
+          return next();
+        }
+      } catch (err) {
+        // Fall through
+      }
+    }
+
+    // Also check if user is a member of any Team named teamName
+    try {
+      const Team = require('../teams/teams.model');
+      const memberTeam = await Team.findOne({
+        name: new RegExp(`^${teamName}$`, 'i'),
+        $or: [{ members: req.user.sub }, { leadId: req.user.sub }]
+      });
+      if (memberTeam) {
+        return next();
+      }
+    } catch (err) {
+      // Fall through
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: `Access denied. ${teamName} team membership required.`,
+    });
+  };
+};

@@ -100,3 +100,51 @@ exports.downloadSheet = async (req, res) => {
     res.status(err.statusCode || 400).json({ success: false, message: err.message });
   }
 };
+
+const linkService = require('./attendanceLink.service');
+
+// Time-Limited Attendance Link & QR (T3)
+exports.generateLink = async (req, res) => {
+  try {
+    const data = await linkService.generateLink(req.body, req.user);
+    res.status(201).json({ success: true, message: 'Attendance link generated', data });
+  } catch (err) {
+    res.status(err.statusCode || 400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getLinkInfo = async (req, res) => {
+  try {
+    const data = await linkService.getLinkInfo(req.params.token, req.user);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    res.status(err.statusCode || 400).json({ success: false, message: err.message });
+  }
+};
+
+exports.markLinkAttendance = async (req, res) => {
+  try {
+    const record = await linkService.markAttendance(req.params.token, req.user);
+    res.status(201).json({ success: true, message: 'Attendance marked successfully', data: record });
+  } catch (err) {
+    res.status(err.statusCode || 400).json({ success: false, message: err.message });
+  }
+};
+
+exports.deactivateLink = async (req, res) => {
+  try {
+    const data = await linkService.deactivateLink(req.params.token, req.user);
+    res.status(200).json({ success: true, message: 'Attendance link deactivated', data });
+  } catch (err) {
+    res.status(err.statusCode || 400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getT3TodayPanel = async (req, res) => {
+  try {
+    const data = await linkService.getT3TodayPanel();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    res.status(err.statusCode || 400).json({ success: false, message: err.message });
+  }
+};
