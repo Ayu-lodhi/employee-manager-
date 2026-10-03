@@ -73,14 +73,16 @@ if (mongoose.connection.readyState === 0) {
     .connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
     .then(async () => {
       console.log('MongoDB Connected');
-      try {
-        const Attendance = require('./modules/attendance/attendance.model');
-        const AttendanceLink = require('./modules/attendance/attendanceLink.model');
-        await Attendance.syncIndexes();
-        await AttendanceLink.syncIndexes();
-        console.log('Attendance & AttendanceLink indexes synced');
-      } catch (idxErr) {
-        console.warn('Index sync warning:', idxErr.message);
+      if (process.env.AUTO_SYNC_INDEXES === 'true') {
+        try {
+          const Attendance = require('./modules/attendance/attendance.model');
+          const AttendanceLink = require('./modules/attendance/attendanceLink.model');
+          await Attendance.syncIndexes();
+          await AttendanceLink.syncIndexes();
+          console.log('Attendance & AttendanceLink indexes synced');
+        } catch (idxErr) {
+          console.warn('Index sync warning:', idxErr.message);
+        }
       }
     })
     .catch((err) => console.error('MongoDB Error:', err.message));

@@ -12,4 +12,8 @@ const reviewSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+reviewSchema.index({ reviewedBy: 1, createdAt: -1 });
+reviewSchema.index({ studentId: 1, createdAt: -1 });
+reviewSchema.index({ eventId: 1 });
+
 module.exports = mongoose.model('Review', reviewSchema);

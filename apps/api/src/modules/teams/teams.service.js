@@ -42,12 +42,12 @@ const projectTeamsForRequester = async (teams, requester) => {
 };
 
 exports.getAllTeams = async (requester) => {
-  const teams = await Team.find().sort({ createdAt: -1 });
+  const teams = await Team.find().sort({ createdAt: -1 }).lean();
   return projectTeamsForRequester(teams, requester);
 };
 
 exports.getTeamById = async (id, requester) => {
-  const team = await Team.findById(id);
+  const team = await Team.findById(id).lean();
   if (!team) throw new Error('Team not found');
   const [result] = await projectTeamsForRequester([team], requester);
   return result;
@@ -59,7 +59,8 @@ exports.getMyTeams = async (userId) => {
   })
     .populate('members', 'name email role')
     .populate('leadId', 'name email role')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   return teams;
 };

@@ -28,4 +28,9 @@ const applicationSchema = new mongoose.Schema({
   reviewedAt: { type: Date, default: null },
 });
 
+applicationSchema.index({ studentId: 1, appliedAt: -1 });
+applicationSchema.index({ teamId: 1, status: 1 });
+applicationSchema.index({ eventId: 1 });
+applicationSchema.index({ status: 1, appliedAt: -1 });
+
 module.exports = mongoose.model('Application', applicationSchema);

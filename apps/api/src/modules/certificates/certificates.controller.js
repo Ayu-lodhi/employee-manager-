@@ -3,8 +3,21 @@ const Certificate = require('./certificates.model');
 
 exports.getMyCertificates = async (req, res) => {
   try {
-    const certs = await Certificate.find({ studentId: req.user.sub }).sort({ issuedAt: -1 });
-    res.json({ success: true, data: certs });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const hasExplicitLimit = req.query.limit !== undefined;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || (hasExplicitLimit ? 50 : 200)));
+    const skip = (page - 1) * limit;
+
+    const [certs, total] = await Promise.all([
+      Certificate.find({ studentId: req.user.sub }).sort({ issuedAt: -1 }).skip(skip).limit(limit).lean(),
+      Certificate.countDocuments({ studentId: req.user.sub }),
+    ]);
+
+    res.json({
+      success: true,
+      data: certs,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -12,8 +25,21 @@ exports.getMyCertificates = async (req, res) => {
 
 exports.getAllCertificates = async (req, res) => {
   try {
-    const certs = await Certificate.find().sort({ issuedAt: -1 });
-    res.json({ success: true, data: certs });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const hasExplicitLimit = req.query.limit !== undefined;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || (hasExplicitLimit ? 50 : 200)));
+    const skip = (page - 1) * limit;
+
+    const [certs, total] = await Promise.all([
+      Certificate.find().sort({ issuedAt: -1 }).skip(skip).limit(limit).lean(),
+      Certificate.countDocuments(),
+    ]);
+
+    res.json({
+      success: true,
+      data: certs,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

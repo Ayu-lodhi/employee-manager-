@@ -10,4 +10,7 @@ const certificateSchema = new mongoose.Schema({
   certificateId: { type: String, unique: true },
 });
 
+certificateSchema.index({ studentId: 1, issuedAt: -1 });
+certificateSchema.index({ eventId: 1 });
+
 module.exports = mongoose.model('Certificate', certificateSchema);
