@@ -99,6 +99,12 @@ exports.logout = async (userId) => {
       },
     });
   }
+  try {
+    const { invalidateUserPermissions } = require('../../core/cache/permissionCache');
+    await invalidateUserPermissions(userId);
+  } catch (err) {
+    // Graceful fallback
+  }
   return { success: true };
 };
 

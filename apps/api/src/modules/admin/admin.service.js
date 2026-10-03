@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { disconnectUserSockets } = require('../../config/socket');
+const { invalidateUserPermissions } = require('../../core/cache/permissionCache');
 const User = require('./admin.model');
 const { sendWelcomeEmail, sendPasswordResetLinkEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
 
@@ -65,6 +66,8 @@ exports.updateUser = async (id, data) => {
     }).catch((err) => console.error('Admin profile update email failed:', err.message));
   }
 
+  invalidateUserPermissions(id).catch(() => {});
+
   return user;
 };
 
@@ -98,6 +101,7 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
   user.mustChangePassword = true;
   await user.save();
   disconnectUserSockets(user._id);
+  invalidateUserPermissions(user._id).catch(() => {});
 
   return {
     userId: user._id,
@@ -129,6 +133,7 @@ exports.reactivateUser = async (id, adminId) => {
   user.isActive = true;
   user.mustChangePassword = true;  // Force password change on next login
   await user.save();
+  invalidateUserPermissions(user._id).catch(() => {});
 
   // Send welcome email with new credentials
   sendWelcomeEmail({
@@ -155,6 +160,7 @@ exports.deleteUser = async (id, adminId) => {
   if (user.role === 'SUPER_ADMIN') throw new Error('Cannot delete a Super Admin account');
   if (id.toString() === adminId?.toString()) throw new Error('You cannot delete your own account');
   await User.findByIdAndDelete(id);
+  invalidateUserPermissions(id).catch(() => {});
   return user;
 };
 
