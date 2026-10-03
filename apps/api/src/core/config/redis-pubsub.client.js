@@ -11,3 +11,9 @@ export const redisPubSub = new Redis(ENV.REDIS_PUBSUB_URL, {
 redisPubSub.on('error', (err) => {
   logger.error('Redis PubSub Client Error', { error: err.message });
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { redisPubSub };
+  module.exports.redisPubSub = redisPubSub;
+}
+

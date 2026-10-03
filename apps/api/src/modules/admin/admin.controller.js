@@ -156,3 +156,39 @@ exports.resetUserSession = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
+
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!role) {
+      return res.status(400).json({ success: false, message: 'Role is required' });
+    }
+    const result = await adminService.updateUserRole(
+      req.params.id,
+      role,
+      req.user,
+      req.ip || req.headers['x-forwarded-for']
+    );
+    res.status(200).json({ success: true, message: 'User role updated', data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateUserPermissions = async (req, res) => {
+  try {
+    const { customGrants } = req.body;
+    if (!Array.isArray(customGrants)) {
+      return res.status(400).json({ success: false, message: 'customGrants array is required' });
+    }
+    const result = await adminService.updateUserPermissions(
+      req.params.id,
+      customGrants,
+      req.user,
+      req.ip || req.headers['x-forwarded-for']
+    );
+    res.status(200).json({ success: true, message: 'User permissions updated', data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

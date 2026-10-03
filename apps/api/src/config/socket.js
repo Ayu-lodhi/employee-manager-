@@ -48,6 +48,45 @@ const authorizeSocket = async (socket) => {
 };
 
 
+// Per-user rate limiting for Socket.io events (Sliding window: max 30 events per 10 seconds)
+const SOCKET_EVENT_LIMIT = 30;
+const SOCKET_WINDOW_SECONDS = 10;
+const inMemorySocketBuckets = new Map();
+
+const checkSocketRateLimit = async (userId) => {
+  if (!userId) return false;
+  const key = `ratelimit:socket:${userId}`;
+
+  // 1. Try Redis cache if available
+  try {
+    const { redisCache } = require('../core/config/redis-cache.client');
+    if (redisCache && (redisCache.status === 'ready' || redisCache.status === 'connect')) {
+      const current = await redisCache.incr(key);
+      if (current === 1) {
+        await redisCache.expire(key, SOCKET_WINDOW_SECONDS);
+      }
+      return current <= SOCKET_EVENT_LIMIT;
+    }
+  } catch {
+    // Fall back to in-memory sliding window
+  }
+
+  // 2. In-memory sliding window fallback (fail closed if invalid)
+  const now = Date.now();
+  let bucket = inMemorySocketBuckets.get(userId);
+  if (!bucket || now - bucket.windowStart > SOCKET_WINDOW_SECONDS * 1000) {
+    bucket = { count: 1, windowStart: now };
+    inMemorySocketBuckets.set(userId, bucket);
+    return true;
+  }
+
+  if (bucket.count >= SOCKET_EVENT_LIMIT) {
+    return false;
+  }
+  bucket.count += 1;
+  return true;
+};
+
 const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
@@ -98,6 +137,19 @@ const initSocket = (httpServer) => {
     expire();
     // Cover revocation while the handshake was in flight, before room registration.
     void authorizeSocket(socket);
+
+    // Enforce per-user event rate limiting
+    socket.use(async ([event, ...args], next) => {
+      const allowed = await checkSocketRateLimit(socket.userId);
+      if (!allowed) {
+        socket.emit('error', {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Too many socket requests. Please slow down.',
+        });
+        return next(new Error('Socket rate limit exceeded'));
+      }
+      next();
+    });
 
     const pendingJoins = new Map();
     socket.on('chat:join', async (roomId) => {
@@ -197,4 +249,6 @@ module.exports = {
   emitToRoom,
   closeChatRoom,
   emitToAll,
+  checkSocketRateLimit,
+  SOCKET_EVENT_LIMIT,
 };
