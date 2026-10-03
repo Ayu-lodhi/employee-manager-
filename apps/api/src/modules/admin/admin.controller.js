@@ -143,3 +143,16 @@ exports.changeEmail = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
+
+exports.resetUserSession = async (req, res) => {
+  try {
+    const user = await adminService.resetUserSession(req.params.id);
+    res.status(200).json({
+      success: true,
+      message: `Active session cleared for ${user.name}.`,
+      data: user,
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

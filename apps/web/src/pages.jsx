@@ -11,7 +11,7 @@ import {
   Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, Crown, AlertTriangle,
   Eye, EyeOff, Key,
   Info, Trash2, Construction, MapPin, Timer, BarChart3, ExternalLink, ChevronRight,
-  FileCheck, Download, Check, AlertCircle, Copy, RefreshCw, Radio, CheckCircle2, XCircle
+  FileCheck, Download, Check, AlertCircle, Copy, RefreshCw, Radio, CheckCircle2, XCircle, Send
 } from 'lucide-react';
 import api from './lib/api';
 import { io } from 'socket.io-client';
@@ -145,7 +145,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? (sessionStorage.getItem('tbi_token') || localStorage.getItem('tbi_token')) : null;
+      if (token) {
+        fetch(`${API_BASE}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }).catch(() => {});
+      }
+    } catch {}
     setUser(null);
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('tbi_user');
@@ -453,19 +465,25 @@ export const Login = () => {
       } catch {
         throw new Error('Unable to connect to the server. Please try again shortly.');
       }
-      if (!data.success) throw new Error(data.message || 'Login failed');
+      if (!data.success) {
+        const err = new Error(data.message || 'Login failed');
+        err.status = res.status;
+        throw err;
+      }
       login(data.data.user, data.data.accessToken);
       navigate(ROLES[data.data.user.role].route);
     } catch (err) {
       const raw = err?.message || '';
-      if (/invalid|incorrect|credential|password|email/i.test(raw) && !/server|init|import|syntax|failed/i.test(raw)) {
+      if (err.status === 409 || /already logged in/i.test(raw)) {
+        setError(raw || 'This account is already logged in on another device');
+      } else if (/invalid|incorrect|credential|password|email/i.test(raw) && !/server|init|import|syntax|failed/i.test(raw)) {
         setError('Invalid username or password. Please verify your credentials.');
       } else if (/rate limit|too many/i.test(raw)) {
         setError('Too many login attempts. Please wait a moment and try again.');
       } else if (/inactive|blocked|disabled|suspended/i.test(raw)) {
         setError('Your account is inactive. Please contact the administrator.');
       } else {
-        setError('Unable to sign in right now. Please try again in a few moments.');
+        setError(raw || 'Unable to sign in right now. Please try again in a few moments.');
       }
     } finally {
       setLoading(false);
@@ -634,6 +652,18 @@ export const Login = () => {
                 <div className="p-2.5 bg-amber-50 border-2 border-amber-500 shadow-[2px_2px_0px_0px_#1A1A1A] rounded-lg text-xs text-amber-950 font-['Space_Mono',monospace] font-bold flex items-center gap-2">
                   <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
                   <span>Logged out due to inactivity. Please sign in again.</span>
+                </div>
+              )}
+              {logoutReason === 'timeout' && !error && (
+                <div className="p-2.5 bg-amber-50 border-2 border-amber-500 shadow-[2px_2px_0px_0px_#1A1A1A] rounded-lg text-xs text-amber-950 font-['Space_Mono',monospace] font-bold flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+                  <span>Session timed out. Please log in again.</span>
+                </div>
+              )}
+              {logoutReason === 'session_ended' && !error && (
+                <div className="p-2.5 bg-red-50 border-2 border-[#C8322B] shadow-[2px_2px_0px_0px_#1A1A1A] rounded-lg text-xs text-red-950 font-['Space_Mono',monospace] font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-[#C8322B] shrink-0" />
+                  <span>Session ended. Please log in again.</span>
                 </div>
               )}
               {logoutReason === 'session_expired' && !error && (
@@ -933,15 +963,6 @@ export const Topbar = () => {
         <input type="text" placeholder="Search..." className="flex-1 bg-transparent border-none outline-none text-sm" />
       </div>
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => window.open('/login?new_session=true', '_blank')}
-          title="Open a separate independent session in a new browser tab to sign into another account simultaneously"
-          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer"
-        >
-          <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
-          <span>New Session Tab</span>
-        </button>
         <button onClick={() => navigate('/notifications')} className="relative p-2 rounded-lg hover:bg-gray-100">
           <Bell className="w-5 h-5 text-gray-600" />
           {unreadCount > 0 && (
@@ -2574,8 +2595,36 @@ export const Chat = () => {
                       {!own && (
                         <p className="text-xs font-medium text-gray-600 mb-1 ml-1">{m.senderName}</p>
                       )}
-                      <div className={`px-4 py-2 rounded-2xl ${own ? 'bg-blue-500 text-white rounded-tr-sm' : 'bg-gray-100 text-gray-900 rounded-tl-sm'}`}>
-                        <p className="text-sm break-words">{m.text}</p>
+                      <div className={`px-4 py-2.5 rounded-2xl ${own ? 'bg-blue-600 text-white rounded-tr-sm shadow-sm' : 'bg-gray-100 text-gray-900 rounded-tl-sm border border-gray-200'}`}>
+                        <p className="text-sm break-words whitespace-pre-line">{m.text}</p>
+                        {m.qrCode && (
+                          <div className="mt-2.5 p-3 bg-white text-slate-800 rounded-xl border border-gray-200 shadow-xs flex flex-col items-center">
+                            <img src={m.qrCode} alt="Attendance QR Code" className="w-48 h-48 object-contain rounded-lg" />
+                            <p className="text-[11px] text-gray-500 font-medium mt-1.5">Scan QR with camera</p>
+                            {m.actionUrl && (
+                              <a
+                                href={m.actionUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg text-center shadow-xs transition flex items-center justify-center gap-1.5 no-underline"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                <span>Mark Attendance</span>
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        {!m.qrCode && m.actionUrl && (
+                          <a
+                            href={m.actionUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs transition no-underline"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>Mark Attendance</span>
+                          </a>
+                        )}
                       </div>
                       <p className="text-[10px] mt-0.5 text-gray-400 mx-1">
                         {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -4216,6 +4265,7 @@ export const ApplicationsPage = () => {
 // ====================================================================
 export const AttendancePage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('t3_link'); // 't3_link' or 'roster'
 
   // --- T3 Link & QR Generator State ---
@@ -4226,6 +4276,14 @@ export const AttendancePage = () => {
   const [copied, setCopied] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [genError, setGenError] = useState('');
+
+  // --- Share to Team Chat State ---
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareTeamId, setShareTeamId] = useState('');
+  const [shareCustomNote, setShareCustomNote] = useState('');
+  const [sharingToChat, setSharingToChat] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState('');
+  const [shareError, setShareError] = useState('');
 
   // --- T3 Today Attendance Panel State ---
   const [panelData, setPanelData] = useState(null);
@@ -4316,6 +4374,31 @@ export const AttendancePage = () => {
       alert(err.response?.data?.message || 'Failed to deactivate link');
     } finally {
       setDeactivating(false);
+    }
+  };
+
+  // Handle sharing active link & QR code to team chat
+  const handleShareToTeamChat = async (e) => {
+    e?.preventDefault();
+    if (!generatedLink?.token) return;
+    const targetTeam = shareTeamId || selectedTeamId || (teams[0]?._id);
+    if (!targetTeam) {
+      setShareError('Please select a target team chat');
+      return;
+    }
+    setSharingToChat(true);
+    setShareError('');
+    setShareSuccess('');
+    try {
+      const res = await api.post(`/attendance/link/${generatedLink.token}/share-chat`, {
+        teamId: targetTeam,
+        customNote: shareCustomNote,
+      });
+      setShareSuccess(res.data.message || 'Shared to team chat successfully!');
+    } catch (err) {
+      setShareError(err.response?.data?.message || err.message || 'Failed to share to team chat');
+    } finally {
+      setSharingToChat(false);
     }
   };
 
@@ -4631,15 +4714,32 @@ export const AttendancePage = () => {
                         </button>
                       </div>
 
-                      {/* Deactivate Button */}
-                      <button
-                        type="button"
-                        onClick={handleDeactivate}
-                        disabled={deactivating}
-                        className="px-4 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition disabled:opacity-50 cursor-pointer"
-                      >
-                        {deactivating ? 'Deactivating...' : 'Deactivate Link Early'}
-                      </button>
+                      {/* Action Buttons: Post to Team Chat & Deactivate */}
+                      <div className="w-full max-w-md flex flex-col sm:flex-row items-center gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShareTeamId(selectedTeamId || teams[0]?._id || '');
+                            setShareCustomNote('');
+                            setShareSuccess('');
+                            setShareError('');
+                            setShareModalOpen(true);
+                          }}
+                          className="w-full sm:flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 text-xs cursor-pointer"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span>Post to Team Chat</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleDeactivate}
+                          disabled={deactivating}
+                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition disabled:opacity-50 cursor-pointer"
+                        >
+                          {deactivating ? 'Deactivating...' : 'Deactivate Early'}
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="py-12 px-6 flex flex-col items-center">
@@ -5000,6 +5100,143 @@ export const AttendancePage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Share QR & Link to Team Chat Modal */}
+      {shareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full p-6 relative">
+            <button
+              type="button"
+              onClick={() => setShareModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-lg transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Share to Team Chat</h3>
+                <p className="text-xs text-gray-500">Post attendance QR code & live link to team chat</p>
+              </div>
+            </div>
+
+            {shareSuccess ? (
+              <div className="py-6 flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-3">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">Shared Successfully!</h4>
+                <p className="text-xs text-gray-500 mt-1 max-w-xs">{shareSuccess}</p>
+                <div className="flex gap-2 mt-5">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/chat')}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Open Team Chat</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShareModalOpen(false)}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleShareToTeamChat} className="space-y-4">
+                {shareError && (
+                  <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{shareError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase mb-1.5">
+                    Select Target Team Chat
+                  </label>
+                  {teams.length === 0 ? (
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-500">
+                      No teams available.
+                    </div>
+                  ) : (
+                    <select
+                      value={shareTeamId || selectedTeamId || teams[0]?._id}
+                      onChange={(e) => setShareTeamId(e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-gray-300 outline-none focus:border-indigo-500 text-xs font-semibold text-slate-800 bg-white"
+                      required
+                    >
+                      {teams.map((t) => (
+                        <option key={t._id} value={t._id}>
+                          {t.name} {t.eventTitle ? `(${t.eventTitle})` : ''} — {t.memberCount || t.members?.length || 0} members
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 uppercase mb-1.5">
+                    Optional Announcement Note
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={shareCustomNote}
+                    onChange={(e) => setShareCustomNote(e.target.value)}
+                    placeholder="e.g. Please mark your attendance now. Session closes in 15 minutes!"
+                    className="w-full p-2.5 rounded-xl border border-gray-300 outline-none focus:border-indigo-500 text-xs text-slate-800"
+                  />
+                </div>
+
+                {/* Preview Thumbnail */}
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center gap-3">
+                  <img src={generatedLink?.qrCode} alt="QR Thumbnail" className="w-14 h-14 object-contain rounded-lg border border-gray-200 bg-white p-1" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-800">Attendance QR & Link</p>
+                    <p className="text-[11px] text-gray-500 truncate">Expires: {new Date(generatedLink?.expiresAt).toLocaleTimeString()}</p>
+                    <span className="inline-block mt-1 text-[10px] font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                      Includes Direct Check-In Link
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setShareModalOpen(false)}
+                    className="px-4 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={sharingToChat || teams.length === 0}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center gap-2 cursor-pointer"
+                  >
+                    {sharingToChat ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Sending to Chat...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send to Team Chat</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

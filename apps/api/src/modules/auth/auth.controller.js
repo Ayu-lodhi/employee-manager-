@@ -19,7 +19,7 @@ exports.login = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    res.status(401).json({
+    res.status(error.statusCode || 401).json({
       success: false,
       message: error.message,
     });
@@ -79,6 +79,17 @@ exports.verifyMfa = async (req, res) => {
     const result = await authService.verifyMfa(challengeToken, code);
     res.status(200).json({ success: true, message: 'Login successful', data: result });
   } catch (error) {
-    res.status(401).json({ success: false, message: error.message });
+    res.status(error.statusCode || 401).json({ success: false, message: error.message });
+  }
+};
+
+exports.logout = async (req, res) => {
+  try {
+    if (req.user?.sub) {
+      await authService.logout(req.user.sub);
+    }
+    res.status(200).json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

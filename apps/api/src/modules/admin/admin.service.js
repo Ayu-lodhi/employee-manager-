@@ -91,6 +91,8 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
 
   // 5. Deactivate + reset password to prevent re-login
   user.isActive = false;
+  user.activeSessionId = null;
+  user.lastActivity = null;
   user.passwordChangeStartedAt = null;
   user.password = await bcrypt.hash(generateDefaultPassword(), 12);
   user.mustChangePassword = true;
@@ -288,5 +290,20 @@ exports.changeEmail = async (id, newEmail, adminId) => {
     byAdmin: true,
   }).catch((err) => console.error('Admin change email notification failed:', err.message));
 
+  return user.toObject({ virtuals: false });
+};
+
+exports.resetUserSession = async (id) => {
+  const user = await User.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        activeSessionId: null,
+        lastActivity: null,
+      },
+    },
+    { new: true }
+  ).select('-password');
+  if (!user) throw new Error('User not found');
   return user.toObject({ virtuals: false });
 };

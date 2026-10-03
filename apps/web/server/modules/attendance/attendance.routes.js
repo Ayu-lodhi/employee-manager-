@@ -1,9 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('./attendance.controller');
-const { protect, restrictTo } = require('../auth/auth.middleware');
+const { protect, restrictTo, requireTeam } = require('../auth/auth.middleware');
 
 router.use(protect);
+
+// Time-Limited Attendance Link + QR Feature (T3 Team)
+router.post('/link/generate', requireTeam('T3'), controller.generateLink);
+router.get('/link/:token', controller.getLinkInfo);
+router.post('/link/:token/mark', controller.markLinkAttendance);
+router.post('/link/:token/deactivate', requireTeam('T3'), controller.deactivateLink);
+router.post('/link/:token/share-chat', requireTeam('T3'), controller.shareLinkToChat);
+router.get('/t3/panel', requireTeam('T3'), controller.getT3TodayPanel);
 
 // Self check-in / check-out (T1/T2/T3)
 router.post('/check-in', controller.selfCheckIn);

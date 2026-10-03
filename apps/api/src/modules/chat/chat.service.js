@@ -161,7 +161,7 @@ class ChatService {
   }
 
   // Send message
-  async sendMessage(roomId, text, user) {
+  async sendMessage(roomId, text, user, options = {}) {
     const room = await ChatRoom.findById(roomId);
     if (!room) throw new Error('Room not found');
 
@@ -178,6 +178,8 @@ class ChatService {
       senderId: user.sub,
       senderName: user.name || 'User',
       text: text.trim(),
+      qrCode: options.qrCode || null,
+      actionUrl: options.actionUrl || null,
     });
 
     room.lastMessageAt = new Date();

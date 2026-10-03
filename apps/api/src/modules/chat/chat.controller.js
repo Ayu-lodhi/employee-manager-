@@ -48,8 +48,8 @@ exports.getMessages = async (req, res) => {
 
 exports.sendMessage = async (req, res) => {
   try {
-    const { text } = req.body;
-    const message = await chatService.sendMessage(req.params.id, text, req.user);
+    const { text, qrCode, actionUrl } = req.body;
+    const message = await chatService.sendMessage(req.params.id, text, req.user, { qrCode, actionUrl });
 
     // Real-time emit to room
     await emitToRoom(`chat:${req.params.id}`, 'chat:new_message', {
@@ -59,6 +59,8 @@ exports.sendMessage = async (req, res) => {
       senderId: message.senderId,
       senderName: message.senderName,
       text: message.text,
+      qrCode: message.qrCode,
+      actionUrl: message.actionUrl,
       createdAt: message.createdAt,
     });
 

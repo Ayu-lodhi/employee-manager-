@@ -148,3 +148,16 @@ exports.getT3TodayPanel = async (req, res) => {
     res.status(err.statusCode || 400).json({ success: false, message: err.message });
   }
 };
+
+exports.shareLinkToChat = async (req, res) => {
+  try {
+    const data = await linkService.shareLinkToTeamChat(req.params.token, req.body, req.user);
+    res.status(200).json({
+      success: true,
+      message: `Attendance link and QR shared to ${data.teamName} chat successfully!`,
+      data,
+    });
+  } catch (err) {
+    res.status(err.statusCode || 400).json({ success: false, message: err.message });
+  }
+};

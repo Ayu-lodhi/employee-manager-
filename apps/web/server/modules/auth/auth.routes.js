@@ -11,5 +11,6 @@ router.get('/profile', protect, authController.getProfile);
 router.patch('/profile', protect, authController.updateProfile);
 router.post('/change-email', protect, authController.changeEmail);
 router.post('/change-password', protectPasswordChange, authController.changePassword);
+router.post('/logout', protect, authController.logout);
 
 module.exports = router;

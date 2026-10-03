@@ -11,13 +11,15 @@ const touchActivity = () => {
   }
 };
 
-const handleUnauthorized = (status) => {
+const handleUnauthorized = (status, message = '') => {
   if (status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
     sessionStorage.removeItem('tbi_user');
     sessionStorage.removeItem('tbi_token');
     localStorage.removeItem('tbi_user');
     localStorage.removeItem('tbi_token');
-    window.location.href = '/login?reason=session_expired';
+    const msg = String(message || '').toLowerCase();
+    const reason = msg.includes('timed out') ? 'timeout' : msg.includes('session ended') ? 'session_ended' : 'session_expired';
+    window.location.href = `/login?reason=${reason}`;
   }
 };
 
@@ -33,7 +35,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) {
-      handleUnauthorized(res.status);
+      handleUnauthorized(res.status, data?.message);
       const err = new Error(data.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
@@ -53,7 +55,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) {
-      handleUnauthorized(res.status);
+      handleUnauthorized(res.status, data?.message);
       const err = new Error(data.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
@@ -73,7 +75,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) {
-      handleUnauthorized(res.status);
+      handleUnauthorized(res.status, data?.message);
       const err = new Error(data.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
@@ -92,7 +94,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) {
-      handleUnauthorized(res.status);
+      handleUnauthorized(res.status, data?.message);
       const err = new Error(data.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
