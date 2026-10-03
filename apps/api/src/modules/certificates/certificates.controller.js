@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const Certificate = require('./certificates.model');
+const { enqueueCertificateGeneration } = require('../../core/queues/queue.service');
 
 exports.getMyCertificates = async (req, res) => {
   try {
@@ -58,6 +59,21 @@ exports.issueCertificate = async (req, res) => {
       role,
       certificateId: certId,
     });
+
+    // Enqueue certificate PDF generation in background worker
+    try {
+      await enqueueCertificateGeneration({
+        certificateId: certId,
+        studentId,
+        studentName,
+        eventId,
+        eventTitle,
+        role,
+        requestId: req.id || req.headers?.['x-request-id'] || null,
+      });
+    } catch (queueErr) {
+      // Do not block certificate issuance response if worker queue is temporarily unavailable
+    }
 
     res.status(201).json({ success: true, message: 'Certificate issued', data: cert });
   } catch (err) {

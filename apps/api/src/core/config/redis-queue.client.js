@@ -11,3 +11,8 @@ export const redisQueue = new Redis(ENV.REDIS_QUEUE_URL, {
 redisQueue.on('error', (err) => {
   logger.error('Redis Queue Client Error', { error: err.message });
 });
+
+export default redisQueue;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { redisQueue };
+}

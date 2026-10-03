@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { enqueueEmail } = require('../core/queues/queue.service');
 
 // Encode profile text where it enters HTML, preserving stored and plain-text names.
 const escapeHtml = (value) => String(value)
@@ -56,8 +57,23 @@ const initTransporter = async () => {
   return transporter;
 };
 
-// Send email
-const sendEmail = async ({ to, subject, html, text }) => {
+// Send email (dispatches to worker queue when available, with direct fallback)
+const sendEmail = async ({ to, subject, html, text, requestId, idempotencyKey, forceDirect = false }) => {
+  if (!forceDirect && process.env.USE_WORKER_QUEUES !== 'false' && process.env.NODE_ENV !== 'test') {
+    try {
+      const enqueueResult = await enqueueEmail(
+        'sendEmail',
+        { to, subject, html, text, requestId },
+        { idempotencyKey, requestId }
+      );
+      if (enqueueResult && enqueueResult.enqueued) {
+        return { success: true, enqueued: true, messageId: enqueueResult.jobId };
+      }
+    } catch (queueErr) {
+      console.warn('Worker queue dispatch failed, falling back to direct sending:', queueErr.message);
+    }
+  }
+
   try {
     const t = await initTransporter();
     const info = await t.sendMail({
