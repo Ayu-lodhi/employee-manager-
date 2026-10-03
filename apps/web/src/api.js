@@ -5,8 +5,25 @@ const getToken = () => {
   return (typeof window !== 'undefined' ? (sessionStorage.getItem('tbi_token') || localStorage.getItem('tbi_token')) : null);
 };
 
+const touchActivity = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('app:activity'));
+  }
+};
+
+const handleUnauthorized = (status) => {
+  if (status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+    sessionStorage.removeItem('tbi_user');
+    sessionStorage.removeItem('tbi_token');
+    localStorage.removeItem('tbi_user');
+    localStorage.removeItem('tbi_token');
+    window.location.href = '/login?reason=session_expired';
+  }
+};
+
 export const api = {
   get: async (url) => {
+    touchActivity();
     const token = getToken();
     const res = await fetch(`${API_BASE}${url}`, {
       headers: {
@@ -16,6 +33,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) {
+      handleUnauthorized(res.status);
       const err = new Error(data.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
@@ -23,6 +41,7 @@ export const api = {
     return { data };
   },
   post: async (url, body) => {
+    touchActivity();
     const token = getToken();
     const res = await fetch(`${API_BASE}${url}`, {
       method: 'POST',
@@ -34,6 +53,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) {
+      handleUnauthorized(res.status);
       const err = new Error(data.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
@@ -41,6 +61,7 @@ export const api = {
     return { data };
   },
   patch: async (url, body) => {
+    touchActivity();
     const token = getToken();
     const res = await fetch(`${API_BASE}${url}`, {
       method: 'PATCH',
@@ -52,6 +73,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) {
+      handleUnauthorized(res.status);
       const err = new Error(data.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
@@ -59,6 +81,7 @@ export const api = {
     return { data };
   },
   delete: async (url) => {
+    touchActivity();
     const token = getToken();
     const res = await fetch(`${API_BASE}${url}`, {
       method: 'DELETE',
@@ -69,6 +92,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) {
+      handleUnauthorized(res.status);
       const err = new Error(data.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;

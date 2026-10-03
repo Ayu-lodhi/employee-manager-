@@ -2,7 +2,7 @@
 // pages.jsx — All Page Components for TBI Management System
 // ====================================================================
 
-import React, { useState, createContext, useContext, useEffect } from 'react';
+import React, { useState, createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import { Navigate, NavLink, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ScrollText, Monitor, Settings, Shield, FileText,
@@ -168,9 +168,109 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{ user, login, logout, initializing, updateUser }}>
       {children}
+      {user && <IdleTimeoutWatcher logout={logout} />}
     </AuthContext.Provider>
   );
 };
+
+// ====================================================================
+// IDLE TIMEOUT WATCHER — Inactivity auto-logout
+// "if user is idle and not making any requests, auto log out from system"
+// ====================================================================
+const DEFAULT_IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes of inactivity
+const WARNING_WINDOW_MS = 60 * 1000;          // 60 seconds warning countdown
+
+export const IdleTimeoutWatcher = ({ logout }) => {
+  const [showWarning, setShowWarning] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(60);
+  const lastActivityRef = useRef(Date.now());
+
+  const resetActivity = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    setShowWarning(false);
+  }, []);
+
+  useEffect(() => {
+    const handleActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click', 'wheel'];
+    events.forEach((ev) => window.addEventListener(ev, handleActivity, { passive: true }));
+    window.addEventListener('app:activity', handleActivity);
+
+    const interval = setInterval(() => {
+      const timeoutLimit =
+        (typeof window !== 'undefined' && window.__IDLE_TIMEOUT_MS) || DEFAULT_IDLE_TIMEOUT_MS;
+      const warningThreshold = Math.min(WARNING_WINDOW_MS, Math.floor(timeoutLimit / 2));
+      const idleTime = Date.now() - lastActivityRef.current;
+      const timeLeft = timeoutLimit - idleTime;
+
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        setShowWarning(false);
+        if (logout) logout();
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('tbi_user');
+          sessionStorage.removeItem('tbi_token');
+          window.location.href = '/login?reason=inactivity';
+        }
+      } else if (timeLeft <= warningThreshold) {
+        setShowWarning(true);
+        setSecondsRemaining(Math.max(1, Math.ceil(timeLeft / 1000)));
+      } else {
+        setShowWarning(false);
+      }
+    }, 1000);
+
+    return () => {
+      events.forEach((ev) => window.removeEventListener(ev, handleActivity));
+      window.removeEventListener('app:activity', handleActivity);
+      clearInterval(interval);
+    };
+  }, [logout]);
+
+  if (!showWarning) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs select-none">
+      <div className="max-w-sm w-full bg-white rounded-2xl shadow-2xl border-2 border-amber-400 p-6 text-center animate-fade-in">
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto mb-3 text-amber-600 shadow-inner">
+          <Clock className="w-7 h-7 animate-pulse" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-900">Session Inactivity Warning</h3>
+        <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
+          You have been idle for a while. To protect your account, your session will automatically end in:
+        </p>
+        <div className="inline-flex items-center justify-center px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl mb-5">
+          <span className="text-2xl font-mono font-black text-amber-700">
+            {secondsRemaining}s
+          </span>
+        </div>
+        <div className="flex gap-2 justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              if (logout) logout();
+              window.location.href = '/login?reason=manual';
+            }}
+            className="px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+          >
+            Log Out Now
+          </button>
+          <button
+            type="button"
+            onClick={resetActivity}
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+          >
+            Stay Logged In
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 // ====================================================================
 // ROLES
@@ -335,6 +435,8 @@ export const Login = () => {
   const [showMuralOnMobile, setShowMuralOnMobile] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const logoutReason = new URLSearchParams(location.search).get('reason');
 
   const performLogin = async (loginEmail, loginPassword) => {
     setError('');
@@ -526,6 +628,20 @@ export const Login = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Inactivity & Expiry notices */}
+              {logoutReason === 'inactivity' && !error && (
+                <div className="p-2.5 bg-amber-50 border-2 border-amber-500 shadow-[2px_2px_0px_0px_#1A1A1A] rounded-lg text-xs text-amber-950 font-['Space_Mono',monospace] font-bold flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+                  <span>Logged out due to inactivity. Please sign in again.</span>
+                </div>
+              )}
+              {logoutReason === 'session_expired' && !error && (
+                <div className="p-2.5 bg-amber-50 border-2 border-amber-500 shadow-[2px_2px_0px_0px_#1A1A1A] rounded-lg text-xs text-amber-950 font-['Space_Mono',monospace] font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Session expired. Please sign in again.</span>
+                </div>
+              )}
 
               {/* Error notice */}
               {error && (
