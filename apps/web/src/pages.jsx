@@ -1212,7 +1212,7 @@ export const Placeholder = ({ title }) => (
 export const ProtectedRoute = ({ children, roles }) => {
   const { user, initializing } = useAuth();
 
-  // Wait for localStorage to be read before deciding
+  // Wait for storage to be read before deciding
   if (initializing) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -1224,7 +1224,11 @@ export const ProtectedRoute = ({ children, roles }) => {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  const hasToken = typeof window !== 'undefined' && Boolean(
+    sessionStorage.getItem('tbi_token') || localStorage.getItem('tbi_token')
+  );
+
+  if (!user || !hasToken) return <Navigate to="/login" replace />;
   if (roles && !roles.includes(user.role)) {
     return <Navigate to={ROLES[user.role].route} replace />;
   }
@@ -1279,12 +1283,12 @@ export const AdminDashboard = () => {
     );
   }
 
-  const tierPieData = [
-    { name: 'T1 Volunteers', value: tiers.T1, color: '#059669' },
-    { name: 'T2 Associates', value: tiers.T2, color: '#0284C7' },
-    { name: 'T3 Executives', value: tiers.T3, color: '#7C3AED' },
-    { name: 'Admins', value: tiers.Admin + tiers.SuperAdmin, color: '#DC2626' },
-  ].filter((d) => d.value > 0);
+  const tierPieData = tiers ? [
+    { name: 'T1 Volunteers', value: tiers.T1 || 0, color: '#059669' },
+    { name: 'T2 Associates', value: tiers.T2 || 0, color: '#0284C7' },
+    { name: 'T3 Executives', value: tiers.T3 || 0, color: '#7C3AED' },
+    { name: 'Admins', value: (tiers.Admin || 0) + (tiers.SuperAdmin || 0), color: '#DC2626' },
+  ].filter((d) => d.value > 0) : [];
 
   return (
     <div className="space-y-6">
@@ -1295,10 +1299,10 @@ export const AdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="Total Users" value={stats.totalUsers} />
-        <KPI label="Active Events" value={stats.activeEvents} />
-        <KPI label="Approval Rate" value={`${stats.approvalRate}%`} />
-        <KPI label="Teams" value={stats.totalTeams} />
+        <KPI label="Total Users" value={stats?.totalUsers ?? 0} />
+        <KPI label="Active Events" value={stats?.activeEvents ?? 0} />
+        <KPI label="Approval Rate" value={`${stats?.approvalRate ?? 0}%`} />
+        <KPI label="Teams" value={stats?.totalTeams ?? 0} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1447,12 +1451,12 @@ export const SuperAdminDashboard = () => {
     );
   }
 
-  const tierPieData = [
-    { name: 'T1', value: tiers.T1, color: '#059669' },
-    { name: 'T2', value: tiers.T2, color: '#0284C7' },
-    { name: 'T3', value: tiers.T3, color: '#7C3AED' },
-    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#DC2626' },
-  ].filter((d) => d.value > 0);
+  const tierPieData = tiers ? [
+    { name: 'T1', value: tiers.T1 || 0, color: '#059669' },
+    { name: 'T2', value: tiers.T2 || 0, color: '#0284C7' },
+    { name: 'T3', value: tiers.T3 || 0, color: '#7C3AED' },
+    { name: 'Admin', value: (tiers.Admin || 0) + (tiers.SuperAdmin || 0), color: '#DC2626' },
+  ].filter((d) => d.value > 0) : [];
 
   return (
     <div className="space-y-6">
@@ -1463,10 +1467,10 @@ export const SuperAdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="Admins" value={stats.admins} />
-        <KPI label="Total Users" value={stats.totalUsers} />
-        <KPI label="Active Events" value={stats.activeEvents} />
-        <KPI label="Check-ins Today" value={stats.sessionsToday} />
+        <KPI label="Admins" value={stats?.admins ?? 0} />
+        <KPI label="Total Users" value={stats?.totalUsers ?? 0} />
+        <KPI label="Active Events" value={stats?.activeEvents ?? 0} />
+        <KPI label="Check-ins Today" value={stats?.sessionsToday ?? 0} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1547,14 +1551,16 @@ export const T1Dashboard = () => {
     );
   }
 
+  const safeStats = stats || {};
+
   return (
     <div className="space-y-6 max-w-2xl">
       <AnnouncementBanner />
       <div>
         <h1 className="text-2xl font-bold">Hi {user.name.split(' ')[0]}</h1>
         <p className="text-gray-500">
-          {stats.todayCheckedIn
-            ? stats.todayCheckedOut
+          {safeStats.todayCheckedIn
+            ? safeStats.todayCheckedOut
               ? 'Your shift is complete for today.'
               : 'You are checked in. Remember to check out.'
             : 'You have not checked in yet today.'}
@@ -1562,18 +1568,18 @@ export const T1Dashboard = () => {
       </div>
 
       {/* Today's status card */}
-      {stats.todayCheckedIn ? (
+      {safeStats.todayCheckedIn ? (
         <div className="bg-white rounded-xl border-l-4 border-l-green-500 border border-gray-200 p-6">
           <p className="text-sm font-semibold text-green-600 mb-3">TODAY'S STATUS</p>
           <h3 className="text-xl font-bold mb-2">
-            {stats.todayCheckedOut ? 'Shift Complete' : 'Checked In'}
+            {safeStats.todayCheckedOut ? 'Shift Complete' : 'Checked In'}
           </h3>
           <p className="text-sm text-gray-600 mb-4">
-            {stats.todayCheckedOut
+            {safeStats.todayCheckedOut
               ? 'Great work today.'
               : 'Don\'t forget to check out at the end of your shift.'}
           </p>
-          {!stats.todayCheckedOut && (
+          {!safeStats.todayCheckedOut && (
             <button
               onClick={() => navigate('/t1/checkin')}
               className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600"
@@ -7488,10 +7494,10 @@ export const T3DashboardEnhanced = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="My Events" value={stats.myEvents} />
-        <KPI label="As Head" value={stats.eventsAsHead} />
-        <KPI label="Pending Apps" value={stats.pendingApps} />
-        <KPI label="Present Today" value={stats.attendanceToday} />
+        <KPI label="My Events" value={stats?.myEvents ?? 0} />
+        <KPI label="As Head" value={stats?.eventsAsHead ?? 0} />
+        <KPI label="Pending Apps" value={stats?.pendingApps ?? 0} />
+        <KPI label="Present Today" value={stats?.attendanceToday ?? 0} />
       </div>
 
       {/* Team Attendance Percentages */}
@@ -7637,16 +7643,16 @@ export const T2DashboardEnhanced = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="My Applications" value={stats.myApplications} />
-        <KPI label="Approved" value={stats.approved} />
-        <KPI label="My Teams" value={stats.myTeams} />
-        <KPI label="Days Attended" value={stats.attendanceDays} />
+        <KPI label="My Applications" value={stats?.myApplications ?? 0} />
+        <KPI label="Approved" value={stats?.approved ?? 0} />
+        <KPI label="My Teams" value={stats?.myTeams ?? 0} />
+        <KPI label="Days Attended" value={stats?.attendanceDays ?? 0} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="Pending" value={stats.pending} />
-        <KPI label="Rejected" value={stats.rejected} />
-        <KPI label="Certificates" value={stats.certificates} />
+        <KPI label="Pending" value={stats?.pending ?? 0} />
+        <KPI label="Rejected" value={stats?.rejected ?? 0} />
+        <KPI label="Certificates" value={stats?.certificates ?? 0} />
         <div></div>
       </div>
 
