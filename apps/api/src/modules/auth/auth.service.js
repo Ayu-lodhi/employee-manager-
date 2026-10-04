@@ -18,19 +18,16 @@ const acquireSession = async (userId) => {
   if (mongoose.connection?.readyState !== 1) {
     return { updatedUser: null, sessionId };
   }
-  const timeoutMs = getSessionTimeoutMs();
-  const timeoutThreshold = new Date(Date.now() - timeoutMs);
+  // Terminate any previous socket connections or permission cache for immediate single-session enforcement
+  try {
+    const { disconnectUserSockets } = require('../../config/socket');
+    if (disconnectUserSockets) disconnectUserSockets(userId);
+  } catch (_) {}
 
-  const updatedUser = await User.findOneAndUpdate(
-    {
-      _id: userId,
-      $or: [
-        { activeSessionId: null },
-        { activeSessionId: { $exists: false } },
-        { lastActivity: null },
-        { lastActivity: { $lt: timeoutThreshold } },
-      ],
-    },
+  // Auto-override: Atomically overwrite activeSessionId with the new session,
+  // terminating any previous active session and establishing this login as the active one.
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
     {
       $set: {
         activeSessionId: sessionId,
@@ -41,8 +38,8 @@ const acquireSession = async (userId) => {
   );
 
   if (!updatedUser) {
-    const error = new Error('This account is already logged in on another device');
-    error.statusCode = 409;
+    const error = new Error('User not found');
+    error.statusCode = 404;
     throw error;
   }
 
