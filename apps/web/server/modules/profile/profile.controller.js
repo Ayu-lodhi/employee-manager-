@@ -214,18 +214,34 @@ exports.uploadAvatar = async (req, res, next) => {
   try {
     const { avatarUrl } = req.body;
     if (!avatarUrl || typeof avatarUrl !== 'string') {
-      return res.status(400).json({ success: false, message: 'avatarUrl is required' });
+      return res.status(400).json({ success: false, message: 'Image data or URL is required' });
     }
 
-    const { profile } = await profileService.getOrCreateProfile(req.user._id);
-    profile.avatarUrl = avatarUrl.trim();
+    const trimmed = avatarUrl.trim();
+    const isHttp = /^https?:\/\//i.test(trimmed);
+    const isDataUrl = /^data:image\/(jpeg|png|webp);base64,/i.test(trimmed);
+
+    if (!isHttp && !isDataUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid image format. Must be JPEG, PNG, or WebP.',
+      });
+    }
+
+    const { profile, user } = await profileService.getOrCreateProfile(req.user._id);
+    profile.avatarUrl = trimmed;
     profile.avatarKey = `avatars/${req.user._id}-${Date.now()}`;
+    await profile.save();
+
+    const { calculateCompletion } = require('./profile.completion');
+    const completion = calculateCompletion(profile.toObject(), user ? user.toObject() : {});
+    profile.completionPercent = completion.percent;
     await profile.save();
 
     return res.status(200).json({
       success: true,
       message: 'Avatar updated successfully',
-      data: { avatarUrl: profile.avatarUrl },
+      data: { avatarUrl: profile.avatarUrl, completion },
     });
   } catch (err) {
     next(err);

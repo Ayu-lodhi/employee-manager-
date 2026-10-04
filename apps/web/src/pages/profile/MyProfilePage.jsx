@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../pages';
 import api from '../../api';
 import {
@@ -40,7 +40,54 @@ export const MyProfilePage = () => {
 
   // Project modal state
   const [projModal, setProjModal] = useState(false);
-  const [projForm, setProjForm] = useState({ title: '', description: '', url: '' });
+  // Avatar file upload state
+  const fileInputRef = useRef(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handleAvatarFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setFeedback({ type: 'error', message: 'Please select a valid image file (JPEG, PNG, or WebP)' });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setFeedback({ type: 'error', message: 'Image size must be less than 5MB' });
+      return;
+    }
+
+    setAvatarUploading(true);
+    setFeedback({ type: '', message: '' });
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64Data = reader.result;
+        const res = await api.post('/profile/me/avatar', { avatarUrl: base64Data });
+        if (res.data?.success) {
+          setProfileData((prev) => ({ ...prev, avatarUrl: res.data.data.avatarUrl }));
+          if (res.data.data.completion) {
+            setCompletion(res.data.data.completion);
+          }
+          setFeedback({ type: 'success', message: 'Profile picture updated successfully!' });
+        } else {
+          setFeedback({ type: 'error', message: res.data?.message || 'Failed to update avatar' });
+        }
+      } catch (err) {
+        setFeedback({ type: 'error', message: err.response?.data?.message || 'Failed to upload image' });
+      } finally {
+        setAvatarUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      setFeedback({ type: 'error', message: 'Failed to read image file' });
+      setAvatarUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const fetchProfile = async () => {
     try {
@@ -183,16 +230,21 @@ export const MyProfilePage = () => {
                     <User className="w-12 h-12 text-slate-400" />
                   )}
                 </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleAvatarFile}
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                />
                 <button
                   type="button"
-                  onClick={() => {
-                    const url = prompt('Enter image URL for avatar:', profileData.avatarUrl);
-                    if (url !== null) setProfileData((prev) => ({ ...prev, avatarUrl: url.trim() }));
-                  }}
-                  className="absolute -bottom-2 -right-2 p-2 bg-[#E6B800] border-2 border-[#1A1A1A] rounded-xl shadow-[2px_2px_0px_0px_#1A1A1A] hover:bg-[#d4a800] transition cursor-pointer"
-                  title="Update profile picture"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="absolute -bottom-2 -right-2 p-2 bg-[#E6B800] border-2 border-[#1A1A1A] rounded-xl shadow-[2px_2px_0px_0px_#1A1A1A] hover:bg-[#d4a800] transition cursor-pointer disabled:opacity-50"
+                  title="Upload profile picture from device"
                 >
-                  <Camera className="w-4 h-4 text-[#1A1A1A]" />
+                  <Camera className={`w-4 h-4 text-[#1A1A1A] ${avatarUploading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
 

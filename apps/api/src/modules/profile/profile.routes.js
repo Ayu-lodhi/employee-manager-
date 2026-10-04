@@ -14,7 +14,7 @@ router.use(protect);
 // 1. Current user own profile endpoints
 router.get('/me', profileController.getMyProfile);
 router.patch('/me', profileController.updateMyProfile);
-router.post('/me/avatar', createUserLimiter, profileController.uploadAvatar);
+router.post('/me/avatar', express.json({ limit: '6mb' }), createUserLimiter, profileController.uploadAvatar);
 router.get('/me/completion', profileController.getMyCompletion);
 router.get('/me/progress', profileController.getMyProgress);
 
