@@ -13,5 +13,8 @@
     "build:api": "npm --prefix apps/api run build",
     "dev:api": "cd apps/api && npm run dev",
     "dev:web": "cd apps/web && npm run dev"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }
