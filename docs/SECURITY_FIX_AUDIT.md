@@ -274,24 +274,71 @@ catch (error) {
 
 ---
 
-## Additional Findings (Not in Scope, Reported Only)
+## Detailed Local Scan Findings (Phase 1 Items 1–7)
 
-1. **env.config.js used in both API and Web apps** — means ES6 modules coexist with CommonJS (`auth.tokens.js`)
-2. **No tests found** for the current behavior baseline
-3. **GitHub secret patterns** — hardcoded credentials in the repository (already exposed; must be rotated by you)
+### 1. Environment Variable Name Inventory & Cross-Reference
+- **Variables read in `apps/`**:
+  - `NODE_ENV`, `PORT`, `CLIENT_URL`, `FRONTEND_URL`, `ALLOWED_ORIGINS`
+  - `MONGODB_URI`
+  - `REDIS_CACHE_URL`, `REDIS_PUBSUB_URL`, `REDIS_QUEUE_URL`
+  - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `JWT_SECRET`
+  - `MFA_ENCRYPTION_KEY`, `ENFORCE_MFA`
+  - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM`
+  - `RECAPTCHA_SECRET_KEY`, `CAPTCHA_ENABLED`, `SESSION_TIMEOUT_MINUTES`, `AUTO_SYNC_INDEXES`
+  - Frontend (`import.meta.env`): `VITE_API_URL`, `VITE_RECAPTCHA_SITE_KEY`
+- **Where defined**:
+  - `.env.example`: defines `MONGODB_URI`, `REDIS_*`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_SECRET` (empty alias), `MFA_*`, `RECAPTCHA_*`.
+  - `apps/api/.env.example`: defines `MONGODB_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET` (missing `JWT_ACCESS_SECRET`).
+  - `docker-compose.yml`: MongoDB and Redis container ports; no application JWT secrets defined.
+  - `infrastructure/terraform`: MongoDB Atlas and ElastiCache provisioned; no ECS task definition environment variables configured.
+- **Mismatches / Unvalidated**:
+  - `JWT_SECRET`: Read by `auth.tokens.js` but NOT validated by `envValidation.js`.
+  - `JWT_ACCESS_SECRET`: Validated by `envValidation.js` but NOT read by `auth.tokens.js`.
+  - `MONGODB_URI`: Validated by `envValidation.js` but has hardcoded credentials fallback in `server.js` and serverless entrypoint.
 
----
+### 2. Current Token Signing Architecture (`auth.tokens.js`)
+- **Secret Usage**: Reads single module-level constant `const JWT_SECRET = process.env.JWT_SECRET || '...'` at import time.
+- **Signing & Verification**: `exports.sign()` and `exports.verify()` use the same secret for both access and refresh tokens.
+- **HMAC Proof**: `exports.authState()` computes HMAC using `JWT_SECRET`.
+- **Validation Timing**: In `apps/api/src/server.js`, `validateEnvironment()` is called before routes are imported, but `auth.tokens.js` was reading `JWT_SECRET` rather than the validated `JWT_ACCESS_SECRET`.
 
-## Variable Name Summary for Phase 2
+### 3. `env.config.js` Imports and Utilized Exports
+- **Imports**:
+  - `apps/api/src/core/middleware/auth.middleware.js`: uses `ENV.JWT_ACCESS_SECRET`
+  - `apps/api/src/core/database/connection.js`: uses `ENV.MONGODB_URI`
+  - `apps/api/src/core/config/redis-cache.client.js`: uses `ENV.REDIS_CACHE_URL`
+  - `apps/api/src/core/config/redis-queue.client.js`: uses `ENV.REDIS_QUEUE_URL`
+  - `apps/api/src/core/config/redis-pubsub.client.js`: uses `ENV.REDIS_PUBSUB_URL`
+  - Parallel imports in `apps/web/server/`
 
-| Purpose | envValidation.js | auth.tokens.js | env.config.js | Notes |
-|---------|-----------------|---------------|--------------| -----|
-| JWT signing | `JWT_ACCESS_SECRET` (min 16) | `JWT_SECRET` (hardcoded fallback) | `JWT_ACCESS_SECRET` (dev fallback) | **Mismatch:** Different variable names |
-| MongoDB | `MONGODB_URI` (required) | N/A | `MONGODB_URI` (localhost fallback) | **Mismatch:** Only validated in one place |
-| Redis Cache | `REDIS_CACHE_URL` (required) | N/A | `REDIS_CACHE_URL` (localhost fallback) | Validated and used |
-| Redis PubSub | `REDIS_PUBSUB_URL` (required) | N/A | `REDIS_PUBSUB_URL` (localhost fallback) | Validated and used |
-| Redis Queue | `REDIS_QUEUE_URL` (required) | N/A | `REDIS_QUEUE_URL` (localhost fallback) | Validated and used |
+### 4. Callers of `acquireSession` and `issueSession`
+- **Callers**:
+  1. `login()` (`apps/api/src/modules/auth/auth.service.js:73`): If `acquireSession()` fails or returns `updatedUser: null`, `issueSession()` currently still issues access and refresh tokens.
+  2. `verifyMfa()` (`apps/api/src/modules/auth/auth.service.js:85`): Same fail-open behavior when DB is unavailable.
+- **Database Failure Impact**: When MongoDB is down (`readyState !== 1`), `acquireSession()` returned `{ updatedUser: null, sessionId }`, allowing tokens to be minted without persisting single-session tracking.
+
+### 5. Repository Scan for Hardcoded Secrets & Git History Status
+- **Hardcoded Secrets in Code (File & Line only)**:
+  - `apps/api/src/server.js:95`
+  - `apps/api/src/modules/auth/auth.tokens.js:4`
+  - `apps/api/src/core/config/env.config.js:12-13`
+  - `apps/api/scripts/reset-demo-users.js:4`
+  - `apps/api/scripts/test-attendance-feature.js:174`
+  - `apps/web/server/server.js:75`
+  - `apps/web/server/modules/auth/auth.tokens.js:4`
+  - `apps/web/server/core/config/env.config.js:12-13`
+  - `apps/web/api/index.js:15`
+- **Secret Values in Git History**: **YES** (present in prior commits; secrets must be rotated).
+
+### 6. Client / Test Reliance on 5xx Error Messages
+- **Frontend (`apps/web/src`)**: Displays generic error UI using `data?.message || 'Something went wrong'`. No component checks for raw stack trace or internal database error strings.
+- **Tests**: Existing unit tests test 4xx error messages (`Session ended`, `Invalid credentials`, `Route not found`, etc.); none assert on raw 5xx internal error strings.
+
+### 7. Sensitive Data in Logs
+- `apps/api/src/core/queues/queue.service.js:113,122`: Logs full recipient email address (`payload.to`).
+- Auth module: No plaintext passwords, tokens, or OTPs logged in service/controller logs.
 
 ---
 
 ## End of Phase 1 Audit
+
