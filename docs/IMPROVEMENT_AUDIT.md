@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-03  
 **Branch**: `improve/performance-and-control`  
-**Repository**: `E:\project emp\tbi`  
+**Repository**: `employee-manager-` (TBI Workforce Platform)  
 
 ---
 
