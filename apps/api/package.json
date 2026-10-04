@@ -5,7 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "build": "npm ci --omit=dev",
+    "check:prod-deps": "node scripts/check-prod-deps.js",
+    "test": "node --test src/__tests__/*.unit.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
