@@ -40,6 +40,8 @@ function sanitizeAuditValue(val) {
   return String(val);
 }
 
+const mongoose = require('mongoose');
+
 /**
  * Record an immutable audit log entry for role or permission changes.
  *
@@ -63,6 +65,11 @@ async function recordPermissionAudit({
   ipAddress = null,
 }) {
   try {
+    if (!mongoose.connection || mongoose.connection.readyState !== 1) {
+      // In offline / test fixture environments without MongoDB connected, do not block or buffer
+      return null;
+    }
+
     const cleanOld = sanitizeAuditValue(oldValue);
     const cleanNew = sanitizeAuditValue(newValue);
 

@@ -1,3 +1,5 @@
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_for_unit_tests_32chars';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
