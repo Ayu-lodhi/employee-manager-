@@ -16,8 +16,11 @@ router.use(protect);
 router.get('/users', restrictTo('ADMIN', 'SUPER_ADMIN'), adminController.getUsers);
 router.post('/users', restrictTo('ADMIN', 'SUPER_ADMIN'), createUserLimiter, validate(schemas.addUser), auditLog('USER_CREATED'), adminController.addUser);
 router.patch('/users/:id', restrictTo('ADMIN', 'SUPER_ADMIN'), adminController.updateUser);
+router.post('/users/:id/reset-session', restrictTo('ADMIN', 'SUPER_ADMIN'), auditLog('SESSION_RESET'), adminController.resetUserSession);
 
 // Super Admin only
+router.patch('/users/:id/role', restrictTo('SUPER_ADMIN'), adminController.updateUserRole);
+router.patch('/users/:id/permissions', restrictTo('SUPER_ADMIN'), adminController.updateUserPermissions);
 router.post('/users/:id/revoke', restrictTo('SUPER_ADMIN'), auditLog('ACCESS_REVOKED'), adminController.revokeUser);
 router.post('/users/:id/reactivate', restrictTo('SUPER_ADMIN'), auditLog('ACCESS_REACTIVATED'), adminController.reactivateUser);
 router.post('/users/:id/reset-password', restrictTo('SUPER_ADMIN'), auditLog('PASSWORD_RESET'), adminController.resetPassword);

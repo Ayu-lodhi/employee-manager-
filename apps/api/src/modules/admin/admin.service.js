@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { disconnectUserSockets } = require('../../config/socket');
+const { invalidateUserPermissions } = require('../../core/cache/permissionCache');
+const { recordPermissionAudit } = require('../../core/utils/auditLogger');
 const User = require('./admin.model');
 const { sendWelcomeEmail, sendPasswordResetLinkEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
 
@@ -65,6 +67,8 @@ exports.updateUser = async (id, data) => {
     }).catch((err) => console.error('Admin profile update email failed:', err.message));
   }
 
+  invalidateUserPermissions(id).catch(() => {});
+
   return user;
 };
 
@@ -91,11 +95,22 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
 
   // 5. Deactivate + reset password to prevent re-login
   user.isActive = false;
+  user.activeSessionId = null;
+  user.lastActivity = null;
   user.passwordChangeStartedAt = null;
   user.password = await bcrypt.hash(generateDefaultPassword(), 12);
   user.mustChangePassword = true;
   await user.save();
   disconnectUserSockets(user._id);
+  invalidateUserPermissions(user._id).catch(() => {});
+  recordPermissionAudit({
+    performedBy: adminId,
+    targetId: user._id,
+    targetType: 'User',
+    action: 'USER_ROLE_REVOKED',
+    oldValue: { isActive: true, role: user.role, reason },
+    newValue: { isActive: false, role: user.role },
+  }).catch(() => {});
 
   return {
     userId: user._id,
@@ -127,6 +142,15 @@ exports.reactivateUser = async (id, adminId) => {
   user.isActive = true;
   user.mustChangePassword = true;  // Force password change on next login
   await user.save();
+  invalidateUserPermissions(user._id).catch(() => {});
+  recordPermissionAudit({
+    performedBy: adminId,
+    targetId: user._id,
+    targetType: 'User',
+    action: 'USER_ROLE_REACTIVATED',
+    oldValue: { isActive: false, role: user.role },
+    newValue: { isActive: true, role: user.role },
+  }).catch(() => {});
 
   // Send welcome email with new credentials
   sendWelcomeEmail({
@@ -153,6 +177,7 @@ exports.deleteUser = async (id, adminId) => {
   if (user.role === 'SUPER_ADMIN') throw new Error('Cannot delete a Super Admin account');
   if (id.toString() === adminId?.toString()) throw new Error('You cannot delete your own account');
   await User.findByIdAndDelete(id);
+  invalidateUserPermissions(id).catch(() => {});
   return user;
 };
 
@@ -289,4 +314,77 @@ exports.changeEmail = async (id, newEmail, adminId) => {
   }).catch((err) => console.error('Admin change email notification failed:', err.message));
 
   return user.toObject({ virtuals: false });
+};
+
+exports.resetUserSession = async (id) => {
+  const user = await User.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        activeSessionId: null,
+        lastActivity: null,
+      },
+    },
+    { new: true }
+  ).select('-password');
+  if (!user) throw new Error('User not found');
+  return user.toObject({ virtuals: false });
+};
+
+// ROLE UPDATE — with audit log & immediate permission cache invalidation
+exports.updateUserRole = async (targetUserId, newRole, adminUser, ipAddress = null) => {
+  const VALID_ROLES = ['SUPER_ADMIN', 'ADMIN', 'T3_EXECUTIVE', 'T2_ASSOCIATE', 'T1_VOLUNTEER'];
+  if (!VALID_ROLES.includes(newRole)) throw new Error('Invalid role specified');
+
+  const user = await User.findById(targetUserId);
+  if (!user) throw new Error('User not found');
+  if (user.role === 'SUPER_ADMIN' && adminUser.sub !== user._id.toString()) {
+    throw new Error('Only the account holder can modify Super Admin role');
+  }
+
+  const oldRole = user.role;
+  user.role = newRole;
+  await user.save();
+
+  await invalidateUserPermissions(user._id);
+
+  await recordPermissionAudit({
+    performedBy: adminUser.sub,
+    performedByName: adminUser.name || adminUser.email,
+    targetId: user._id,
+    targetType: 'User',
+    action: 'USER_ROLE_CHANGED',
+    oldValue: { role: oldRole },
+    newValue: { role: newRole },
+    ipAddress,
+  });
+
+  return { userId: user._id, oldRole, newRole };
+};
+
+// PERMISSIONS (ACCESS_GRANT overrides) UPDATE — with audit log & immediate permission cache invalidation
+exports.updateUserPermissions = async (targetUserId, customGrants, adminUser, ipAddress = null) => {
+  if (!Array.isArray(customGrants)) throw new Error('customGrants must be an array of permissions');
+
+  const user = await User.findById(targetUserId);
+  if (!user) throw new Error('User not found');
+
+  const oldGrants = user.customGrants || [];
+  user.customGrants = customGrants;
+  await user.save();
+
+  await invalidateUserPermissions(user._id);
+
+  await recordPermissionAudit({
+    performedBy: adminUser.sub,
+    performedByName: adminUser.name || adminUser.email,
+    targetId: user._id,
+    targetType: 'User',
+    action: 'USER_PERMISSIONS_CHANGED',
+    oldValue: { customGrants: oldGrants },
+    newValue: { customGrants },
+    ipAddress,
+  });
+
+  return { userId: user._id, customGrants };
 };

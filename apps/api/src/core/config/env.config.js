@@ -14,3 +14,10 @@ export const ENV = Object.freeze({
   JWT_ACCESS_EXPIRY: process.env.JWT_ACCESS_EXPIRY || '15m',
   JWT_REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY || '7d'
 });
+
+export default ENV;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { ENV };
+  module.exports.ENV = ENV;
+}
+

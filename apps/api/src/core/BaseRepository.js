@@ -24,37 +24,43 @@ class BaseRepository {
   }
 
   /**
-   * Find all with optional filter, sort, pagination
+   * Find all with optional filter, sort, pagination, projection and lean
    */
   async findAll(filter = {}, options = {}) {
-    const { sort = { createdAt: -1 }, limit, skip, populate } = options;
+    const { sort = { createdAt: -1 }, limit, skip, populate, select, lean = true } = options;
     let query = this.model.find(filter);
 
+    if (select) query = query.select(select);
     if (populate) query = query.populate(populate);
     if (sort) query = query.sort(sort);
     if (skip) query = query.skip(skip);
     if (limit) query = query.limit(limit);
+    if (lean) query = query.lean();
 
     return await query;
   }
 
   /**
-   * Find by ID with optional populate
+   * Find by ID with optional populate, select, and lean
    */
-  async findById(id, populate) {
+  async findById(id, populate, select, lean = false) {
     let query = this.model.findById(id);
+    if (select) query = query.select(select);
     if (populate) query = query.populate(populate);
+    if (lean) query = query.lean();
     const doc = await query;
     if (!doc) throw new Error(`${this.model.modelName} not found`);
     return doc;
   }
 
   /**
-   * Find one by filter
+   * Find one by filter with optional populate, select, and lean
    */
-  async findOne(filter, populate) {
+  async findOne(filter, populate, select, lean = false) {
     let query = this.model.findOne(filter);
+    if (select) query = query.select(select);
     if (populate) query = query.populate(populate);
+    if (lean) query = query.lean();
     return await query;
   }
 

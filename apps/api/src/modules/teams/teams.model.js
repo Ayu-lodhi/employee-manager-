@@ -14,4 +14,9 @@ const teamSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+teamSchema.index({ leadId: 1 });
+teamSchema.index({ members: 1 });
+teamSchema.index({ eventId: 1 });
+teamSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Team', teamSchema);

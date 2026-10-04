@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const { disconnectUserSockets } = require('../../config/socket');
 const User = require('./admin.model');
 const { sendWelcomeEmail, sendPasswordResetLinkEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
 
@@ -90,10 +91,13 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
 
   // 5. Deactivate + reset password to prevent re-login
   user.isActive = false;
+  user.activeSessionId = null;
+  user.lastActivity = null;
   user.passwordChangeStartedAt = null;
   user.password = await bcrypt.hash(generateDefaultPassword(), 12);
   user.mustChangePassword = true;
   await user.save();
+  disconnectUserSockets(user._id);
 
   return {
     userId: user._id,
@@ -160,7 +164,7 @@ exports.resetPassword = async (id) => {
   if (!user) throw new Error('User not found');
   if (user.role === 'SUPER_ADMIN') throw new Error('Cannot reset Super Admin password this way');
 
-  // Generate a cryptographically secure one-time token (hex, 48 chars)
+  // Generate a cryptographically secure one-time token
   const rawToken = crypto.randomBytes(32).toString('hex');
   // Store a SHA-256 hash (never store raw tokens in DB)
   user.passwordResetToken = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -186,7 +190,7 @@ exports.resetPassword = async (id) => {
   return { user: user.toObject({ virtuals: false }), emailSent };
 };
 
-// VERIFY TOKEN — check a one-time reset link token (does NOT consume it yet)
+// VERIFY TOKEN — check a one-time reset link token
 exports.verifyResetToken = async (id, rawToken) => {
   const user = await User.findById(id).select('+passwordResetToken +passwordResetExpiry');
   if (!user) throw new Error('Invalid or expired reset link');
@@ -286,5 +290,20 @@ exports.changeEmail = async (id, newEmail, adminId) => {
     byAdmin: true,
   }).catch((err) => console.error('Admin change email notification failed:', err.message));
 
+  return user.toObject({ virtuals: false });
+};
+
+exports.resetUserSession = async (id) => {
+  const user = await User.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        activeSessionId: null,
+        lastActivity: null,
+      },
+    },
+    { new: true }
+  ).select('-password');
+  if (!user) throw new Error('User not found');
   return user.toObject({ virtuals: false });
 };

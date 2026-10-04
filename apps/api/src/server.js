@@ -2,14 +2,25 @@ const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
 require('dotenv').config();
+const { validateEnvironment } = require('./core/config/envValidation');
+if (process.env.NODE_ENV !== 'test') {
+  validateEnvironment();
+}
+
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 
 const securityMiddleware = require('./middleware/security.middleware');
+const { requestIdMiddleware } = require('./middleware/requestId.middleware');
 const { globalLimiter } = require('./middleware/rateLimit.middleware');
 const { initSocket } = require('./config/socket');
+const compression = require('compression');
+const { noCache, publicCache } = require('./middleware/cacheControl.middleware');
+const { queueBoardRouter } = require('./core/queues/queueBoard');
+const { closeQueues } = require('./core/queues/queue.service');
+const { protect, restrictTo } = require('./modules/auth/auth.middleware');
 
 const app = express();
 
@@ -33,8 +44,20 @@ app.use(cors({
   },
   credentials: true,
 }));
+app.use(compression());
 app.use(securityMiddleware);
+app.use(requestIdMiddleware);
 app.use(globalLimiter);
+
+// Health check endpoint (public, returns ok/not-ok component statuses only)
+app.use('/health', require('./modules/health/health.routes'));
+app.use('/api/v1/health', require('./modules/health/health.routes'));
+
+// Queue dashboard (protected behind admin authentication only)
+app.use('/admin/queues', protect, restrictTo('ADMIN', 'SUPER_ADMIN'), queueBoardRouter);
+
+// Enforce no-cache by default across all authenticated and API routes
+app.use('/api', noCache);
 
 app.use('/api/v1/auth', require('./modules/auth/auth.routes'));
 app.use('/api/v1/admin', require('./modules/admin/admin.routes'));
@@ -52,7 +75,7 @@ app.use('/api/v1/preferences', require('./modules/users/preferences.routes'));
 app.use('/api/v1/announcements', require('./modules/announcements/announcements.routes'));
 app.use('/api/v1/timesheets', require('./modules/timesheets/timesheets.routes'));
 
-app.get('/', (req, res) => {
+app.get('/', publicCache(120), (req, res) => {
   res.json({
     message: 'TBI API running',
     version: '3.0.0',
@@ -73,14 +96,16 @@ if (mongoose.connection.readyState === 0) {
     .connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
     .then(async () => {
       console.log('MongoDB Connected');
-      try {
-        const Attendance = require('./modules/attendance/attendance.model');
-        const AttendanceLink = require('./modules/attendance/attendanceLink.model');
-        await Attendance.syncIndexes();
-        await AttendanceLink.syncIndexes();
-        console.log('Attendance & AttendanceLink indexes synced');
-      } catch (idxErr) {
-        console.warn('Index sync warning:', idxErr.message);
+      if (process.env.AUTO_SYNC_INDEXES === 'true') {
+        try {
+          const Attendance = require('./modules/attendance/attendance.model');
+          const AttendanceLink = require('./modules/attendance/attendanceLink.model');
+          await Attendance.syncIndexes();
+          await AttendanceLink.syncIndexes();
+          console.log('Attendance & AttendanceLink indexes synced');
+        } catch (idxErr) {
+          console.warn('Index sync warning:', idxErr.message);
+        }
       }
     })
     .catch((err) => console.error('MongoDB Error:', err.message));
@@ -91,8 +116,38 @@ initSocket(server);
 console.log('Socket.io initialized');
 
 const PORT = process.env.PORT || 5000;
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && process.env.NODE_ENV !== 'test') {
   server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 }
+
+// Graceful shutdown handling on SIGTERM and SIGINT
+async function gracefulShutdown(signal) {
+  console.log(`Received ${signal}. Initiating graceful shutdown...`);
+  server.close(async () => {
+    console.log('HTTP server closed to new connections.');
+    try {
+      await closeQueues();
+      console.log('BullMQ queues closed.');
+      if (mongoose.connection.readyState === 1) {
+        await mongoose.disconnect();
+        console.log('MongoDB connection closed.');
+      }
+      console.log('Graceful shutdown completed successfully.');
+      process.exit(0);
+    } catch (shutdownErr) {
+      console.error('Error during graceful shutdown:', shutdownErr);
+      process.exit(1);
+    }
+  });
+
+  // Force shutdown if cleanup takes longer than 10 seconds
+  setTimeout(() => {
+    console.error('Graceful shutdown timed out, forcing exit.');
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 module.exports = app;

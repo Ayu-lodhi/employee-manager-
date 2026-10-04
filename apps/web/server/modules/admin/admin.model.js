@@ -25,6 +25,10 @@ const userSchema = new mongoose.Schema({
   passwordChangeStartedAt: { type: Date, default: null, select: false },
   teamId: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
 
+  // Single active session tracking
+  activeSessionId: { type: String, default: null },
+  lastActivity: { type: Date, default: null },
+
   // Profile fields
   skills: { type: String, default: '' },
   availability: { type: String, default: '' },

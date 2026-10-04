@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const User = require('../admin/admin.model');
 
@@ -5,6 +6,48 @@ const repository = require('./auth.repository');
 const tokens = require('./auth.tokens');
 const mfa = require('./mfa.service');
 const { sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
+
+const getSessionTimeoutMs = () => {
+  const minutes = parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10);
+  return (isNaN(minutes) || minutes <= 0 ? 30 : minutes) * 60 * 1000;
+};
+
+const acquireSession = async (userId) => {
+  const sessionId = crypto.randomBytes(32).toString('hex');
+  const mongoose = require('mongoose');
+  if (mongoose.connection?.readyState !== 1) {
+    return { updatedUser: null, sessionId };
+  }
+  const timeoutMs = getSessionTimeoutMs();
+  const timeoutThreshold = new Date(Date.now() - timeoutMs);
+
+  const updatedUser = await User.findOneAndUpdate(
+    {
+      _id: userId,
+      $or: [
+        { activeSessionId: null },
+        { activeSessionId: { $exists: false } },
+        { lastActivity: null },
+        { lastActivity: { $lt: timeoutThreshold } },
+      ],
+    },
+    {
+      $set: {
+        activeSessionId: sessionId,
+        lastActivity: new Date(),
+      },
+    },
+    { new: true }
+  );
+
+  if (!updatedUser) {
+    const error = new Error('This account is already logged in on another device');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  return { updatedUser, sessionId };
+};
 
 exports.login = async (email, password) => {
   if (typeof email !== 'string' || typeof password !== 'string') throw new Error('Invalid credentials');
@@ -29,7 +72,9 @@ exports.login = async (email, password) => {
   if (requiresMfa) {
     return { mfaRequired: true, challengeToken: tokens.sign(user, 'mfa', '5m') };
   }
-  return issueSession(user, false);
+
+  const { updatedUser, sessionId } = await acquireSession(user._id);
+  return issueSession(updatedUser || user, false, sessionId);
 };
 
 exports.verifyMfa = async (challengeToken, code) => {
@@ -40,22 +85,43 @@ exports.verifyMfa = async (challengeToken, code) => {
     throw new Error('MFA verification expired; sign in again');
   }
   const verified = await mfa.verify(user, code);
-  return issueSession(verified, true);
+  const { updatedUser, sessionId } = await acquireSession(verified._id);
+  return issueSession(updatedUser || verified, true, sessionId);
 };
 
-const issueSession = (user, isMfaVerified) => {
+exports.logout = async (userId) => {
+  const mongoose = require('mongoose');
+  if (mongoose.connection?.readyState === 1 && User && typeof User.findByIdAndUpdate === 'function') {
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        activeSessionId: null,
+        lastActivity: null,
+      },
+    });
+  }
+  try {
+    const { invalidateUserPermissions } = require('../../core/cache/permissionCache');
+    await invalidateUserPermissions(userId);
+  } catch (err) {
+    // Graceful fallback
+  }
+  return { success: true };
+};
+
+const issueSession = (user, isMfaVerified, sessionId) => {
+  const sid = sessionId || user.activeSessionId;
   if (user.mustChangePassword) {
     const remaining = Math.floor((new Date(user.passwordChangeStartedAt).getTime() + 300000 - Date.now()) / 1000);
     if (!user.passwordChangeStartedAt || remaining <= 0) throw new Error('Password replacement expired; ask an administrator to reset it');
     return {
       mustChangePassword: true,
-      passwordChangeToken: tokens.sign(user, 'password-change', remaining, { isMfaVerified }),
+      passwordChangeToken: tokens.sign(user, 'password-change', remaining, { isMfaVerified, sid }),
     };
   }
   const accessToken = tokens.sign(user, 'access', process.env.JWT_ACCESS_EXPIRY || '15m', {
-    role: user.role, isMfaVerified,
+    role: user.role, isMfaVerified, sid,
   });
-  const refreshToken = tokens.sign(user, 'refresh', process.env.JWT_REFRESH_EXPIRY || '7d');
+  const refreshToken = tokens.sign(user, 'refresh', process.env.JWT_REFRESH_EXPIRY || '7d', { sid });
 
   return {
     user: {
@@ -153,6 +219,13 @@ exports.changePassword = async (credential, oldPassword, newPassword) => {
   if (await bcrypt.compare(newPassword, user.password)) throw new Error('New password must differ from the current password');
   const updated = await repository.replacePassword(user, await bcrypt.hash(newPassword, 12));
   if (!updated) throw new Error('Credentials changed; sign in again');
+
+  const mongoose = require('mongoose');
+  if (user.mustChangePassword && mongoose.connection?.readyState === 1 && User && typeof User.updateOne === 'function') {
+    try {
+      await User.updateOne({ _id: user._id }, { $set: { activeSessionId: null, lastActivity: null } });
+    } catch (_) {}
+  }
 
   sendPasswordChangedEmail({
     to: user.email,

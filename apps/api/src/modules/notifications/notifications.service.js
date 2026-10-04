@@ -1,6 +1,7 @@
 const Notification = require('./notifications.model');
 const User = require('../admin/admin.model');
 const { emitToUser } = require('../../config/socket');
+const { enqueueEmail } = require('../../core/queues/queue.service');
 
 // Check if a user wants a specific type of notification
 const shouldSend = (prefs, channel, type) => {
@@ -10,11 +11,11 @@ const shouldSend = (prefs, channel, type) => {
   return true;
 };
 
-// Simulated email/SMS queue (replace with real BullMQ + SendGrid/Twilio later)
+// BullMQ email queue dispatcher
 // Log only fixed status text: recipient/content data can forge records or expose PII.
 const queueEmail = async (to, subject, body) => {
   console.log('[EMAIL QUEUED]');
-  // TODO: emailQueue.add('sendEmail', { to, subject, body });
+  await enqueueEmail('sendEmail', { to, subject, html: body, text: body, type: 'notification' });
 };
 
 const queueSMS = async (to, body) => {
