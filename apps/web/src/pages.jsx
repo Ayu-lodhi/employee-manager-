@@ -749,24 +749,6 @@ export const Login = () => {
                   {loading ? 'Accessing...' : 'Sign In'}
                 </button>
               </div>
-
-              {/* Secondary Links */}
-              <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] sm:text-xs font-['Space_Mono',monospace] font-bold text-[#1A1A1A] pt-1">
-                <button
-                  type="button"
-                  onClick={() => alert('Password reset service: Please contact TBI IT Administration (support@tbi.geu.ac.in)')}
-                  className="underline hover:text-[#1B5299] transition cursor-pointer"
-                >
-                  Forgot Password?
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDemo(!showDemo)}
-                  className="hover:text-[#1B5299] transition cursor-pointer"
-                >
-                  Already have an Account?
-                </button>
-              </div>
             </form>
           </div>
         </div>
