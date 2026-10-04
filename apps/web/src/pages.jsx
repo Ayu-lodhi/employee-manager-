@@ -11,7 +11,8 @@ import {
   Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, Crown, AlertTriangle,
   Eye, EyeOff, Key,
   Info, Trash2, Construction, MapPin, Timer, BarChart3, ExternalLink, ChevronRight,
-  FileCheck, Download, Check, AlertCircle, Copy, RefreshCw, Radio, CheckCircle2, XCircle, Send
+  FileCheck, Download, Check, AlertCircle, Copy, RefreshCw, Radio, CheckCircle2, XCircle, Send,
+  Menu
 } from 'lucide-react';
 import api from './lib/api';
 import { io } from 'socket.io-client';
@@ -718,11 +719,22 @@ export const Login = () => {
 };
 
 // ====================================================================
+// LAYOUT CONTEXT (Mobile Drawer & Desktop Collapse)
+// ====================================================================
+export const LayoutContext = createContext({
+  collapsed: false,
+  setCollapsed: () => {},
+  mobileOpen: false,
+  setMobileOpen: () => {},
+});
+export const useLayout = () => useContext(LayoutContext);
+
+// ====================================================================
 // SIDEBAR
 // ====================================================================
 export const Sidebar = () => {
   const { user, logout } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useLayout();
   const navigate = useNavigate();
   const location = useLocation();
   const socket = useSocket();
@@ -839,9 +851,15 @@ export const Sidebar = () => {
   };
 
   return (
-    <aside className={`h-screen flex flex-col border-r border-white/10 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}
-      style={{ backgroundColor: cfg.sidebarBg }}>
-      <div className={`h-16 flex items-center border-b border-white/10 relative ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
+    <aside
+      className={`h-screen flex flex-col border-r border-white/10 transition-all duration-300 z-50 ${
+        mobileOpen
+          ? 'fixed inset-y-0 left-0 w-64 translate-x-0 shadow-2xl'
+          : 'fixed -translate-x-full md:relative md:translate-x-0 ' + (collapsed ? 'md:w-16' : 'md:w-64')
+      }`}
+      style={{ backgroundColor: cfg.sidebarBg }}
+    >
+      <div className={`h-16 flex items-center border-b border-white/10 relative ${collapsed ? 'justify-between px-3 md:justify-center md:px-2' : 'justify-between px-4'}`}>
         <div
           onClick={() => collapsed && setCollapsed(false)}
           className={`flex items-center gap-2.5 min-w-0 ${collapsed ? 'cursor-pointer' : ''}`}
@@ -852,17 +870,29 @@ export const Sidebar = () => {
             alt="TBI-GEU"
             className="w-8 h-8 rounded-full object-contain bg-white p-0.5 shadow-sm ring-1 ring-white/20 flex-shrink-0"
           />
-          {!collapsed && (
+          {(!collapsed || mobileOpen) && (
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-white font-bold text-lg tracking-wide">TBI-GEU</span>
               <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: cfg.color }} />
             </div>
           )}
         </div>
+
+        {/* Mobile close button */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 md:hidden transition-colors"
+          title="Close menu"
+          aria-label="Close menu"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Desktop collapse toggle */}
         {!collapsed && (
           <button
             onClick={() => setCollapsed(true)}
-            className="text-gray-400 hover:text-white p-1 rounded hover:bg-white/5 transition-colors"
+            className="hidden md:block text-gray-400 hover:text-white p-1 rounded hover:bg-white/5 transition-colors"
             title="Collapse sidebar"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -871,14 +901,15 @@ export const Sidebar = () => {
         {collapsed && (
           <button
             onClick={() => setCollapsed(false)}
-            className="absolute -right-3 top-5 w-6 h-6 rounded-full bg-slate-800 border border-white/20 text-gray-300 hover:text-white flex items-center justify-center shadow-md z-30 transition-transform hover:scale-110"
+            className="hidden md:flex absolute -right-3 top-5 w-6 h-6 rounded-full bg-slate-800 border border-white/20 text-gray-300 hover:text-white items-center justify-center shadow-md z-30 transition-transform hover:scale-110"
             title="Expand sidebar"
           >
             <ChevronLeft className="w-3.5 h-3.5 rotate-180" />
           </button>
         )}
       </div>
-      {!collapsed && (
+
+      {(!collapsed || mobileOpen) && (
         <div className="p-3">
           <div className="rounded-xl p-3 border" style={{ backgroundColor: `${cfg.color}15`, borderColor: `${cfg.color}30` }}>
             <div className="flex items-center gap-2">
@@ -893,10 +924,11 @@ export const Sidebar = () => {
           </div>
         </div>
       )}
+
       <nav className="flex-1 overflow-y-auto px-2 pb-4">
         {menus.map((sec) => (
           <div key={sec.section}>
-            {!collapsed && <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 px-3 pt-5 pb-2">{sec.section}</p>}
+            {(!collapsed || mobileOpen) && <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 px-3 pt-5 pb-2">{sec.section}</p>}
             {sec.items.map((item) => {
               const badgeCount = getItemBadge(item);
               return (
@@ -904,6 +936,7 @@ export const Sidebar = () => {
                   key={item.to}
                   to={item.to}
                   end
+                  onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center gap-3 h-10 px-3 rounded-lg text-sm transition-all duration-150 relative group ${
                       isActive
@@ -922,13 +955,12 @@ export const Sidebar = () => {
                 >
                   <div className="relative flex-shrink-0">
                     <item.icon className="w-5 h-5" />
-                    {/* Collapsed view indicator dot */}
-                    {collapsed && badgeCount > 0 && (
+                    {collapsed && !mobileOpen && badgeCount > 0 && (
                       <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-slate-900 animate-pulse" />
                     )}
                   </div>
-                  {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
-                  {!collapsed && badgeCount > 0 && (
+                  {(!collapsed || mobileOpen) && <span className="flex-1 truncate">{item.label}</span>}
+                  {(!collapsed || mobileOpen) && badgeCount > 0 && (
                     <span
                       title={`${badgeCount} item${badgeCount > 1 ? 's' : ''}`}
                       className="min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center bg-rose-500 shadow-sm shadow-rose-900/40 animate-pulse flex-shrink-0"
@@ -942,10 +974,10 @@ export const Sidebar = () => {
           </div>
         ))}
       </nav>
-      <button onClick={() => { logout(); navigate('/login'); }}
+      <button onClick={() => { logout(); navigate('/login'); setMobileOpen(false); }}
         className="flex items-center gap-3 h-12 px-4 border-t border-white/10 text-gray-300 hover:bg-white/5 hover:text-white">
         <LogOut className="w-5 h-5" />
-        {!collapsed && <span className="text-sm">Logout</span>}
+        {(!collapsed || mobileOpen) && <span className="text-sm">Logout</span>}
       </button>
     </aside>
   );
@@ -956,6 +988,7 @@ export const Sidebar = () => {
 // ====================================================================
 export const Topbar = () => {
   const { user } = useAuth();
+  const { setMobileOpen } = useLayout();
   const navigate = useNavigate();
   const socket = useSocket();
   const cfg = ROLES[user.role];
@@ -985,27 +1018,69 @@ export const Topbar = () => {
   }, [socket]);
 
   return (
-    <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200">
-      <div className="flex items-center gap-3 flex-1 max-w-md">
-        <Search className="w-5 h-5 text-gray-400" />
-        <input type="text" placeholder="Search..." className="flex-1 bg-transparent border-none outline-none text-sm" />
+    <header className="h-16 flex items-center justify-between px-3 sm:px-6 bg-white border-b border-gray-200 gap-2 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 max-w-md">
+        {/* Mobile Hamburger Menu Toggle */}
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="md:hidden p-2 -ml-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+          title="Open menu"
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Mobile Brand Mark */}
+        <div className="flex items-center gap-1.5 md:hidden flex-shrink-0">
+          <img
+            src="/tbi-geu-logo.png"
+            alt="TBI-GEU"
+            className="w-7 h-7 rounded-full object-contain"
+          />
+          <span className="font-bold text-xs sm:text-sm text-gray-900 hidden xs:inline tracking-wide">TBI-GEU</span>
+        </div>
+
+        {/* Search Input */}
+        <div className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100/70 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 px-2.5 py-1.5 rounded-lg border border-gray-200/80 transition-all flex-1 min-w-0 max-w-xs md:max-w-md">
+          <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="Search..."
+            className="w-full bg-transparent border-none outline-none text-xs sm:text-sm text-gray-800 placeholder-gray-400 min-w-0"
+          />
+        </div>
       </div>
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/notifications')} className="relative p-2 rounded-lg hover:bg-gray-100">
-          <Bell className="w-5 h-5 text-gray-600" />
+
+      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        <button
+          onClick={() => navigate('/notifications')}
+          className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+          title="Notifications"
+        >
+          <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 text-[10px] rounded-full text-white flex items-center justify-center font-bold" style={{ backgroundColor: cfg.color }}>
+            <span
+              className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 text-[10px] rounded-full text-white flex items-center justify-center font-bold"
+              style={{ backgroundColor: cfg.color }}
+            >
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: cfg.color }}>
+        <div
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-2 cursor-pointer p-1 rounded-lg hover:bg-gray-50 transition-colors"
+          title="View profile"
+        >
+          <div
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-xs"
+            style={{ backgroundColor: cfg.color }}
+          >
             {user.name.charAt(0)}
           </div>
-          <div className="hidden md:block">
-            <p className="text-sm font-medium">{user.name}</p>
-            <p className="text-xs text-gray-500">{cfg.label}</p>
+          <div className="hidden sm:block text-left">
+            <p className="text-sm font-medium text-gray-800 leading-tight truncate max-w-[120px]">{user.name}</p>
+            <p className="text-[11px] text-gray-500 leading-tight">{cfg.label}</p>
           </div>
         </div>
       </div>
@@ -1016,40 +1091,64 @@ export const Topbar = () => {
 // ====================================================================
 // LAYOUT
 // ====================================================================
-export const Layout = ({ children }) => (
-  <div className="flex h-screen overflow-hidden">
-    <Sidebar />
-    <div className="flex-1 flex flex-col overflow-hidden relative">
-      <Topbar />
-      <main className="flex-1 overflow-y-auto p-6 bg-slate-50/80 relative">
-        {/* Transparent watermark logo in center of background */}
-        <div
-          className="pointer-events-none fixed inset-0 flex items-center justify-center select-none z-0 overflow-hidden pl-16 md:pl-64 opacity-[0.04]"
-          aria-hidden="true"
-        >
-          <img
-            src="/tbi-geu-logo.png"
-            alt=""
-            className="w-[500px] h-[500px] max-w-[50vw] max-h-[50vh] object-contain drop-shadow-sm"
+export const Layout = ({ children }) => {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  return (
+    <LayoutContext.Provider value={{ collapsed, setCollapsed, mobileOpen, setMobileOpen }}>
+      <div className="flex h-screen overflow-hidden bg-slate-50">
+        {/* Mobile Backdrop Overlay */}
+        {mobileOpen && (
+          <div
+            onClick={() => setMobileOpen(false)}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 md:hidden transition-opacity"
+            aria-hidden="true"
           />
+        )}
+
+        <Sidebar />
+
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+          <Topbar />
+          <main className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 bg-slate-50/90 relative">
+            {/* Centered Transparent Watermark */}
+            <div
+              className={`pointer-events-none fixed inset-0 flex items-center justify-center select-none z-0 overflow-hidden transition-all duration-300 opacity-[0.035] ${
+                collapsed ? 'pl-0 md:pl-16' : 'pl-0 md:pl-64'
+              }`}
+              aria-hidden="true"
+            >
+              <img
+                src="/tbi-geu-logo.png"
+                alt=""
+                className="w-[280px] h-[280px] sm:w-[400px] sm:h-[400px] md:w-[500px] md:h-[500px] max-w-[75vw] max-h-[75vh] object-contain drop-shadow-sm"
+              />
+            </div>
+            <div className="relative z-10 max-w-full min-w-0">
+              {children}
+            </div>
+          </main>
+          <AnnouncementPopup />
         </div>
-        <div className="relative z-10">
-          {children}
-        </div>
-      </main>
-      <AnnouncementPopup />
-    </div>
-  </div>
-);
+      </div>
+    </LayoutContext.Provider>
+  );
+};
 
 // ====================================================================
 // SHARED
 // ====================================================================
 export const KPI = ({ label, value, change }) => (
-  <div className="bg-white p-5 rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
-    <p className="text-sm text-gray-500">{label}</p>
-    <p className="text-3xl font-bold mt-2">{value}</p>
-    {change && <p className="text-xs text-green-500 mt-1">+{change}</p>}
+  <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-gray-200 hover:shadow-md transition-shadow min-w-0">
+    <p className="text-xs sm:text-sm text-gray-500 truncate">{label}</p>
+    <p className="text-xl sm:text-2xl md:text-3xl font-bold mt-1 sm:mt-2 truncate text-gray-900">{value}</p>
+    {change && <p className="text-[10px] sm:text-xs text-green-500 mt-1">+{change}</p>}
   </div>
 );
 
@@ -1195,7 +1294,7 @@ export const AdminDashboard = () => {
         <p className="text-gray-500">Here's what's happening today.</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KPI label="Total Users" value={stats.totalUsers} />
         <KPI label="Active Events" value={stats.activeEvents} />
         <KPI label="Approval Rate" value={`${stats.approvalRate}%`} />
@@ -1203,7 +1302,7 @@ export const AdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 min-w-0 overflow-hidden">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-gray-500" /> Users by Tier
           </h3>
@@ -1235,7 +1334,7 @@ export const AdminDashboard = () => {
           )}
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 min-w-0 overflow-hidden">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-gray-500" /> Applications (Last 7 Days)
           </h3>
@@ -1363,7 +1462,7 @@ export const SuperAdminDashboard = () => {
         <p className="text-gray-500">Full system overview and admin actions.</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KPI label="Admins" value={stats.admins} />
         <KPI label="Total Users" value={stats.totalUsers} />
         <KPI label="Active Events" value={stats.activeEvents} />
@@ -1371,7 +1470,7 @@ export const SuperAdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 min-w-0 overflow-hidden">
           <h3 className="font-semibold mb-4">Users by Tier</h3>
           {tierPieData.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-sm text-gray-400">No data</div>
@@ -1390,7 +1489,7 @@ export const SuperAdminDashboard = () => {
           )}
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 min-w-0 overflow-hidden">
           <h3 className="font-semibold mb-4">Applications (7 Days)</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -1810,7 +1909,8 @@ export const UserManagement = () => {
         <SkeletonTable rows={4} cols={5} />
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[640px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
@@ -1916,6 +2016,7 @@ export const UserManagement = () => {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -3267,7 +3368,8 @@ export const QRCheckIn = () => {
           <div className="p-4 border-b border-gray-200">
             <h3 className="font-semibold">Recent Attendance (Last 14 Days)</h3>
           </div>
-          <table className="w-full text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[560px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -3296,6 +3398,7 @@ export const QRCheckIn = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
@@ -5026,7 +5129,8 @@ export const AttendancePage = () => {
                   <h3 className="font-semibold">Team Roster — {teamInfo?.name}</h3>
                   <p className="text-xs text-gray-500">{roster.length} members</p>
                 </div>
-                <table className="w-full text-left">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left min-w-[560px]">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Member</th>
@@ -5075,6 +5179,7 @@ export const AttendancePage = () => {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </>
           )}
@@ -5921,7 +6026,8 @@ export const AuditLogsPage = () => {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Action</th>
@@ -5945,6 +6051,7 @@ export const AuditLogsPage = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
@@ -5989,7 +6096,8 @@ export const AdminManagementPage = () => {
             <p>No admin accounts found</p>
           </div>
         ) : (
-          <table className="w-full text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[600px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Name</th>
@@ -6019,6 +6127,7 @@ export const AdminManagementPage = () => {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
@@ -7227,7 +7336,8 @@ export const MyTeamsPage = () => {
           <div className="p-4 border-b border-gray-200">
             <h3 className="font-semibold">Members ({team.members?.length || 0})</h3>
           </div>
-          <table className="w-full text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[500px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Member</th>
@@ -7264,6 +7374,7 @@ export const MyTeamsPage = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     );
@@ -7376,7 +7487,7 @@ export const T3DashboardEnhanced = () => {
         <p className="text-gray-500">Your events and pending tasks</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KPI label="My Events" value={stats.myEvents} />
         <KPI label="As Head" value={stats.eventsAsHead} />
         <KPI label="Pending Apps" value={stats.pendingApps} />
@@ -7385,7 +7496,7 @@ export const T3DashboardEnhanced = () => {
 
       {/* Team Attendance Percentages */}
       {teamAttendance.length > 0 && (
-        <div className="bg-white p-5 rounded-xl border border-gray-200">
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 min-w-0 overflow-hidden">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold text-lg">Team Attendance Today</h3>
             <button onClick={() => navigate('/t3/attendance')} className="text-xs text-purple-500 hover:underline">
@@ -7525,14 +7636,14 @@ export const T2DashboardEnhanced = () => {
         <p className="text-gray-500">Here's your activity</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KPI label="My Applications" value={stats.myApplications} />
         <KPI label="Approved" value={stats.approved} />
         <KPI label="My Teams" value={stats.myTeams} />
         <KPI label="Days Attended" value={stats.attendanceDays} />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KPI label="Pending" value={stats.pending} />
         <KPI label="Rejected" value={stats.rejected} />
         <KPI label="Certificates" value={stats.certificates} />
