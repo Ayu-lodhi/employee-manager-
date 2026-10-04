@@ -5,7 +5,21 @@ const User = require('../admin/admin.model');
 // Shared by every mounted HTTP router and the Socket.io handshake.
 const authenticateToken = async (token, allowPasswordChange = false) => {
   const decoded = tokens.verify(token, allowPasswordChange ? ['access', 'password-change'] : 'access');
-  const user = await repository.findById(decoded.sub);
+  let user;
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection?.readyState !== 1) {
+      const err = new Error('Service temporarily unavailable');
+      err.statusCode = 503;
+      throw err;
+    }
+    user = await repository.findById(decoded.sub);
+  } catch (err) {
+    if (err.statusCode) throw err;
+    const dbErr = new Error('Service temporarily unavailable');
+    dbErr.statusCode = 503;
+    throw dbErr;
+  }
   if (!user?.isActive || decoded.authState !== tokens.authState(user)) {
     throw new Error('Account or credentials changed; sign in again');
   }

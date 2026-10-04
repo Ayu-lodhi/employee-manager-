@@ -16,7 +16,9 @@ const acquireSession = async (userId) => {
   const sessionId = crypto.randomBytes(32).toString('hex');
   const mongoose = require('mongoose');
   if (mongoose.connection?.readyState !== 1) {
-    return { updatedUser: null, sessionId };
+    const error = new Error('Service temporarily unavailable');
+    error.statusCode = 503;
+    throw error;
   }
   // Terminate any previous socket connections or permission cache for immediate single-session enforcement
   try {
@@ -26,16 +28,23 @@ const acquireSession = async (userId) => {
 
   // Auto-override: Atomically overwrite activeSessionId with the new session,
   // terminating any previous active session and establishing this login as the active one.
-  const updatedUser = await User.findByIdAndUpdate(
-    userId,
-    {
-      $set: {
-        activeSessionId: sessionId,
-        lastActivity: new Date(),
+  let updatedUser;
+  try {
+    updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          activeSessionId: sessionId,
+          lastActivity: new Date(),
+        },
       },
-    },
-    { new: true }
-  );
+      { new: true }
+    );
+  } catch (err) {
+    const error = new Error('Service temporarily unavailable');
+    error.statusCode = 503;
+    throw error;
+  }
 
   if (!updatedUser) {
     const error = new Error('User not found');
@@ -48,6 +57,12 @@ const acquireSession = async (userId) => {
 
 exports.login = async (email, password) => {
   if (typeof email !== 'string' || typeof password !== 'string') throw new Error('Invalid credentials');
+  const mongoose = require('mongoose');
+  if (mongoose.connection?.readyState !== 1) {
+    const error = new Error('Service temporarily unavailable');
+    error.statusCode = 503;
+    throw error;
+  }
   let user = await repository.findByEmail(email);
   if (!user) throw new Error('Invalid credentials');
   if (!user.isActive) throw new Error('Account is deactivated');
@@ -71,11 +86,17 @@ exports.login = async (email, password) => {
   }
 
   const { updatedUser, sessionId } = await acquireSession(user._id);
-  return issueSession(updatedUser || user, false, sessionId);
+  return issueSession(updatedUser, false, sessionId);
 };
 
 exports.verifyMfa = async (challengeToken, code) => {
   const challenge = tokens.verify(challengeToken, 'mfa');
+  const mongoose = require('mongoose');
+  if (mongoose.connection?.readyState !== 1) {
+    const error = new Error('Service temporarily unavailable');
+    error.statusCode = 503;
+    throw error;
+  }
   const user = await repository.findById(challenge.sub);
   if (!user?.isActive || !user.mfa || !(await tokens.requiresMfa(user.role)) ||
       challenge.authState !== tokens.authState(user)) {
@@ -83,7 +104,7 @@ exports.verifyMfa = async (challengeToken, code) => {
   }
   const verified = await mfa.verify(user, code);
   const { updatedUser, sessionId } = await acquireSession(verified._id);
-  return issueSession(updatedUser || verified, true, sessionId);
+  return issueSession(updatedUser, true, sessionId);
 };
 
 exports.logout = async (userId) => {
@@ -106,7 +127,12 @@ exports.logout = async (userId) => {
 };
 
 const issueSession = (user, isMfaVerified, sessionId) => {
-  const sid = sessionId || user.activeSessionId;
+  if (!user || !sessionId || !user.activeSessionId || user.activeSessionId !== sessionId) {
+    const error = new Error('Service temporarily unavailable');
+    error.statusCode = 503;
+    throw error;
+  }
+  const sid = sessionId;
   if (user.mustChangePassword) {
     const remaining = Math.floor((new Date(user.passwordChangeStartedAt).getTime() + 300000 - Date.now()) / 1000);
     if (!user.passwordChangeStartedAt || remaining <= 0) throw new Error('Password replacement expired; ask an administrator to reset it');
