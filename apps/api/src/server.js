@@ -87,8 +87,17 @@ app.get('/', publicCache(120), (req, res) => {
 
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 app.use((err, req, res, next) => {
-  console.error('Server error:', err.message);
-  res.status(err.status || 500).json({ success: false, message: err.message });
+  const status = err.status || 500;
+  const isProd = process.env.NODE_ENV === 'production';
+  const requestId = req?.id || req?.headers?.['x-request-id'] || null;
+  console.error('Server error:', {
+    message: err.message,
+    status,
+    requestId,
+    stack: isProd ? undefined : err.stack,
+  });
+  const message = isProd && status >= 500 ? 'Internal server error' : err.message;
+  res.status(status).json({ success: false, message });
 });
 
 console.log('Connecting to MongoDB...');
