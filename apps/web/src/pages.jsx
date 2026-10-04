@@ -288,11 +288,11 @@ export const IdleTimeoutWatcher = ({ logout }) => {
 // ROLES
 // ====================================================================
 export const ROLES = {
-  SUPER_ADMIN: { label: 'Super Admin', code: 'SA', color: '#F44336', sidebarBg: '#111827', route: '/super-admin' },
-  ADMIN: { label: 'Admin', code: 'AD', color: '#FF9800', sidebarBg: '#0F172A', route: '/admin' },
-  T3_EXECUTIVE: { label: 'T3 Executive', code: 'T3', color: '#9C27B0', sidebarBg: '#1E1B4B', route: '/t3' },
-  T2_ASSOCIATE: { label: 'T2 Associate', code: 'T2', color: '#2196F3', sidebarBg: '#0C4A6E', route: '/t2' },
-  T1_VOLUNTEER: { label: 'T1 Volunteer', code: 'T1', color: '#4CAF50', sidebarBg: '#064E3B', route: '/t1' },
+  SUPER_ADMIN: { label: 'Super Admin', code: 'SA', color: '#DC2626', sidebarBg: '#0B1120', route: '/super-admin' },
+  ADMIN: { label: 'Admin', code: 'AD', color: '#0B5CAD', sidebarBg: '#0B1120', route: '/admin' },
+  T3_EXECUTIVE: { label: 'T3 Executive', code: 'T3', color: '#2563EB', sidebarBg: '#0B1120', route: '/t3' },
+  T2_ASSOCIATE: { label: 'T2 Associate', code: 'T2', color: '#0284C7', sidebarBg: '#0B1120', route: '/t2' },
+  T1_VOLUNTEER: { label: 'T1 Volunteer', code: 'T1', color: '#DC2626', sidebarBg: '#0B1120', route: '/t1' },
 };
 
 // ====================================================================
@@ -841,14 +841,42 @@ export const Sidebar = () => {
   return (
     <aside className={`h-screen flex flex-col border-r border-white/10 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}
       style={{ backgroundColor: cfg.sidebarBg }}>
-      <div className="h-16 flex items-center justify-between px-4 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: cfg.color }} />
-          {!collapsed && <span className="text-white font-bold text-lg">TBI</span>}
+      <div className={`h-16 flex items-center border-b border-white/10 relative ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
+        <div
+          onClick={() => collapsed && setCollapsed(false)}
+          className={`flex items-center gap-2.5 min-w-0 ${collapsed ? 'cursor-pointer' : ''}`}
+          title={collapsed ? 'Click to expand sidebar' : 'TBI-GEU'}
+        >
+          <img
+            src="/tbi-geu-logo.png"
+            alt="TBI-GEU"
+            className="w-8 h-8 rounded-full object-contain bg-white p-0.5 shadow-sm ring-1 ring-white/20 flex-shrink-0"
+          />
+          {!collapsed && (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-white font-bold text-lg tracking-wide">TBI-GEU</span>
+              <span className="w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: cfg.color }} />
+            </div>
+          )}
         </div>
-        <button onClick={() => setCollapsed(!collapsed)} className="text-gray-400 hover:text-white" title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-          <ChevronLeft className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
-        </button>
+        {!collapsed && (
+          <button
+            onClick={() => setCollapsed(true)}
+            className="text-gray-400 hover:text-white p-1 rounded hover:bg-white/5 transition-colors"
+            title="Collapse sidebar"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
+        {collapsed && (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="absolute -right-3 top-5 w-6 h-6 rounded-full bg-slate-800 border border-white/20 text-gray-300 hover:text-white flex items-center justify-center shadow-md z-30 transition-transform hover:scale-110"
+            title="Expand sidebar"
+          >
+            <ChevronLeft className="w-3.5 h-3.5 rotate-180" />
+          </button>
+        )}
       </div>
       {!collapsed && (
         <div className="p-3">
@@ -991,10 +1019,23 @@ export const Topbar = () => {
 export const Layout = ({ children }) => (
   <div className="flex h-screen overflow-hidden">
     <Sidebar />
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden relative">
       <Topbar />
-      <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
-        {children}
+      <main className="flex-1 overflow-y-auto p-6 bg-slate-50/80 relative">
+        {/* Transparent watermark logo in center of background */}
+        <div
+          className="pointer-events-none fixed inset-0 flex items-center justify-center select-none z-0 overflow-hidden pl-16 md:pl-64 opacity-[0.04]"
+          aria-hidden="true"
+        >
+          <img
+            src="/tbi-geu-logo.png"
+            alt=""
+            className="w-[500px] h-[500px] max-w-[50vw] max-h-[50vh] object-contain drop-shadow-sm"
+          />
+        </div>
+        <div className="relative z-10">
+          {children}
+        </div>
       </main>
       <AnnouncementPopup />
     </div>
@@ -1140,10 +1181,10 @@ export const AdminDashboard = () => {
   }
 
   const tierPieData = [
-    { name: 'T1 Volunteers', value: tiers.T1, color: '#4CAF50' },
-    { name: 'T2 Associates', value: tiers.T2, color: '#2196F3' },
-    { name: 'T3 Executives', value: tiers.T3, color: '#9C27B0' },
-    { name: 'Admins', value: tiers.Admin + tiers.SuperAdmin, color: '#FF9800' },
+    { name: 'T1 Volunteers', value: tiers.T1, color: '#059669' },
+    { name: 'T2 Associates', value: tiers.T2, color: '#0284C7' },
+    { name: 'T3 Executives', value: tiers.T3, color: '#7C3AED' },
+    { name: 'Admins', value: tiers.Admin + tiers.SuperAdmin, color: '#DC2626' },
   ].filter((d) => d.value > 0);
 
   return (
@@ -1308,10 +1349,10 @@ export const SuperAdminDashboard = () => {
   }
 
   const tierPieData = [
-    { name: 'T1', value: tiers.T1, color: '#4CAF50' },
-    { name: 'T2', value: tiers.T2, color: '#2196F3' },
-    { name: 'T3', value: tiers.T3, color: '#9C27B0' },
-    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#FF9800' },
+    { name: 'T1', value: tiers.T1, color: '#059669' },
+    { name: 'T2', value: tiers.T2, color: '#0284C7' },
+    { name: 'T3', value: tiers.T3, color: '#7C3AED' },
+    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#DC2626' },
   ].filter((d) => d.value > 0);
 
   return (
@@ -6031,10 +6072,10 @@ export const AnalyticsPage = () => {
   }
 
   const tierPieData = [
-    { name: 'T1', value: tiers.T1, color: '#4CAF50' },
-    { name: 'T2', value: tiers.T2, color: '#2196F3' },
-    { name: 'T3', value: tiers.T3, color: '#9C27B0' },
-    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#FF9800' },
+    { name: 'T1', value: tiers.T1, color: '#059669' },
+    { name: 'T2', value: tiers.T2, color: '#0284C7' },
+    { name: 'T3', value: tiers.T3, color: '#7C3AED' },
+    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#DC2626' },
   ].filter((d) => d.value > 0);
 
   return (
@@ -8458,9 +8499,13 @@ export const LandingPage = () => {
     <div className="min-h-screen bg-white">
       <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-xl font-bold text-gray-900">TBI</span>
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/tbi-geu-logo.png"
+              alt="TBI-GEU Logo"
+              className="w-8 h-8 rounded-full object-contain shadow-sm border border-gray-200"
+            />
+            <span className="text-xl font-bold text-gray-900 tracking-wide">TBI-GEU</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-gray-600 hover:text-gray-900">Features</a>
@@ -8594,10 +8639,14 @@ export const LandingPage = () => {
       <footer className="bg-gray-900 text-gray-400 py-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="text-white font-bold">TBI</span>
-              <span className="text-sm">Workforce Platform</span>
+            <div className="flex items-center gap-2.5">
+              <img
+                src="/tbi-geu-logo.png"
+                alt="TBI-GEU Logo"
+                className="w-6 h-6 rounded-full object-contain bg-white p-0.5"
+              />
+              <span className="text-white font-bold tracking-wide">TBI-GEU</span>
+              <span className="text-sm text-gray-400">Workforce Platform</span>
             </div>
             <p className="text-sm">Built for Technology Business Incubators</p>
           </div>
