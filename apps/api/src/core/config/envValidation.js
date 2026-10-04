@@ -9,7 +9,7 @@ const envSchema = Joi.object({
   REDIS_PUBSUB_URL: Joi.string().required(),
   REDIS_QUEUE_URL: Joi.string().required(),
   JWT_ACCESS_SECRET: Joi.string().min(16).required(),
-  JWT_REFRESH_SECRET: Joi.string().min(16).required(),
+  JWT_REFRESH_SECRET: Joi.string().min(16).invalid(Joi.ref('JWT_ACCESS_SECRET')).required(),
   JWT_ACCESS_EXPIRY: Joi.string().default('15m'),
   JWT_REFRESH_EXPIRY: Joi.string().default('7d'),
 }).unknown(true); // Allow other optional variables like EMAIL_*, AUTO_SYNC_INDEXES, etc.

@@ -12,7 +12,7 @@ try {
   console.error('Server module load error:', e);
 }
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ayushlodhi88_db_user:9IzJqRATQYl1hERt@ac-gkiqwag-shard-00-00.wiv7fca.mongodb.net:27017,ac-gkiqwag-shard-00-01.wiv7fca.mongodb.net:27017,ac-gkiqwag-shard-00-02.wiv7fca.mongodb.net:27017/tbi_db?ssl=true&replicaSet=atlas-6g5sz6-shard-0&authSource=admin&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 export default async function handler(req, res) {
   if (initError) {

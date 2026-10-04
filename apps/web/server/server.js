@@ -1,7 +1,10 @@
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
+const path = require('path');
 require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '../../api/.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
@@ -72,8 +75,8 @@ app.use((err, req, res, next) => {
 });
 
 console.log('Connecting to MongoDB...');
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ayushlodhi88_db_user:9IzJqRATQYl1hERt@ac-gkiqwag-shard-00-00.wiv7fca.mongodb.net:27017,ac-gkiqwag-shard-00-01.wiv7fca.mongodb.net:27017,ac-gkiqwag-shard-00-02.wiv7fca.mongodb.net:27017/tbi_db?ssl=true&replicaSet=atlas-6g5sz6-shard-0&authSource=admin&appName=Cluster0';
-if (mongoose.connection.readyState === 0) {
+const MONGODB_URI = process.env.MONGODB_URI;
+if (mongoose.connection.readyState === 0 && MONGODB_URI) {
   mongoose
     .connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
     .then(() => console.log('MongoDB Connected'))
