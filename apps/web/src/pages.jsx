@@ -446,19 +446,62 @@ export const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
   const [showMuralOnMobile, setShowMuralOnMobile] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaContainerRef = useRef(null);
+  const captchaWidgetIdRef = useRef(null);
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const logoutReason = new URLSearchParams(location.search).get('reason');
+  const SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '';
+
+  // Load reCAPTCHA script and render widget
+  useEffect(() => {
+    if (!SITE_KEY) return;
+    const SCRIPT_ID = 'recaptcha-script';
+    const renderWidget = () => {
+      if (captchaContainerRef.current && captchaWidgetIdRef.current === null && window.grecaptcha) {
+        captchaWidgetIdRef.current = window.grecaptcha.render(captchaContainerRef.current, {
+          sitekey: SITE_KEY,
+          callback: (token) => setCaptchaToken(token),
+          'expired-callback': () => setCaptchaToken(''),
+          'error-callback': () => setCaptchaToken(''),
+        });
+      }
+    };
+    if (!document.getElementById(SCRIPT_ID)) {
+      const script = document.createElement('script');
+      script.id = SCRIPT_ID;
+      script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit';
+      script.async = true;
+      script.defer = true;
+      window.onRecaptchaLoad = renderWidget;
+      document.head.appendChild(script);
+    } else if (window.grecaptcha && window.grecaptcha.render) {
+      renderWidget();
+    } else {
+      window.onRecaptchaLoad = renderWidget;
+    }
+    return () => {
+      // Cleanup: reset widget ref so it can re-render if component re-mounts
+      captchaWidgetIdRef.current = null;
+    };
+  }, [SITE_KEY]);
 
   const performLogin = async (loginEmail, loginPassword) => {
     setError('');
     setLoading(true);
     try {
+      // Reject early if CAPTCHA is enabled but token not yet obtained
+      if (SITE_KEY && !captchaToken) {
+        setError('Please complete the CAPTCHA before signing in.');
+        setLoading(false);
+        return;
+      }
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+        body: JSON.stringify({ email: loginEmail, password: loginPassword, 'g-recaptcha-response': captchaToken }),
       });
       let data;
       try {
@@ -483,8 +526,15 @@ export const Login = () => {
         setError('Too many login attempts. Please wait a moment and try again.');
       } else if (/inactive|blocked|disabled|suspended/i.test(raw)) {
         setError('Your account is inactive. Please contact the administrator.');
+      } else if (/captcha/i.test(raw)) {
+        setError('CAPTCHA verification failed. Please try again.');
       } else {
         setError(raw || 'Unable to sign in right now. Please try again in a few moments.');
+      }
+      // Reset CAPTCHA widget so user can try again
+      if (SITE_KEY && captchaWidgetIdRef.current !== null && window.grecaptcha) {
+        window.grecaptcha.reset(captchaWidgetIdRef.current);
+        setCaptchaToken('');
       }
     } finally {
       setLoading(false);
@@ -679,6 +729,13 @@ export const Login = () => {
                 <div className="p-2 bg-red-100 border-2 border-[#C8322B] shadow-[2px_2px_0px_0px_#1A1A1A] rounded-lg text-xs text-[#C8322B] font-['Space_Mono',monospace] font-bold flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[#C8322B] shrink-0" />
                   <span>{error}</span>
+                </div>
+              )}
+
+              {/* reCAPTCHA Widget — only rendered when VITE_RECAPTCHA_SITE_KEY is set */}
+              {SITE_KEY && (
+                <div className="flex justify-center pt-1">
+                  <div ref={captchaContainerRef} />
                 </div>
               )}
 
