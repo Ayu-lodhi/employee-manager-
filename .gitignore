@@ -40,3 +40,12 @@ Thumbs.db
 # Test coverage
 coverage/
 */coverage/
+
+# Archify generated runs, outputs & execution receipts
+.archify/
+.archify/**
+
+# Local agent / skill tooling
+.agents/
+skills-lock.json
+
