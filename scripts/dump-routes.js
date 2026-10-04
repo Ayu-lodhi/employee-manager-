@@ -8,6 +8,10 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'dump_routes_placeholder_32_chars__';
 process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'dump_routes_access_placeholder_32c';
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dump_routes_refresh_placeholder_32';
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/dump_test_db';
+process.env.REDIS_CACHE_URL = process.env.REDIS_CACHE_URL || 'redis://127.0.0.1:6379/0';
+process.env.REDIS_QUEUE_URL = process.env.REDIS_QUEUE_URL || 'redis://127.0.0.1:6381/2';
+process.env.REDIS_PUBSUB_URL = process.env.REDIS_PUBSUB_URL || 'redis://127.0.0.1:6380/1';
 
 const mongoose = require('mongoose');
 // Prevent server.js from trying to connect to remote MongoDB Atlas and satisfy model compilation
