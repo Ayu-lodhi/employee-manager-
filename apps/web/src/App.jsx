@@ -12,6 +12,9 @@ import {
   ChangePasswordPage, ResetPasswordPage, PreferencesPage, AnnouncementsPage,
   TimesheetPage, AttendPage
 } from './pages';
+import { MyProfilePage } from './pages/profile/MyProfilePage';
+import { UserProfileView } from './pages/profile/UserProfileView';
+import { TeamProfilesPage } from './pages/profile/TeamProfilesPage';
 
 const RootRedirect = () => {
   const { user, initializing } = useAuth();
@@ -76,11 +79,13 @@ function App() {
             <Route path="/t1/certificates" element={<ProtectedRoute roles={['T1_VOLUNTEER']}><CertificatesPage /></ProtectedRoute>} />
             <Route path="/t1/reviews" element={<ProtectedRoute roles={['T1_VOLUNTEER']}><MyReviewsPage /></ProtectedRoute>} />
 
-            {/* Shared */}
+            {/* Shared & Profile */}
             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
             <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><MyProfilePage /></ProtectedRoute>} />
+            <Route path="/profile/:userId" element={<ProtectedRoute><UserProfileView /></ProtectedRoute>} />
+            <Route path="/profile/team" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><TeamProfilesPage /></ProtectedRoute>} />
             <Route path="/preferences" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />
             <Route path="/timesheets" element={<ProtectedRoute><TimesheetPage /></ProtectedRoute>} />
             <Route path="/admin/applications" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><ApplicationsPage /></ProtectedRoute>} />
