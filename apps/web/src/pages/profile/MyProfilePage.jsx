@@ -7,6 +7,23 @@ import {
   Camera, Plus, Trash2, Edit3, ShieldCheck
 } from 'lucide-react';
 
+const ROLE_LABELS = {
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN: 'Admin',
+  T3_EXECUTIVE: 'T3 Executive',
+  T2_ASSOCIATE: 'T2 Associate',
+  T1_VOLUNTEER: 'T1 Volunteer',
+  STUDENT: 'Student',
+  EMPLOYEE: 'Employee',
+};
+
+const getDisplayTier = (role, tier) => {
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'T3_EXECUTIVE') {
+    return tier && tier !== 'T1' ? tier : 'T3';
+  }
+  return tier || 'T1';
+};
+
 export const MyProfilePage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -254,10 +271,10 @@ export const MyProfilePage = () => {
                     {user?.name || 'TBI Member'}
                   </h1>
                   <span className="px-2 py-0.5 text-xs font-['Space_Mono',monospace] font-bold bg-[#1B5299] text-white rounded-md border border-[#1A1A1A]">
-                    {user?.role || 'STUDENT'}
+                    {ROLE_LABELS[user?.role] || user?.role || 'Member'}
                   </span>
                   <span className="px-2 py-0.5 text-xs font-['Space_Mono',monospace] font-bold bg-[#E6B800] text-[#1A1A1A] rounded-md border border-[#1A1A1A]">
-                    Tier {user?.tier || 'T1'}
+                    Tier {getDisplayTier(user?.role, user?.tier)}
                   </span>
                 </div>
 

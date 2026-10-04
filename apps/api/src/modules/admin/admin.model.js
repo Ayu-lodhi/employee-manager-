@@ -18,6 +18,13 @@ const userSchema = new mongoose.Schema({
     enum: ['SUPER_ADMIN', 'ADMIN', 'T3_EXECUTIVE', 'T2_ASSOCIATE', 'T1_VOLUNTEER'],
     default: 'T1_VOLUNTEER',
   },
+  tier: {
+    type: String,
+    enum: ['T1', 'T2', 'T3'],
+    default: function () {
+      return (this.role === 'SUPER_ADMIN' || this.role === 'ADMIN' || this.role === 'T3_EXECUTIVE') ? 'T3' : 'T1';
+    },
+  },
   isActive: { type: Boolean, default: true },
   mfa: { type: mfaSchema, select: false },
   mustChangePassword: { type: Boolean, default: true },

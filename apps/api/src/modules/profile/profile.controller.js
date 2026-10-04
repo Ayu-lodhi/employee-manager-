@@ -9,13 +9,25 @@ const { canViewProfile, sanitizeProfileForViewer } = require('./profile.access')
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+// Helper to extract caller's user ID from JWT payload
+const getAuthUserId = (req) => req.user?.sub || req.user?._id || req.user?.id;
+
+// Resolve default tier based on role (SUPER_ADMIN, ADMIN, T3_EXECUTIVE default to T3)
+const resolveTier = (role, tier) => {
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'T3_EXECUTIVE') {
+    return tier && tier !== 'T1' ? tier : 'T3';
+  }
+  return tier || 'T1';
+};
+
 /**
  * GET /profile/me
  */
 exports.getMyProfile = async (req, res, next) => {
   try {
-    const { profile, user, completion } = await profileService.getOrCreateProfile(req.user._id);
-    const progress = await profileService.getUserProgress(req.user._id);
+    const callerId = getAuthUserId(req);
+    const { profile, user, completion } = await profileService.getOrCreateProfile(callerId);
+    const progress = await profileService.getUserProgress(callerId);
 
     return res.status(200).json({
       success: true,
@@ -25,7 +37,7 @@ exports.getMyProfile = async (req, res, next) => {
           name: user.name,
           email: user.email,
           role: user.role,
-          tier: user.tier || 'T1',
+          tier: resolveTier(user.role, user.tier),
         },
         profile,
         completion,
@@ -42,7 +54,8 @@ exports.getMyProfile = async (req, res, next) => {
  */
 exports.updateMyProfile = async (req, res, next) => {
   try {
-    const { profile, completion } = await profileService.updateMyProfile(req.user._id, req.body);
+    const callerId = getAuthUserId(req);
+    const { profile, completion } = await profileService.updateMyProfile(callerId, req.body);
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
@@ -64,7 +77,8 @@ exports.updateMyProfile = async (req, res, next) => {
  */
 exports.getMyCompletion = async (req, res, next) => {
   try {
-    const { completion } = await profileService.getOrCreateProfile(req.user._id);
+    const callerId = getAuthUserId(req);
+    const { completion } = await profileService.getOrCreateProfile(callerId);
     return res.status(200).json({
       success: true,
       data: completion,
@@ -79,7 +93,8 @@ exports.getMyCompletion = async (req, res, next) => {
  */
 exports.getMyProgress = async (req, res, next) => {
   try {
-    const progress = await profileService.getUserProgress(req.user._id);
+    const callerId = getAuthUserId(req);
+    const progress = await profileService.getUserProgress(callerId);
     return res.status(200).json({
       success: true,
       data: progress,
@@ -98,7 +113,8 @@ exports.getTeamProfiles = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Forbidden: T3 executive access only' });
     }
 
-    const memberIds = await profileService.getLedTeamMemberIds(req.user._id);
+    const callerId = getAuthUserId(req);
+    const memberIds = await profileService.getLedTeamMemberIds(callerId);
     const members = await User.find({ _id: { $in: memberIds } }).select('name email role tier phone');
 
     const results = [];
@@ -110,7 +126,7 @@ exports.getTeamProfiles = async (req, res, next) => {
           id: m._id,
           name: m.name,
           role: m.role,
-          tier: m.tier || 'T1',
+          tier: resolveTier(m.role, m.tier),
         },
         profile: sanitized,
       });
@@ -141,9 +157,10 @@ exports.getUserProfile = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    const callerId = getAuthUserId(req);
     let t3MemberIds = [];
     if (req.user.role === 'T3_EXECUTIVE') {
-      t3MemberIds = await profileService.getLedTeamMemberIds(req.user._id);
+      t3MemberIds = await profileService.getLedTeamMemberIds(callerId);
     }
 
     const authCheck = canViewProfile(req.user, targetUser, t3MemberIds);
@@ -160,7 +177,7 @@ exports.getUserProfile = async (req, res, next) => {
       id: targetUser._id,
       name: targetUser.name,
       role: targetUser.role,
-      tier: targetUser.tier || 'T1',
+      tier: resolveTier(targetUser.role, targetUser.tier),
     };
     if (authCheck.scope === 'owner' || authCheck.scope === 'admin') {
       userView.email = targetUser.email;
@@ -228,9 +245,10 @@ exports.uploadAvatar = async (req, res, next) => {
       });
     }
 
-    const { profile, user } = await profileService.getOrCreateProfile(req.user._id);
+    const callerId = getAuthUserId(req);
+    const { profile, user } = await profileService.getOrCreateProfile(callerId);
     profile.avatarUrl = trimmed;
-    profile.avatarKey = `avatars/${req.user._id}-${Date.now()}`;
+    profile.avatarKey = `avatars/${callerId}-${Date.now()}`;
     await profile.save();
 
     const { calculateCompletion } = require('./profile.completion');
