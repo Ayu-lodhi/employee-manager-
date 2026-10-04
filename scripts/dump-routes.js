@@ -10,8 +10,14 @@ process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'dump_routes_ac
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dump_routes_refresh_placeholder_32';
 
 const mongoose = require('mongoose');
-// Prevent server.js from trying to connect to remote MongoDB Atlas
+// Prevent server.js from trying to connect to remote MongoDB Atlas and satisfy model compilation
 mongoose.connection.readyState = 1;
+mongoose.connection.db = {
+  collection: () => ({
+    createIndex: () => Promise.resolve(),
+    indexes: () => Promise.resolve([]),
+  }),
+};
 
 const app = require('../apps/api/src/server');
 

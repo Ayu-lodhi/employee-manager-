@@ -55,8 +55,9 @@ function validateLinkedInUrl(raw) {
     return { valid: false, normalized: null, reason: 'Invalid hostname characters' };
   }
 
-  // Path must start with /in/
-  if (!parsed.pathname.startsWith('/in/')) {
+  // Path must start with /in/ and have a non-empty profile identifier
+  const slug = parsed.pathname.replace(/^\/in\/?/, '').replace(/\/+$/, '');
+  if (!parsed.pathname.startsWith('/in/') || !slug) {
     return { valid: false, normalized: null, reason: 'LinkedIn URL must be a /in/ profile link' };
   }
 

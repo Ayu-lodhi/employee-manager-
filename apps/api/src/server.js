@@ -14,7 +14,7 @@ const mongoose = require('mongoose');
 
 const securityMiddleware = require('./middleware/security.middleware');
 const { requestIdMiddleware } = require('./middleware/requestId.middleware');
-const { globalLimiter } = require('./middleware/rateLimit.middleware');
+const { globalLimiter, createUserLimiter } = require('./middleware/rateLimit.middleware');
 const { initSocket } = require('./config/socket');
 const compression = require('compression');
 const { noCache, publicCache } = require('./middleware/cacheControl.middleware');
@@ -74,6 +74,8 @@ app.use('/api/v1/stats', require('./modules/stats/stats.routes'));
 app.use('/api/v1/preferences', require('./modules/users/preferences.routes'));
 app.use('/api/v1/announcements', require('./modules/announcements/announcements.routes'));
 app.use('/api/v1/timesheets', require('./modules/timesheets/timesheets.routes'));
+app.use('/api/v1/profile', require('./modules/profile/profile.routes'));
+app.patch('/api/v1/admin/users/:userId/tier', protect, restrictTo('ADMIN', 'SUPER_ADMIN'), createUserLimiter, require('./modules/profile/profile.controller').updateUserTier);
 
 app.get('/', publicCache(120), (req, res) => {
   res.json({
