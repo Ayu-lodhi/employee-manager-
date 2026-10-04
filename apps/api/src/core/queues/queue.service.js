@@ -72,6 +72,13 @@ try {
   logger.error('Failed to initialize BullMQ queues', { error: err.message });
 }
 
+const maskEmail = (email) => {
+  if (typeof email !== 'string' || !email.includes('@')) return '***';
+  const [local, domain] = email.split('@');
+  if (local.length <= 1) return `*@${domain}`;
+  return `${local[0]}***@${domain}`;
+};
+
 /**
  * Enqueue an email job with idempotency key, retries with exponential backoff,
  * and request ID tracing.
@@ -110,7 +117,7 @@ async function enqueueEmail(jobName, payload, options = {}) {
     logger.info('Email job enqueued to BullMQ worker', {
       jobId: job.id,
       name: jobName,
-      to: payload.to,
+      to: maskEmail(payload.to),
       requestId: jobData.requestId,
     });
 
@@ -119,7 +126,7 @@ async function enqueueEmail(jobName, payload, options = {}) {
     logger.warn('BullMQ email enqueue failed, falling back', {
       error: err.message,
       jobName,
-      to: payload?.to,
+      to: maskEmail(payload?.to),
       requestId: payload?.requestId,
     });
     return { enqueued: false, error: err.message };
