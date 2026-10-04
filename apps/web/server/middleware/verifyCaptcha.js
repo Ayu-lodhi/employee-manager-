@@ -5,8 +5,13 @@
 const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 
 const verifyCaptcha = async (req, res, next) => {
-  // Bypass if CAPTCHA_ENABLED is explicitly false
-  if (process.env.CAPTCHA_ENABLED === 'false') {
+  // Bypass if CAPTCHA is not explicitly enabled or if secret key is unconfigured / placeholder
+  const isConfigured =
+    process.env.CAPTCHA_ENABLED === 'true' &&
+    process.env.RECAPTCHA_SECRET_KEY &&
+    process.env.RECAPTCHA_SECRET_KEY !== 'REPLACE_WITH_YOUR_RECAPTCHA_SECRET_KEY';
+
+  if (!isConfigured) {
     return next();
   }
 
