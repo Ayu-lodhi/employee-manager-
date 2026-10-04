@@ -101,6 +101,8 @@ exports.restrictTo = (...allowedRoles) => {
   };
 };
 
+const escapeRegExp = (s) => (typeof s === 'string' ? s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '');
+
 // Team-based access control
 exports.requireTeam = (teamName) => {
   return async (req, res, next) => {
@@ -134,7 +136,7 @@ exports.requireTeam = (teamName) => {
     try {
       const Team = require('../teams/teams.model');
       const memberTeam = await Team.findOne({
-        name: new RegExp(`^${teamName}$`, 'i'),
+        name: new RegExp(`^${escapeRegExp(teamName)}$`, 'i'),
         $or: [{ members: req.user.sub }, { leadId: req.user.sub }]
       });
       if (memberTeam) {
