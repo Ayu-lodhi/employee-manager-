@@ -28,8 +28,13 @@ const clearClientCache = () => {
   clientCache.clear();
 };
 
+let isRedirectingToLogin = false;
+
 const getToken = () => {
-  return (typeof window !== 'undefined' ? (sessionStorage.getItem('tbi_token') || localStorage.getItem('tbi_token')) : null);
+  if (typeof window === 'undefined') return null;
+  const token = sessionStorage.getItem('tbi_token') || localStorage.getItem('tbi_token');
+  if (!token || token === 'undefined' || token === 'null') return null;
+  return token;
 };
 
 const touchActivity = () => {
@@ -39,15 +44,27 @@ const touchActivity = () => {
 };
 
 const handleUnauthorized = (status, message = '') => {
-  if (status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+  if (status === 401 && typeof window !== 'undefined') {
     clearClientCache();
     sessionStorage.removeItem('tbi_user');
     sessionStorage.removeItem('tbi_token');
     localStorage.removeItem('tbi_user');
     localStorage.removeItem('tbi_token');
-    const msg = String(message || '').toLowerCase();
-    const reason = msg.includes('timed out') ? 'timeout' : msg.includes('session ended') ? 'session_ended' : 'session_expired';
-    window.location.href = `/login?reason=${reason}`;
+
+    if (!window.location.pathname.includes('/login') && !isRedirectingToLogin) {
+      isRedirectingToLogin = true;
+      const msg = String(message || '').toLowerCase();
+      const reason = msg.includes('timed out') ? 'timeout' : msg.includes('session ended') ? 'session_ended' : 'session_expired';
+      window.location.replace(`/login?reason=${reason}`);
+    }
+  }
+};
+
+const parseResponseJson = async (res) => {
+  try {
+    return await res.json();
+  } catch {
+    return { success: false, message: res.statusText || 'API request failed' };
   }
 };
 
@@ -71,10 +88,10 @@ export const api = {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
-    const data = await res.json();
+    const data = await parseResponseJson(res);
     if (!res.ok) {
       handleUnauthorized(res.status, data?.message);
-      const err = new Error(data.message || 'API request failed');
+      const err = new Error(data?.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
     }
@@ -101,10 +118,10 @@ export const api = {
       },
       body: JSON.stringify(body),
     });
-    const data = await res.json();
+    const data = await parseResponseJson(res);
     if (!res.ok) {
       handleUnauthorized(res.status, data?.message);
-      const err = new Error(data.message || 'API request failed');
+      const err = new Error(data?.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
     }
@@ -122,10 +139,10 @@ export const api = {
       },
       body: JSON.stringify(body),
     });
-    const data = await res.json();
+    const data = await parseResponseJson(res);
     if (!res.ok) {
       handleUnauthorized(res.status, data?.message);
-      const err = new Error(data.message || 'API request failed');
+      const err = new Error(data?.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
     }
@@ -142,10 +159,10 @@ export const api = {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
-    const data = await res.json();
+    const data = await parseResponseJson(res);
     if (!res.ok) {
       handleUnauthorized(res.status, data?.message);
-      const err = new Error(data.message || 'API request failed');
+      const err = new Error(data?.message || 'API request failed');
       err.response = { data, status: res.status };
       throw err;
     }
