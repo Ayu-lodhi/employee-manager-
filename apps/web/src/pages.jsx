@@ -2387,6 +2387,7 @@ export const Chat = () => {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
+  const messagesEndRef = useRef(null);
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [createModal, setCreateModal] = useState(false);
@@ -2530,20 +2531,42 @@ export const Chat = () => {
     return () => clearInterval(interval);
   }, [canCreateRoom]);
 
-  // Fetch messages when room changes
+  // Fetch messages when room changes + auto-polling fallback
   useEffect(() => {
     if (!selectedRoom) return;
     setLoadingMessages(true);
-    (async () => {
+    let isMounted = true;
+
+    const fetchRoomMessages = async (silent = false) => {
       try {
         const res = await api.get(`/chat/rooms/${selectedRoom._id}/messages`);
-        setMessages(res.data.data);
+        if (!isMounted) return;
+        const incoming = res.data?.data || [];
+        setMessages((prev) => {
+          if (silent && prev.length === incoming.length &&
+              prev[prev.length - 1]?._id === incoming[incoming.length - 1]?._id) {
+            return prev;
+          }
+          return incoming;
+        });
       } catch (err) {
-        console.error(err);
+        if (!silent) console.error(err);
       } finally {
-        setLoadingMessages(false);
+        if (!silent && isMounted) setLoadingMessages(false);
       }
-    })();
+    };
+
+    fetchRoomMessages(false);
+
+    // Reliable 3.5s background polling fallback for serverless environments
+    const pollInterval = setInterval(() => {
+      fetchRoomMessages(true);
+    }, 3500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
   }, [selectedRoom]);
 
   // Real-time listener
@@ -2552,7 +2575,7 @@ export const Chat = () => {
     socket.emit('chat:join', selectedRoom._id);
 
     const handleNewMessage = (msg) => {
-      if (msg.roomId !== selectedRoom._id) return;
+      if (!msg || msg.roomId !== selectedRoom._id) return;
       setMessages((prev) => {
         if (prev.some((m) => m._id === msg._id)) return prev;
         return [...prev, msg];
@@ -2566,6 +2589,11 @@ export const Chat = () => {
       socket.off('chat:new_message', handleNewMessage);
     };
   }, [socket, selectedRoom]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const toggleMember = (userId) => {
     setForm((f) => ({
@@ -2621,10 +2649,17 @@ export const Chat = () => {
 
   const sendMessage = async () => {
     if (!message.trim() || !selectedRoom) return;
-    const text = message;
+    const text = message.trim();
     setMessage('');
     try {
-      await api.post(`/chat/rooms/${selectedRoom._id}/messages`, { text });
+      const res = await api.post(`/chat/rooms/${selectedRoom._id}/messages`, { text });
+      const newMsg = res.data?.data || res.data;
+      if (newMsg && (newMsg._id || newMsg.text)) {
+        setMessages((prev) => {
+          if (newMsg._id && prev.some((m) => m._id === newMsg._id)) return prev;
+          return [...prev, newMsg];
+        });
+      }
     } catch (err) {
       alert('Failed to send');
       setMessage(text);
@@ -2736,9 +2771,9 @@ export const Chat = () => {
               ) : messages.length === 0 ? (
                 <p className="text-center text-gray-400 text-sm mt-8">No messages yet. Say hello</p>
               ) : messages.map((m) => {
-                const own = m.senderId === user._id;
+                const own = (m.senderId?._id || m.senderId)?.toString() === (user._id || user.id || user.sub)?.toString();
                 return (
-                  <div key={m._id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
+                  <div key={m._id || Math.random()} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-md flex flex-col ${own ? 'items-end' : 'items-start'}`}>
                       {!own && (
                         <p className="text-xs font-medium text-gray-600 mb-1 ml-1">{m.senderName}</p>
@@ -2775,12 +2810,13 @@ export const Chat = () => {
                         )}
                       </div>
                       <p className="text-[10px] mt-0.5 text-gray-400 mx-1">
-                        {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                       </p>
                     </div>
                   </div>
                 );
               })}
+              <div ref={messagesEndRef} />
             </div>
 
             <div className="p-4 border-t border-gray-200 flex gap-2">

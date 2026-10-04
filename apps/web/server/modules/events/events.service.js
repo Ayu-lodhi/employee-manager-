@@ -32,7 +32,7 @@ class EventService extends BaseService {
     let headName = '';
     let headEmail = '';
     if (headId) {
-      const head = await User.findById(headId).select('name email');
+      const head = await User.findById(headId).select('name email role');
       if (!head) throw new Error('Event head not found');
       if (!['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(head.role)) {
         throw new Error('Event head must be T3 Executive or higher');
