@@ -473,8 +473,8 @@ test('FIX 1: IDOR in deactivateLink — non-owner cannot deactivate session with
   assert.equal(deactivatedByAdmin.active, false, 'Admin must be allowed to deactivate');
 });
 
-// BUG 2: IDOR & Chat Room Injection in shareLinkToTeamChat
-test('VULNERABILITY AUDIT: IDOR in shareLinkToTeamChat — user cannot post link to unauthorized team chat', async () => {
+// FIX 2 TEST: IDOR & Chat Room Injection in shareLinkToTeamChat
+test('FIX 2: IDOR in shareLinkToTeamChat — user cannot post link to unauthorized team chat', async () => {
   const store = createInMemoryStore();
   setupMocks(store);
 
@@ -493,10 +493,18 @@ test('VULNERABILITY AUDIT: IDOR in shareLinkToTeamChat — user cannot post link
   };
   store.teams.set(secretTeam._id, secretTeam);
 
+  // Team 1 is the lead's own team
+  const myTeam = {
+    _id: '507f1f77bcf86cd799439001',
+    name: 'T3 Team',
+    leadId: t3Lead.sub,
+    members: [t3Lead.sub],
+  };
+  store.teams.set(myTeam._id, myTeam);
+
   const link = await linkService.generateLink({ minutes: 30 }, t3Lead);
 
   // Security requirement: Caller must not be allowed to share attendance QR to a team they do not belong to or lead
-  // In vulnerable code: shareLinkToTeamChat blindly accepts teamId and injects user into room.members!
   await assert.rejects(
     async () => {
       await linkService.shareLinkToTeamChat(link.token, { teamId: secretTeam._id }, t3Lead);
@@ -506,6 +514,11 @@ test('VULNERABILITY AUDIT: IDOR in shareLinkToTeamChat — user cannot post link
       return true;
     }
   );
+
+  // Legitimate lead CAN share to their own team chat
+  const shared = await linkService.shareLinkToTeamChat(link.token, { teamId: myTeam._id }, t3Lead);
+  assert.ok(shared.messageId, 'Message must be created in team chat');
+  assert.equal(shared.teamId, myTeam._id);
 });
 
 // BUG 3: Privilege Escalation — T1_VOLUNTEER with team="T3" can generate attendance sessions

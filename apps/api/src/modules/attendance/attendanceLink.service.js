@@ -301,14 +301,22 @@ class AttendanceLinkService {
       team = await Team.findOne({
         $or: [{ leadId: user.sub || user._id }, { members: user.sub || user._id }],
       });
-      if (!team) {
-        team = await Team.findOne();
-      }
     }
 
     if (!team) {
       const err = new Error('Target team not found');
       err.statusCode = 404;
+      throw err;
+    }
+
+    const callerId = (user.sub || user._id || '').toString();
+    const isLead = team.leadId && team.leadId.toString() === callerId;
+    const isMember = Array.isArray(team.members) && team.members.some((m) => m.toString() === callerId);
+    const isAdmin = user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+
+    if (!isLead && !isMember && !isAdmin) {
+      const err = new Error('Access denied. You are not a member or lead of this team.');
+      err.statusCode = 403;
       throw err;
     }
 
