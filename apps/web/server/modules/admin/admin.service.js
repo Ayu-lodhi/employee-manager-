@@ -7,8 +7,8 @@ const { sendWelcomeEmail, sendPasswordResetLinkEmail, sendProfileUpdatedEmail, s
 const generateDefaultPassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let pass = 'TBI@';
-  for (let i = 0; i < 6; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
-  pass += Math.floor(Math.random() * 90 + 10);
+  for (let i = 0; i < 6; i++) pass += chars[crypto.randomInt(chars.length)];
+  pass += String(10 + crypto.randomInt(90)).padStart(2, '0');
   return pass;
 };
 
@@ -50,7 +50,60 @@ exports.createUser = async (data, callerRole = null) => {
     loginUrl: LOGIN_URL,
   }).catch((err) => console.error('Welcome email failed:', err.message));
 
-  return { user: user.toObject({ virtuals: false }), tempPassword };
+  const userObj = user.toObject ? user.toObject({ virtuals: false }) : { ...user };
+  delete userObj.password;
+  return { user: userObj, tempPassword };
+};
+
+exports.bulkCreateUsers = async (rows, callerRole = null) => {
+  const results = [];
+  let succeeded = 0;
+  let failed = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const line = i + 1;
+    try {
+      if (row.role === 'SUPER_ADMIN' && callerRole !== 'SUPER_ADMIN') {
+        const err = new Error('Only Super Admins can create Super Admin accounts');
+        err.statusCode = 403;
+        throw err;
+      }
+      const { user } = await exports.createUser(row, callerRole);
+      succeeded++;
+      results.push({
+        line,
+        email: row.email,
+        status: 'created',
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      failed++;
+      const isExpected =
+        error.message === 'Email already exists' ||
+        error.message?.includes('Super Admin') ||
+        error.statusCode === 400 ||
+        error.statusCode === 403;
+      results.push({
+        line,
+        email: row.email,
+        status: 'failed',
+        error: isExpected ? error.message : 'User could not be created',
+      });
+    }
+  }
+
+  return {
+    total: rows.length,
+    succeeded,
+    failed,
+    results,
+  };
 };
 
 exports.updateUser = async (id, data) => {

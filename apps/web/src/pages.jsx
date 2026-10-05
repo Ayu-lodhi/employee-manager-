@@ -6453,41 +6453,130 @@ export const BulkImportPage = () => {
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   const parseCSV = (text) => {
-    const lines = text.trim().split('\n');
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    // Strip UTF-8 BOM if present; normalize line endings
+    const cleaned = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = cleaned.trim().split('\n');
+
+    const rawHeader = lines[0] || '';
+    // Binary detection: header must start with a letter and contain no control characters
+    const hasControlChar = (str) => {
+      for (let c = 0; c < str.length; c++) {
+        const code = str.charCodeAt(c);
+        if ((code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31)) return true;
+      }
+      return false;
+    };
+    if (!/^[a-zA-Z]/.test(rawHeader.trim()) || hasControlChar(rawHeader)) {
+      return { rows: [], errs: [{ line: 1, errors: ['Invalid CSV: unrecognized file format or binary content'] }] };
+    }
+
+    const headers = rawHeader.split(',').map(h => h.trim().toLowerCase());
+    const requiredHeaders = ['name', 'email', 'role'];
+    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+    if (missingHeaders.length > 0) {
+      return { rows: [], errs: [{ line: 1, errors: [`Invalid CSV: missing required columns: ${missingHeaders.join(', ')}`] }] };
+    }
+
+    const MAX_ROWS = 500;
+    const dataLines = lines.slice(1).filter(l => l.trim() !== '');
+
+    // Enforce row limit
+    if (dataLines.length > MAX_ROWS) {
+      return {
+        rows: [],
+        errs: [{ line: 1, errors: [`Too many rows: limit is ${MAX_ROWS} rows, file has ${dataLines.length}`] }],
+      };
+    }
+
+    // F: Formula injection — characters that spreadsheets interpret as formula starters
+    const FORMULA_STARTERS = ['=', '+', '-', '@', '\t'];
+    const hasFormulaInjection = (val) => val && FORMULA_STARTERS.includes(val.charAt(0));
+
     const rows = [];
     const errs = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
+    const seenEmails = new Map(); // email -> first line number (for duplicate detection)
+
+    for (let i = 0; i < dataLines.length; i++) {
+      const lineNum = i + 2; // 1-indexed, skipping header (line 1)
+      // D: Handle quoted fields with commas (RFC 4180 minimal)
+      const parseFields = (line) => {
+        const fields = [];
+        let cur = '';
+        let inQ = false;
+        for (let c = 0; c < line.length; c++) {
+          const ch = line[c];
+          if (inQ) {
+            if (ch === '"' && line[c + 1] === '"') { cur += '"'; c++; }
+            else if (ch === '"') { inQ = false; }
+            else { cur += ch; }
+          } else {
+            if (ch === '"') { inQ = true; }
+            else if (ch === ',') { fields.push(cur.trim()); cur = ''; }
+            else { cur += ch; }
+          }
+        }
+        fields.push(cur.trim());
+        return fields;
+      };
+
+      const values = parseFields(dataLines[i]);
       const row = {};
-      headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+      headers.forEach((h, idx) => { row[h] = values[idx] !== undefined ? values[idx] : ''; });
+
       const rowErrors = [];
+
+      // F: Reject formula injection in name, role (not email — email starts with local-part)
+      if (hasFormulaInjection(row.name)) rowErrors.push('Name must not start with =, +, -, @ or tab (formula injection)');
+      if (row.phone && ['=', '@', '\t'].includes(row.phone.charAt(0))) rowErrors.push('Phone must not start with =, @ or tab (formula injection)');
+
       if (!row.name) rowErrors.push('Missing name');
       if (!row.email) rowErrors.push('Missing email');
-      // Bound work before matching; email components cannot consume their separators.
+      // Validate email format
       if (row.email && (row.email.length > 254 || !/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(row.email))) {
         rowErrors.push('Invalid email');
+      }
+      // Intra-file duplicate email detection
+      if (row.email && !rowErrors.includes('Invalid email')) {
+        const emailKey = row.email.toLowerCase();
+        if (seenEmails.has(emailKey)) {
+          rowErrors.push(`Duplicate email (first seen on line ${seenEmails.get(emailKey)})`);
+        } else {
+          seenEmails.set(emailKey, lineNum);
+        }
+      }
+      // E: Phone format validation (digits, spaces, +, -, () only; 7-15 digits when stripped)
+      if (row.phone && !rowErrors.some(e => e.includes('formula injection'))) {
+        const stripped = row.phone.replace(/[\s\-().+]/g, '');
+        if (!/^\d{7,15}$/.test(stripped)) {
+          rowErrors.push('Invalid phone number format');
+        }
       }
       if (!row.role) rowErrors.push('Missing role');
       if (row.role && !['T1_VOLUNTEER', 'T2_ASSOCIATE', 'T3_EXECUTIVE'].includes(row.role.toUpperCase())) {
         rowErrors.push('Invalid role');
       }
-      rows.push({ ...row, _line: i + 1, _errors: rowErrors });
-      if (rowErrors.length > 0) errs.push({ line: i + 1, errors: rowErrors });
+      rows.push({ ...row, _line: lineNum, _errors: rowErrors });
+      if (rowErrors.length > 0) errs.push({ line: lineNum, errors: rowErrors });
     }
-    return { rows, errs };
+    const validRows = rows.filter(r => r._errors.length === 0);
+    return { rows: validRows, preview: rows, errs };
   };
 
   const handleFile = (f) => {
     if (!f) return;
+    if (f.size > 2 * 1024 * 1024) {
+      alert('File size exceeds the 2 MB limit');
+      return;
+    }
     setFile(f);
     setDone(false);
     const reader = new FileReader();
     reader.onload = (e) => {
-      const { rows, errs } = parseCSV(e.target.result);
-      setPreview(rows);
+      const { rows, preview: previewRows, errs } = parseCSV(e.target.result);
+      setPreview(previewRows || rows);
       setErrors(errs);
     };
     reader.readAsText(f);
@@ -6506,21 +6595,35 @@ export const BulkImportPage = () => {
 
     let succeeded = 0;
     const importErrors = [];
+    const BATCH_SIZE = 25; // Sized to fit comfortably within Vercel serverless function limits
 
-    for (let i = 0; i < validRows.length; i++) {
-      const row = validRows[i];
+    for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
+      const chunk = validRows.slice(i, i + BATCH_SIZE);
+      const payloadRows = chunk.map((r) => ({
+        name: r.name,
+        email: r.email,
+        phone: r.phone || '',
+        role: (r.role || 'T1_VOLUNTEER').toUpperCase(),
+      }));
+
       try {
-        await api.post('/admin/users', {
-          name: row.name,
-          email: row.email,
-          phone: row.phone || '',
-          role: (row.role || 'T1_VOLUNTEER').toUpperCase(),
+        const res = await api.post('/admin/users/bulk', { rows: payloadRows });
+        const results = res.data?.results || [];
+        results.forEach((resRow, idx) => {
+          const origRow = chunk[idx];
+          if (resRow.status === 'created') {
+            succeeded++;
+          } else {
+            importErrors.push({ line: origRow._line, error: resRow.error || 'Failed' });
+          }
         });
-        succeeded++;
       } catch (err) {
-        importErrors.push({ line: row._line, error: err.response?.data?.message || err.message });
+        const errMsg = err.response?.data?.message || err.message;
+        chunk.forEach((r) => {
+          importErrors.push({ line: r._line, error: errMsg });
+        });
       }
-      setProgress(Math.round(((i + 1) / validRows.length) * 100));
+      setProgress(Math.min(100, Math.round(((i + chunk.length) / validRows.length) * 100)));
     }
 
     setImporting(false);
@@ -6528,12 +6631,11 @@ export const BulkImportPage = () => {
     if (importErrors.length > 0) {
       console.warn('Import errors:', importErrors);
     }
-    // Store results for display
-    window._lastImportResult = { succeeded, failed: importErrors.length, errors: importErrors };
+    setImportResult({ succeeded, failed: importErrors.length, errors: importErrors });
   };
 
   const reset = () => {
-    setFile(null); setPreview([]); setErrors([]); setDone(false); setProgress(0);
+    setFile(null); setPreview([]); setErrors([]); setDone(false); setProgress(0); setImportResult(null);
   };
 
   const validRows = preview.filter(r => r._errors.length === 0);
@@ -6563,7 +6665,7 @@ export const BulkImportPage = () => {
           className={`bg-white rounded-xl border-2 border-dashed transition cursor-pointer p-12 text-center ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'}`}
           onClick={() => document.getElementById('csv-input').click()}
         >
-          <input id="csv-input" type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
+          <input id="csv-input" type="file" accept=".csv,.txt" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
           <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <p className="font-medium mb-1">Drop your CSV file here</p>
           <p className="text-sm text-gray-500">or click to browse</p>
@@ -6663,7 +6765,11 @@ export const BulkImportPage = () => {
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
           <h3 className="text-xl font-bold mb-2">Import Complete</h3>
-          <p className="text-gray-500 mb-6">{validRows.length} users created successfully{invalidRows.length > 0 && `, ${invalidRows.length} skipped`}</p>
+          <p className="text-gray-500 mb-6">
+            {importResult ? importResult.succeeded : validRows.length} users created successfully
+            {importResult && importResult.failed > 0 ? `, ${importResult.failed} failed` : ''}
+            {invalidRows.length > 0 ? `, ${invalidRows.length} invalid rows skipped` : ''}
+          </p>
           <div className="flex gap-3 justify-center">
             <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Download Report</button>
             <button onClick={reset} className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">Import Another</button>

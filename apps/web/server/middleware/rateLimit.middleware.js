@@ -58,3 +58,32 @@ exports.createUserLimiter = (req, res, next) => {
   next();
 };
 
+const bulkImportRequests = new Map();
+const BULK_IMPORT_WINDOW_MS = 5 * 60 * 1000; // 5 mins
+const BULK_IMPORT_MAX_REQUESTS = 10;
+
+exports.bulkImportLimiter = (req, res, next) => {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const record = bulkImportRequests.get(ip) || { count: 0, resetTime: now + BULK_IMPORT_WINDOW_MS };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + BULK_IMPORT_WINDOW_MS;
+  } else {
+    record.count++;
+  }
+
+  bulkImportRequests.set(ip, record);
+
+  if (record.count > BULK_IMPORT_MAX_REQUESTS) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many bulk import requests, please try again later.',
+    });
+  }
+
+  next();
+};
+
+

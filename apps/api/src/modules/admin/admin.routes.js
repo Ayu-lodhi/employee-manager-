@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('./admin.controller');
 const { protect, restrictTo } = require('../auth/auth.middleware');
-const { createUserLimiter } = require('../../middleware/rateLimit.middleware');
+const { createUserLimiter, bulkImportLimiter } = require('../../middleware/rateLimit.middleware');
 const { validate, schemas } = require('../../middleware/validate.middleware');
 const { auditLog } = require('../../middleware/audit.middleware');
 
@@ -15,6 +15,7 @@ router.use(protect);
 // Admin + Super Admin
 router.get('/users', restrictTo('ADMIN', 'SUPER_ADMIN'), adminController.getUsers);
 router.post('/users', restrictTo('ADMIN', 'SUPER_ADMIN'), createUserLimiter, validate(schemas.addUser), auditLog('USER_CREATED'), adminController.addUser);
+router.post('/users/bulk', restrictTo('ADMIN', 'SUPER_ADMIN'), bulkImportLimiter, express.json({ limit: '2mb' }), validate(schemas.bulkUsers), auditLog('BULK_USERS_IMPORTED'), adminController.bulkImportUsers);
 router.patch('/users/:id', restrictTo('ADMIN', 'SUPER_ADMIN'), adminController.updateUser);
 router.patch('/users/:id/tier', restrictTo('ADMIN', 'SUPER_ADMIN'), createUserLimiter, require('../profile/profile.controller').updateUserTier);
 router.post('/users/:id/reset-session', restrictTo('ADMIN', 'SUPER_ADMIN'), auditLog('SESSION_RESET'), adminController.resetUserSession);

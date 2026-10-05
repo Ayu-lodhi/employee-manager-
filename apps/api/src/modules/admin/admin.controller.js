@@ -24,7 +24,38 @@ exports.addUser = async (req, res) => {
       data: user,
     });
   } catch (error) {
-    res.status(error.statusCode || error.status || 400).json({ success: false, message: error.message });
+    const isExpected =
+      error.message === 'Email already exists' ||
+      error.message?.includes('Super Admin') ||
+      error.statusCode === 400 ||
+      error.statusCode === 403;
+    const safeMessage = isExpected ? error.message : 'User could not be created';
+    res.status(error.statusCode || error.status || 400).json({ success: false, message: safeMessage });
+  }
+};
+
+exports.bulkImportUsers = async (req, res) => {
+  try {
+    const rows = req.body?.rows || [];
+    if (req.user?.role !== 'SUPER_ADMIN' && rows.some((r) => r.role === 'SUPER_ADMIN')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only Super Admins can create Super Admin accounts',
+      });
+    }
+
+    const report = await adminService.bulkCreateUsers(rows, req.user?.role);
+    res.status(200).json({
+      success: true,
+      message: `Bulk import completed: ${report.succeeded} created, ${report.failed} failed`,
+      ...report,
+    });
+  } catch (error) {
+    const isExpected = error.statusCode === 400 || error.statusCode === 403;
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: isExpected ? error.message : 'Bulk import failed',
+    });
   }
 };
 

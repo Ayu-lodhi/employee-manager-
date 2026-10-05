@@ -155,3 +155,70 @@ exports.createUserLimiter = async (req, res, next) => {
 
   return inMemoryCreateUserLimiter(req, res, next, identifier);
 };
+
+// --- In-Memory Bulk Import Limiter State ---
+const inMemoryBulkImportRequests = new Map();
+const BULK_IMPORT_WINDOW_MS = 5 * 60 * 1000; // 5 mins
+const BULK_IMPORT_MAX_REQUESTS = 10;
+
+const inMemoryBulkImportLimiter = (req, res, next, identifier) => {
+  const now = Date.now();
+  const record = inMemoryBulkImportRequests.get(identifier) || { count: 0, resetTime: now + BULK_IMPORT_WINDOW_MS };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + BULK_IMPORT_WINDOW_MS;
+  } else {
+    record.count++;
+  }
+
+  inMemoryBulkImportRequests.set(identifier, record);
+
+  if (record.count > BULK_IMPORT_MAX_REQUESTS) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many bulk import requests, please try again later.',
+    });
+  }
+
+  next();
+};
+
+exports.bulkImportLimiter = async (req, res, next) => {
+  const identifier = getClientIdentifier(req);
+  const redisKey = `rl:bulk_import:${identifier}`;
+
+  try {
+    if (redisCache && redisCache.status === 'ready') {
+      const results = await redisCache
+        .multi()
+        .incr(redisKey)
+        .pttl(redisKey)
+        .exec();
+
+      if (results && results[0] && !results[0][0]) {
+        const count = results[0][1];
+        let ttl = results[1] ? results[1][1] : -1;
+
+        if (ttl === -1 || count === 1) {
+          await redisCache.pexpire(redisKey, BULK_IMPORT_WINDOW_MS);
+          ttl = BULK_IMPORT_WINDOW_MS;
+        }
+
+        if (count > BULK_IMPORT_MAX_REQUESTS) {
+          return res.status(429).json({
+            success: false,
+            message: 'Too many bulk import requests, please try again later.',
+          });
+        }
+
+        return next();
+      }
+    }
+  } catch (err) {
+    logger.warn('Redis bulk import limiter failed; falling back to in-memory limiter', { error: err.message });
+  }
+
+  return inMemoryBulkImportLimiter(req, res, next, identifier);
+};
+
