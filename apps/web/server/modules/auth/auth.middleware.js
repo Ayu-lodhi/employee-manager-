@@ -143,6 +143,10 @@ exports.requireTeam = (teamName) => {
     }
 
     const role = req.user.role || '';
+    if (['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      return next();
+    }
+
     const isTeamMatch =
       (teamName === 'T3' && (role === 'T3_EXECUTIVE' || role === 'T3')) ||
       (req.user.team && req.user.team.toUpperCase() === teamName.toUpperCase());
