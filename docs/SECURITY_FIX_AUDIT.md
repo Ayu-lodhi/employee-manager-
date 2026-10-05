@@ -36,7 +36,7 @@
 
 #### MongoDB URI Fallback (with embedded credentials)
 - **File:** `apps/api/src/server.js`, line 95
-- **Code:** `const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://ayushlodhi88_db_user:9IzJqRATQYl1hERt@ac-gkiqwag-shard-00-00.wiv7fca.mongodb.net:27017,...'`
+- **Code:** `const MONGODB_URI = process.env.MONGODB_URI || '[REDACTED]'`
 - **Issue:** Falls back to a hardcoded connection string with embedded credentials
 - **Used by:** Line 98, `mongoose.connect(MONGODB_URI, ...)`
 - **Critical:** Credentials are exposed in the source code
