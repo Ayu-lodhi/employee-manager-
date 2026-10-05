@@ -91,6 +91,7 @@ MONGODB_URI, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, NODE_ENV=production
 | 2026-10-05 | Converted ESM config/cache files in `apps/web/server/core/` to CommonJS |
 | 2026-10-05 | Gender enum normalized to lowercase at setter; avatar limit 10MB with canvas compression |
 | 2026-10-05 | Route shadowing fixed: `/profile/team` moved before `/profile/:userId` in App.jsx |
+| 2026-10-05 | Canonicalized documentation under docs/ and replaced root duplicates with redirect links |
 | 2026-10-04 | Vercel monorepo deployment configured; retro-industrial login design applied |
 | 2026-10-02–04 | Phase 1 security hardening: 15 CVEs resolved across auth, teams, chat, attendance |
 
@@ -109,14 +110,14 @@ MONGODB_URI, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, NODE_ENV=production
 
 | Topic | File |
 |-------|------|
-| Full architecture & module map | [architecture.md](file:///e:/project%20emp/tbi/architecture.md) |
+| Full architecture & module map | [docs/architecture.md](file:///e:/project%20emp/tbi/docs/architecture.md) |
 | Security fixes status | [docs/SECURITY_FIX_AUDIT.md](file:///e:/project%20emp/tbi/docs/SECURITY_FIX_AUDIT.md) |
 | Profile auth matrix & field privacy | [docs/PROFILE_AUTH_MATRIX.md](file:///e:/project%20emp/tbi/docs/PROFILE_AUTH_MATRIX.md) |
 | Profile feature audit | [docs/PROFILE_FEATURE_AUDIT.md](file:///e:/project%20emp/tbi/docs/PROFILE_FEATURE_AUDIT.md) |
 | Test commands & coverage | [docs/TESTING.md](file:///e:/project%20emp/tbi/docs/TESTING.md) |
 | All approved changes with rationale | [docs/CHANGELOG-decisions.md](file:///e:/project%20emp/tbi/docs/CHANGELOG-decisions.md) |
 | Performance/efficiency issues | [docs/IMPROVEMENT_AUDIT.md](file:///e:/project%20emp/tbi/docs/IMPROVEMENT_AUDIT.md) |
-| Phase status | [phases.md](file:///e:/project%20emp/tbi/phases.md) |
-| Design system / UI rules | [designe.md](file:///e:/project%20emp/tbi/designe.md) |
-| Coding conventions & guardrails | [rules.md](file:///e:/project%20emp/tbi/rules.md) |
-| Product requirements | [prd.md](file:///e:/project%20emp/tbi/prd.md) |
+| Phase status | [docs/phases.md](file:///e:/project%20emp/tbi/docs/phases.md) |
+| Design system / UI rules | [docs/designe.md](file:///e:/project%20emp/tbi/docs/designe.md) |
+| Coding conventions & guardrails | [docs/rules.md](file:///e:/project%20emp/tbi/docs/rules.md) |
+| Product requirements | [docs/prd.md](file:///e:/project%20emp/tbi/docs/prd.md) |

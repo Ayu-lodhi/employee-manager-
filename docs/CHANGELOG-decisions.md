@@ -4,6 +4,11 @@
 
 ---
 
+### [2026-10-05] Canonicalize documentation under docs/ and replace root duplicates with redirect links
+- **What:** Designated `docs/` as the single canonical source of truth for all repository documentation (`CHANGELOG-decisions.md`, `TESTING.md`, `architecture.md`, `designe.md`, `memory.md`, `phases.md`, `prd.md`, `rules.md`). Replaced root markdown files with redirect links pointing to `docs/`. Updated cross-document references to point to `docs/`.
+- **Reason:** Eliminates document drift and dual-synchronization maintenance overhead where both root and `docs/` copies were previously updated in parallel.
+- **Where:** `docs/rules.md`, `docs/memory.md`, `docs/CHANGELOG-decisions.md`, and root redirect stubs (`CHANGELOG-decisions.md`, `TESTING.md`, `architecture.md`, `designe.md`, `memory.md`, `phases.md`, `prd.md`, `rules.md`).
+
 ### [2026-10-05] Fix gender enum, avatar limit, broken routes — commit `59cd804`
 - **What:** Gender setter normalizes Male/Female/Other to lowercase; avatar limit raised to 10MB; canvas compression on client; avatarUrl excluded from PATCH /me; /profile/team route shadow fixed in App.jsx; GET /teams/my-teams alias added; PATCH /admin/users/:id/tier added to web server admin.routes.js; req.user.id/._id aliases attached; fieldOfStudy added to profile model.
 - **Where:** profile.model.js, profile.service.js, profile.controller.js, MyProfilePage.jsx, security.middleware.js, profile.routes.js, App.jsx, teams.routes.js, admin.routes.js, auth.middleware.js
@@ -37,7 +42,7 @@
 ---
 # CHANGELOG-decisions.md
 
-Registry of approved changes, per the Change Approval & Logging Protocol in `rules.md`. Entries below this line are backfilled from decisions made earlier in this project’s design discussion, before the protocol itself was added.
+Registry of approved changes, per the Change Approval & Logging Protocol in `docs/rules.md`. Entries below this line are backfilled from decisions made earlier in this project’s design discussion, before the protocol itself was added.
 
 ---
 
@@ -54,7 +59,7 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 ### [2026-09-17] Geofenced QR attendance deferred to v2
 - **What**: Geofence validation removed from MVP scope.
 - **Reason**: Chosen over keeping it in scope, given browser geolocation reliability concerns for a web-only (no native app) v1 and no prior PRD/diagram coverage.
-- **Where**: `apps/web/src/modules/attendance/components/` (`GeoFenceAlert.jsx` removed), `apps/api/src/modules/attendance/qr.service.js`, `phases.md` (v2 backlog)
+- **Where**: `apps/web/src/modules/attendance/components/` (`GeoFenceAlert.jsx` removed), `apps/api/src/modules/attendance/qr.service.js`, `docs/phases.md` (v2 backlog)
 
 ### [2026-09-17] MFA required for Admin and Super Admin
 - **What**: TOTP-based MFA added as a mandatory step for the two highest-privilege roles.

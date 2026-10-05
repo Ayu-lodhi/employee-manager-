@@ -8,9 +8,9 @@
 
 ## 1. Memory Protocol
 
-- **Start of Session**: Read [memory.md](file:///e:/project%20emp/tbi/memory.md) first. It is the single source of truth for high-level state, open issues, and doc references.
+- **Start of Session**: Read [docs/memory.md](file:///e:/project%20emp/tbi/docs/memory.md) first. It is the single source of truth for high-level state, open issues, and doc references.
 - **Code is Truth**: If a document and the codebase disagree, inspect and follow the code, then update the documentation to match.
-- **Log Decisions**: Any architectural decision or non-trivial change must be logged in [docs/CHANGELOG-decisions.md](file:///e:/project%20emp/tbi/docs/CHANGELOG-decisions.md) and summarized in [memory.md](file:///e:/project%20emp/tbi/memory.md).
+- **Log Decisions**: Any architectural decision or non-trivial change must be logged in [docs/CHANGELOG-decisions.md](file:///e:/project%20emp/tbi/docs/CHANGELOG-decisions.md) and summarized in [docs/memory.md](file:///e:/project%20emp/tbi/docs/memory.md).
 
 ---
 
