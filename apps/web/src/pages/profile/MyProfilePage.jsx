@@ -71,8 +71,8 @@ export const MyProfilePage = () => {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setFeedback({ type: 'error', message: 'Image size must be less than 5MB' });
+    if (file.size > 10 * 1024 * 1024) {
+      setFeedback({ type: 'error', message: 'Image size must be less than 10MB' });
       return;
     }
 
@@ -80,24 +80,56 @@ export const MyProfilePage = () => {
     setFeedback({ type: '', message: '' });
 
     const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const base64Data = reader.result;
-        const res = await api.post('/profile/me/avatar', { avatarUrl: base64Data });
-        if (res.data?.success) {
-          setProfileData((prev) => ({ ...prev, avatarUrl: res.data.data.avatarUrl }));
-          if (res.data.data.completion) {
-            setCompletion(res.data.data.completion);
+    reader.onload = (readerEvent) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          // Client-side canvas compression: scale to max 500x500 to keep avatars lightweight and fast
+          const maxDim = 500;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
           }
-          setFeedback({ type: 'success', message: 'Profile picture updated successfully!' });
-        } else {
-          setFeedback({ type: 'error', message: res.data?.message || 'Failed to update avatar' });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Export as JPEG with 0.85 quality
+          const base64Data = canvas.toDataURL('image/jpeg', 0.85);
+
+          const res = await api.post('/profile/me/avatar', { avatarUrl: base64Data });
+          if (res.data?.success) {
+            setProfileData((prev) => ({ ...prev, avatarUrl: res.data.data.avatarUrl }));
+            if (res.data.data.completion) {
+              setCompletion(res.data.data.completion);
+            }
+            setFeedback({ type: 'success', message: 'Profile picture updated successfully!' });
+          } else {
+            setFeedback({ type: 'error', message: res.data?.message || 'Failed to update avatar' });
+          }
+        } catch (uploadErr) {
+          setFeedback({ type: 'error', message: uploadErr.response?.data?.message || 'Failed to upload image' });
+        } finally {
+          setAvatarUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
         }
-      } catch (err) {
-        setFeedback({ type: 'error', message: err.response?.data?.message || 'Failed to upload image' });
-      } finally {
+      };
+      img.onerror = () => {
+        setFeedback({ type: 'error', message: 'Failed to process image' });
         setAvatarUploading(false);
-      }
+      };
+      img.src = readerEvent.target.result;
     };
     reader.onerror = () => {
       setFeedback({ type: 'error', message: 'Failed to read image file' });
@@ -112,19 +144,41 @@ export const MyProfilePage = () => {
       const res = await api.get('/profile/me');
       if (res.data?.success) {
         const p = res.data.data.profile || {};
+        let normalizedGender = (p.gender || '').toLowerCase().trim();
+        if (normalizedGender === 'non-binary') normalizedGender = 'other';
+        if (normalizedGender === 'prefer not to say') normalizedGender = 'prefer_not_to_say';
+
+        let formattedBirthday = '';
+        if (p.birthday) {
+          const bdayDate = new Date(p.birthday);
+          if (!isNaN(bdayDate.getTime())) {
+            formattedBirthday = bdayDate.toISOString().split('T')[0];
+          }
+        }
+
         setProfileData({
           headline: p.headline || '',
           university: p.university || '',
           city: p.city || '',
-          gender: p.gender || '',
-          birthday: p.birthday ? new Date(p.birthday).toISOString().split('T')[0] : '',
+          gender: normalizedGender,
+          birthday: formattedBirthday,
           mobile: p.mobile || '',
           linkedinUrl: p.linkedinUrl || '',
           avatarUrl: p.avatarUrl || '',
           bio: p.bio || '',
           skills: p.skills || [],
-          education: p.education || [],
-          projects: p.projects || [],
+          education: (p.education || []).map((e) => ({
+            institution: e.institution || '',
+            degree: e.degree || '',
+            fieldOfStudy: e.fieldOfStudy || e.field || '',
+            startYear: e.startYear || '',
+            endYear: e.endYear || '',
+          })),
+          projects: (p.projects || []).map((proj) => ({
+            title: proj.title || '',
+            description: proj.description || '',
+            url: proj.url || '',
+          })),
         });
         setCompletion(res.data.data.completion || { percent: 0, missing: [] });
         setProgress(res.data.data.progress || { score: 0, level: 'Beginner', breakdown: {} });
@@ -146,7 +200,24 @@ export const MyProfilePage = () => {
     setFeedback({ type: '', message: '' });
 
     try {
-      const res = await api.patch('/profile/me', profileData);
+      // Exclude avatarUrl from PATCH /profile/me to prevent multi-megabyte payloads
+      const { avatarUrl, ...saveData } = profileData;
+
+      // Auto-prefix https:// if user entered linkedin.com without protocol
+      if (saveData.linkedinUrl && !/^https?:\/\//i.test(saveData.linkedinUrl.trim())) {
+        saveData.linkedinUrl = 'https://' + saveData.linkedinUrl.trim();
+      }
+
+      // Cast education years cleanly to numbers or null
+      if (Array.isArray(saveData.education)) {
+        saveData.education = saveData.education.map((edu) => ({
+          ...edu,
+          startYear: edu.startYear ? (Number(edu.startYear) || null) : null,
+          endYear: edu.endYear ? (Number(edu.endYear) || null) : null,
+        }));
+      }
+
+      const res = await api.patch('/profile/me', saveData);
       if (res.data?.success) {
         setCompletion(res.data.data.completion);
         setFeedback({ type: 'success', message: 'Profile updated successfully!' });
@@ -501,10 +572,10 @@ export const MyProfilePage = () => {
                   className="w-full p-2.5 text-xs font-['Space_Mono',monospace] border-2 border-[#1A1A1A] rounded-xl focus:outline-none focus:border-[#1B5299]"
                 >
                   <option value="">Select Gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Non-Binary">Non-Binary</option>
-                  <option value="Prefer not to say">Prefer not to say</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other / Non-Binary</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
                 </select>
               </div>
 
@@ -623,7 +694,7 @@ export const MyProfilePage = () => {
                     <div>
                       <h3 className="font-bold text-sm text-[#1A1A1A]">{edu.institution}</h3>
                       <p className="text-xs font-['Space_Mono',monospace] text-slate-600">
-                        {edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}
+                        {edu.degree} {(edu.fieldOfStudy || edu.field) ? `in ${edu.fieldOfStudy || edu.field}` : ''}
                       </p>
                       {(edu.startYear || edu.endYear) && (
                         <p className="text-[11px] font-['Space_Mono',monospace] text-slate-500 mt-1">
@@ -736,6 +807,16 @@ export const MyProfilePage = () => {
                   placeholder="e.g. Master of Computer Applications"
                   value={eduForm.degree}
                   onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })}
+                  className="w-full p-2 border-2 border-[#1A1A1A] rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block font-bold mb-1">Field of Study</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Computer Science / Information Technology"
+                  value={eduForm.fieldOfStudy}
+                  onChange={(e) => setEduForm({ ...eduForm, fieldOfStudy: e.target.value })}
                   className="w-full p-2 border-2 border-[#1A1A1A] rounded-lg"
                 />
               </div>

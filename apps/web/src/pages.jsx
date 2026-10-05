@@ -370,6 +370,7 @@ const MENUS = {
       section: 'MY WORKSPACE', items: [
         { icon: LayoutDashboard, label: 'Dashboard', to: '/t3' },
         { icon: UsersRound, label: 'My Teams', to: '/t3/teams' },
+        { icon: Users, label: 'Team Profiles', to: '/profile/team' },
         { icon: FileCheck, label: 'Approval Requests', to: '/t3/applications' },
         { icon: CheckCircle, label: 'Attendance', to: '/t3/attendance' },
         { icon: Clock, label: 'Timesheets', to: '/timesheets' },

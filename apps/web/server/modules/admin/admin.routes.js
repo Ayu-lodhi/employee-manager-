@@ -16,6 +16,7 @@ router.use(protect);
 router.get('/users', restrictTo('ADMIN', 'SUPER_ADMIN'), adminController.getUsers);
 router.post('/users', restrictTo('ADMIN', 'SUPER_ADMIN'), createUserLimiter, validate(schemas.addUser), auditLog('USER_CREATED'), adminController.addUser);
 router.patch('/users/:id', restrictTo('ADMIN', 'SUPER_ADMIN'), adminController.updateUser);
+router.patch('/users/:id/tier', restrictTo('ADMIN', 'SUPER_ADMIN'), createUserLimiter, require('../profile/profile.controller').updateUserTier);
 router.post('/users/:id/reset-session', restrictTo('ADMIN', 'SUPER_ADMIN'), auditLog('SESSION_RESET'), adminController.resetUserSession);
 
 // Super Admin only

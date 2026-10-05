@@ -65,6 +65,9 @@ exports.updateMyProfile = async (req, res, next) => {
       },
     });
   } catch (err) {
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: err.message });
+    }
     if (err.statusCode) {
       return res.status(err.statusCode).json({ success: false, message: err.message });
     }

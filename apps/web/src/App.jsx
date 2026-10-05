@@ -84,8 +84,8 @@ function App() {
             <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><MyProfilePage /></ProtectedRoute>} />
-            <Route path="/profile/:userId" element={<ProtectedRoute><UserProfileView /></ProtectedRoute>} />
             <Route path="/profile/team" element={<ProtectedRoute roles={['T3_EXECUTIVE']}><TeamProfilesPage /></ProtectedRoute>} />
+            <Route path="/profile/:userId" element={<ProtectedRoute><UserProfileView /></ProtectedRoute>} />
             <Route path="/preferences" element={<ProtectedRoute><PreferencesPage /></ProtectedRoute>} />
             <Route path="/timesheets" element={<ProtectedRoute><TimesheetPage /></ProtectedRoute>} />
             <Route path="/admin/applications" element={<ProtectedRoute roles={['ADMIN', 'SUPER_ADMIN']}><ApplicationsPage /></ProtectedRoute>} />

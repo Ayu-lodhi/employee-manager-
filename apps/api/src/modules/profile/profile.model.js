@@ -6,8 +6,9 @@ const educationSchema = new mongoose.Schema({
   institution: { type: String, maxlength: 200 },
   degree: { type: String, maxlength: 200 },
   field: { type: String, maxlength: 200 },
-  startYear: { type: Number },
-  endYear: { type: Number },
+  fieldOfStudy: { type: String, maxlength: 200 },
+  startYear: { type: Number, default: null },
+  endYear: { type: Number, default: null },
   current: { type: Boolean, default: false },
   grade: { type: String, maxlength: 50 },
 }, { _id: true });
@@ -35,7 +36,20 @@ const profileSchema = new mongoose.Schema({
   headline: { type: String, default: '', maxlength: 200 },   // e.g. "MCA"
   university: { type: String, default: '', maxlength: 200 },
   city: { type: String, default: '', maxlength: 100 },
-  gender: { type: String, enum: ['male', 'female', 'other', 'prefer_not_to_say', ''], default: '' },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other', 'prefer_not_to_say', 'Male', 'Female', 'Other', 'Non-Binary', 'Prefer not to say', ''],
+    default: '',
+    set: function (val) {
+      if (!val) return '';
+      const v = String(val).toLowerCase().trim();
+      if (v === 'male') return 'male';
+      if (v === 'female') return 'female';
+      if (v === 'other' || v === 'non-binary') return 'other';
+      if (v === 'prefer not to say' || v === 'prefer_not_to_say') return 'prefer_not_to_say';
+      return v;
+    },
+  },
   birthday: { type: Date, default: null },
   bio: { type: String, default: '', maxlength: 2000 },
 

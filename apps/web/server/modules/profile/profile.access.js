@@ -60,12 +60,15 @@ function sanitizeProfileForViewer(profile, scope) {
   }
 
   if (scope === 't3_team') {
-    // Redact sensitive personal data for team view
+    // Redact sensitive personal data for team view per PROFILE_AUTH_MATRIX
     delete data.mobile;
     delete data.birthday;
     delete data.email;
     delete data.mobileVerified;
     delete data.emailVerified;
+    delete data.gender;
+    delete data.completionPercent;
+    delete data.completionMissing;
     return data;
   }
 

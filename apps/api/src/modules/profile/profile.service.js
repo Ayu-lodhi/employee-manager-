@@ -84,22 +84,60 @@ async function updateMyProfile(userId, rawData = {}) {
         continue;
       }
 
+      if (field === 'gender') {
+        const v = String(val || '').toLowerCase().trim();
+        if (v === 'male') profile.gender = 'male';
+        else if (v === 'female') profile.gender = 'female';
+        else if (v === 'other' || v === 'non-binary') profile.gender = 'other';
+        else if (v === 'prefer not to say' || v === 'prefer_not_to_say') profile.gender = 'prefer_not_to_say';
+        else if (!v) profile.gender = '';
+        else profile.gender = v;
+        continue;
+      }
+
       if (field === 'education' && Array.isArray(val)) {
-        profile.education = val.slice(0, 10);
+        profile.education = val.slice(0, 10).map((edu) => {
+          const fieldVal = String(edu.fieldOfStudy || edu.field || '').trim().slice(0, 200);
+          return {
+            institution: String(edu.institution || '').trim().slice(0, 200),
+            degree: String(edu.degree || '').trim().slice(0, 200),
+            field: fieldVal,
+            fieldOfStudy: fieldVal,
+            startYear: edu.startYear ? (Number(edu.startYear) || null) : null,
+            endYear: edu.endYear ? (Number(edu.endYear) || null) : null,
+            current: !!edu.current,
+            grade: String(edu.grade || '').trim().slice(0, 50),
+          };
+        });
         continue;
       }
 
       if (field === 'projects' && Array.isArray(val)) {
-        profile.projects = val.slice(0, 15);
+        profile.projects = val.slice(0, 15).map((p) => ({
+          title: String(p.title || '').trim().slice(0, 200),
+          description: String(p.description || '').trim().slice(0, 2000),
+          url: String(p.url || '').trim().slice(0, 500),
+          technologies: Array.isArray(p.technologies)
+            ? p.technologies.map((t) => String(t).trim().slice(0, 50)).filter(Boolean).slice(0, 20)
+            : [],
+        }));
         continue;
       }
 
       if (field === 'birthday') {
         if (val) {
           const d = new Date(val);
-          if (!isNaN(d.getTime()) && d < new Date()) {
-            profile.birthday = d;
+          if (isNaN(d.getTime())) {
+            const err = new Error('Invalid birthday date');
+            err.statusCode = 400;
+            throw err;
           }
+          if (d >= new Date()) {
+            const err = new Error('Birthday must be a date in the past');
+            err.statusCode = 400;
+            throw err;
+          }
+          profile.birthday = d;
         } else {
           profile.birthday = null;
         }

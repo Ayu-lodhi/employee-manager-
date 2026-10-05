@@ -263,7 +263,7 @@ export const UserProfileView = () => {
                 <div key={idx} className="p-3 bg-[#FDFBF7] border-2 border-[#1A1A1A] rounded-xl shadow-[2px_2px_0px_0px_#1A1A1A]">
                   <h3 className="font-bold text-sm text-[#1A1A1A]">{edu.institution}</h3>
                   <p className="text-xs font-['Space_Mono',monospace] text-slate-600">
-                    {edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}
+                    {edu.degree} {(edu.fieldOfStudy || edu.field) ? `in ${edu.fieldOfStudy || edu.field}` : ''}
                   </p>
                 </div>
               ))}

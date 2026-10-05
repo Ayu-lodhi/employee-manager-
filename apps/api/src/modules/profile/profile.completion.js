@@ -61,7 +61,7 @@ function calculateCompletion(profile = {}, user = {}) {
     }
   };
 
-  check('avatar', !!(profile.avatarKey && profile.avatarKey.length > 0));
+  check('avatar', !!((profile.avatarKey && profile.avatarKey.length > 0) || (profile.avatarUrl && profile.avatarUrl.length > 0)));
   check('education', Array.isArray(profile.education) && profile.education.length > 0);
   check('skills', Array.isArray(profile.skills) && profile.skills.length > 0);
   check('projects', Array.isArray(profile.projects) && profile.projects.length > 0);

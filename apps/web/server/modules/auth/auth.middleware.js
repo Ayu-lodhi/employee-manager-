@@ -61,7 +61,7 @@ const authenticateToken = async (token, allowPasswordChange = false) => {
     }
   }
 
-  return { ...decoded, name: user.name, email: user.email, role: user.role };
+  return { ...decoded, id: decoded.sub, _id: decoded.sub, name: user.name, email: user.email, role: user.role };
 };
 exports.authenticateToken = authenticateToken;
 

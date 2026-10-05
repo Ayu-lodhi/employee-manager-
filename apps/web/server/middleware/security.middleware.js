@@ -1,7 +1,16 @@
 const express = require('express');
 
-const jsonParser = express.json({ limit: '100kb' }); // M10: was 10mb — reduced to prevent DoS
-const urlencodedParser = express.urlencoded({ extended: true });
+const defaultJsonParser = express.json({ limit: '100kb' }); // M10: was 10mb — reduced to prevent DoS
+const avatarJsonParser = express.json({ limit: '10mb' });
+const urlencodedParser = express.urlencoded({ extended: true, limit: '100kb' });
+
+const jsonParser = (req, res, next) => {
+  const url = req.originalUrl || req.url || '';
+  if (url.includes('/profile/me/avatar')) {
+    return avatarJsonParser(req, res, next);
+  }
+  return defaultJsonParser(req, res, next);
+};
 
 const securityHeaders = (req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');

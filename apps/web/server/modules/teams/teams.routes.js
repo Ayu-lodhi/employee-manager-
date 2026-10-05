@@ -10,6 +10,7 @@ router.get('/', teamController.getTeams);
 
 // T3's own teams
 router.get('/me', teamController.getMyTeams);
+router.get('/my-teams', teamController.getMyTeams);
 router.get('/me/members', teamController.getMyTeamMembers);
 router.get('/me/event-members', teamController.getMyEventMembers);
 

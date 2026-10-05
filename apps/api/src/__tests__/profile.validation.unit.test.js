@@ -80,3 +80,48 @@ test('Profile Validation - Future birthday is rejected', () => {
   assert.equal(isPastDate('2000-01-01'), true);
   assert.equal(isPastDate('invalid-date'), false);
 });
+
+test('Profile Validation - Gender normalizes properly across enum values', () => {
+  const Profile = require('../modules/profile/profile.model');
+  const mongoose = require('mongoose');
+
+  const testCases = [
+    { input: 'Male', expected: 'male' },
+    { input: 'Female', expected: 'female' },
+    { input: 'Non-Binary', expected: 'other' },
+    { input: 'other', expected: 'other' },
+    { input: 'Prefer not to say', expected: 'prefer_not_to_say' },
+    { input: 'prefer_not_to_say', expected: 'prefer_not_to_say' },
+    { input: '', expected: '' },
+  ];
+
+  for (const { input, expected } of testCases) {
+    const doc = new Profile({
+      userId: new mongoose.Types.ObjectId(),
+      gender: input,
+    });
+    assert.equal(doc.gender, expected, `Input "${input}" should normalize to "${expected}"`);
+    const validationError = doc.validateSync();
+    assert.equal(validationError, undefined, `Validation should pass for gender "${input}"`);
+  }
+});
+
+test('Profile Validation - Education supports fieldOfStudy and number casting', () => {
+  const Profile = require('../modules/profile/profile.model');
+  const mongoose = require('mongoose');
+
+  const doc = new Profile({
+    userId: new mongoose.Types.ObjectId(),
+    education: [{
+      institution: 'Graphic Era University',
+      degree: 'B.Tech',
+      fieldOfStudy: 'Computer Science',
+      startYear: 2020,
+      endYear: 2024,
+    }],
+  });
+
+  const err = doc.validateSync();
+  assert.equal(err, undefined, 'Education validation should pass');
+  assert.equal(doc.education[0].fieldOfStudy, 'Computer Science');
+});
