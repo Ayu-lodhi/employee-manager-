@@ -63,7 +63,7 @@ const authenticateToken = async (token, allowPasswordChange = false) => {
   }
 
   // 1. Verify that the session/token sessionId matches user.activeSessionId
-  if (user.activeSessionId && (!decoded.sid || decoded.sid !== user.activeSessionId)) {
+  if (decoded.purpose === 'access' && (!user.activeSessionId || !decoded.sid || decoded.sid !== user.activeSessionId)) {
     const error = new Error('Session ended. Please log in again.');
     error.statusCode = 401;
     throw error;
