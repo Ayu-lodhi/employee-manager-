@@ -2481,6 +2481,21 @@ export const UserManagement = () => {
 // ====================================================================
 // CHAT
 // ====================================================================
+const isSafeActionUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return true;
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+    const isAllowed = isLocalhost || host.endsWith('.vercel.app') || (typeof window !== 'undefined' && host === window.location.hostname);
+    return (parsed.protocol === 'https:' || (isLocalhost && parsed.protocol === 'http:')) && isAllowed;
+  } catch (_) {
+    return false;
+  }
+};
+
 export const Chat = () => {
   const { user } = useAuth();
   const socket = useSocket();
@@ -2886,7 +2901,7 @@ export const Chat = () => {
                           <div className="mt-2.5 p-3 bg-white text-slate-800 rounded-xl border border-gray-200 shadow-xs flex flex-col items-center">
                             <img src={m.qrCode} alt="Attendance QR Code" className="w-48 h-48 object-contain rounded-lg" />
                             <p className="text-[11px] text-gray-500 font-medium mt-1.5">Scan QR with camera</p>
-                            {m.actionUrl && (
+                            {isSafeActionUrl(m.actionUrl) && (
                               <a
                                 href={m.actionUrl}
                                 target="_blank"
@@ -2899,7 +2914,7 @@ export const Chat = () => {
                             )}
                           </div>
                         )}
-                        {!m.qrCode && m.actionUrl && (
+                        {!m.qrCode && isSafeActionUrl(m.actionUrl) && (
                           <a
                             href={m.actionUrl}
                             target="_blank"

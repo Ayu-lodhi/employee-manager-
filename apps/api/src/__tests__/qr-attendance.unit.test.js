@@ -521,6 +521,79 @@ test('FIX 2: IDOR in shareLinkToTeamChat — user cannot post link to unauthoriz
   assert.equal(shared.teamId, myTeam._id);
 });
 
+// FIX 3 TEST: Safe actionUrl in chat
+test('FIX 3: Unsafe actionUrl in chat messages is dropped while legitimate attendance links pass', async () => {
+  const chatController = require('../modules/chat/chat.controller');
+  const chatService = require('../modules/chat/chat.service');
+
+  const capturedMessageOpts = [];
+  const origSendMessage = chatService.sendMessage;
+  chatService.sendMessage = async (roomId, text, user, opts) => {
+    capturedMessageOpts.push(opts);
+    return {
+      _id: 'msg-123',
+      roomId,
+      senderId: user.sub,
+      senderName: user.name,
+      text,
+      ...opts,
+    };
+  };
+
+  try {
+    const caller = { sub: '507f1f77bcf86cd799439001', name: 'User' };
+    const mockRes = {
+      statusCode: 200,
+      status(code) { this.statusCode = code; return this; },
+      json(data) { this.body = data; return this; },
+    };
+
+    // 1. Malicious: javascript: payload
+    await chatController.sendMessage(
+      { params: { id: 'room-1' }, body: { text: 'Hello', actionUrl: 'javascript:alert(1)' }, user: caller },
+      mockRes
+    );
+    assert.equal(capturedMessageOpts[0].actionUrl, null, 'javascript: URL must be dropped to null');
+
+    // 2. Malicious: protocol-relative //evil.com
+    await chatController.sendMessage(
+      { params: { id: 'room-1' }, body: { text: 'Hello', actionUrl: '//evil.com/phish' }, user: caller },
+      mockRes
+    );
+    assert.equal(capturedMessageOpts[1].actionUrl, null, '//evil.com URL must be dropped to null');
+
+    // 3. Malicious: external unallowed host
+    await chatController.sendMessage(
+      { params: { id: 'room-1' }, body: { text: 'Hello', actionUrl: 'http://evil.com/login' }, user: caller },
+      mockRes
+    );
+    assert.equal(capturedMessageOpts[2].actionUrl, null, 'external unallowed host must be dropped to null');
+
+    // 4. Malicious: data: scheme
+    await chatController.sendMessage(
+      { params: { id: 'room-1' }, body: { text: 'Hello', actionUrl: 'data:text/html,<script>alert(1)</script>' }, user: caller },
+      mockRes
+    );
+    assert.equal(capturedMessageOpts[3].actionUrl, null, 'data: scheme must be dropped to null');
+
+    // 5. Legitimate relative attendance link
+    await chatController.sendMessage(
+      { params: { id: 'room-1' }, body: { text: 'Check in', actionUrl: '/attend/abcdef1234567890' }, user: caller },
+      mockRes
+    );
+    assert.equal(capturedMessageOpts[4].actionUrl, '/attend/abcdef1234567890', 'Legitimate /attend link must be preserved');
+
+    // 6. Legitimate app base URL
+    await chatController.sendMessage(
+      { params: { id: 'room-1' }, body: { text: 'Check in', actionUrl: 'http://localhost:5173/attend/abcdef1234567890' }, user: caller },
+      mockRes
+    );
+    assert.equal(capturedMessageOpts[5].actionUrl, 'http://localhost:5173/attend/abcdef1234567890', 'Legitimate app URL must be preserved');
+  } finally {
+    chatService.sendMessage = origSendMessage;
+  }
+});
+
 // BUG 3: Privilege Escalation — T1_VOLUNTEER with team="T3" can generate attendance sessions
 test('VULNERABILITY AUDIT: Privilege escalation in requireTeam("T3") allowing T1 volunteers to generate links', async () => {
   const middleware = requireTeam('T3');

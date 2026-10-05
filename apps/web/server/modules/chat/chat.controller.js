@@ -46,10 +46,49 @@ exports.getMessages = async (req, res) => {
   }
 };
 
+const validateActionUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  // Single leading slash (not protocol-relative //)
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    return trimmed;
+  }
+
+  // Allowed base hosts from environment
+  const allowedHosts = new Set(['localhost', '127.0.0.1']);
+  const baseEnvs = [process.env.BASE_URL, process.env.APP_URL, process.env.FRONTEND_URL, process.env.CLIENT_URL];
+  for (const b of baseEnvs) {
+    if (b) {
+      try {
+        const parsed = new URL(b);
+        allowedHosts.add(parsed.hostname.toLowerCase());
+      } catch (_) {}
+    }
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+    if (parsed.protocol === 'https:' || (isLocalhost && parsed.protocol === 'http:')) {
+      if (allowedHosts.has(host) || host.endsWith('.vercel.app')) {
+        return trimmed;
+      }
+    }
+  } catch (_) {
+    return null;
+  }
+
+  return null;
+};
+
 exports.sendMessage = async (req, res) => {
   try {
     const { text, qrCode, actionUrl } = req.body;
-    const message = await chatService.sendMessage(req.params.id, text, req.user, { qrCode, actionUrl });
+    const safeActionUrl = validateActionUrl(actionUrl);
+    const message = await chatService.sendMessage(req.params.id, text, req.user, { qrCode, actionUrl: safeActionUrl });
 
     // Real-time emit to room
     await emitToRoom(`chat:${req.params.id}`, 'chat:new_message', {
