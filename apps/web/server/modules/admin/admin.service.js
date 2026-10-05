@@ -18,7 +18,13 @@ exports.getAllUsers = async () => {
   return await User.find().select('-password').sort({ createdAt: -1 });
 };
 
-exports.createUser = async (data) => {
+exports.createUser = async (data, callerRole = null) => {
+  if (data.role === 'SUPER_ADMIN' && callerRole && callerRole !== 'SUPER_ADMIN') {
+    const err = new Error('Only Super Admins can create Super Admin accounts');
+    err.statusCode = 403;
+    err.status = 403;
+    throw err;
+  }
   const existing = await User.findOne({ email: data.email.toLowerCase() });
   if (existing) throw new Error('Email already exists');
 

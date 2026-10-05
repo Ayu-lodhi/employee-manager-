@@ -11,7 +11,13 @@ exports.getUsers = async (req, res) => {
 
 exports.addUser = async (req, res) => {
   try {
-    const { user, tempPassword } = await adminService.createUser(req.body);
+    if (req.body.role === 'SUPER_ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only Super Admins can create Super Admin accounts',
+      });
+    }
+    const { user, tempPassword } = await adminService.createUser(req.body, req.user?.role);
     res.status(201).json({
       success: true,
       message: 'User created. Credentials sent via email.',
@@ -19,7 +25,7 @@ exports.addUser = async (req, res) => {
       tempPassword,
     });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(error.statusCode || error.status || 400).json({ success: false, message: error.message });
   }
 };
 
