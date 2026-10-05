@@ -4,6 +4,17 @@
 
 ---
 
+### [2026-10-06] QR & Link Attendance Security Hardening (Fixes 1, 2, 3, 4a, 5, 6, 7)
+- **What:**
+  1. Fix 1 (IDOR on deactivate): Gated `deactivateLink` so only the session creator, `ADMIN`, or `SUPER_ADMIN` can deactivate an active attendance session (returns 403 otherwise).
+  2. Fix 2 (IDOR & chat injection): Enforced authorization check on `shareLinkToTeamChat` verifying caller is team lead, member, or `ADMIN`/`SUPER_ADMIN` BEFORE creating message or modifying room; removed side effect that silently added unauthorized callers to `room.members`.
+  3. Fix 3 (Unsafe actionUrl): Added server-side validation in `chat.controller.js` restricting `actionUrl` to relative paths starting with single `/` (and not `//`) or allow-listed app hosts; added client-side `isSafeActionUrl` verification in `pages.jsx` before rendering `<a href>`.
+  4. Fix 4a (Admin access to team routes): Extended `requireTeam` middleware to permit `ADMIN` and `SUPER_ADMIN` (additive, no existing legitimate users lose access).
+  5. Fix 5 (Dedicated rate limiters): Mounted `attendanceGenerateLimiter` (10/min) on `POST /link/generate` and `attendanceScanLimiter` (30/min keyed by authenticated `sub` ID to avoid blocking shared campus Wi-Fi) on `POST /link/:token/mark`.
+  6. Fix 6 (Raw error masking): Standardized `attendance.controller.js` error handling to return `err.message` only for intentional statuses (`400, 403, 404, 409, 410, 425`); unexpected errors and 5xx return generic `'An unexpected error occurred. Please try again shortly.'` and log details without PII.
+  7. Fix 7 (Audit logging): Structured audit logging via `recordAttendanceAudit` for session generation, deactivation, chat sharing, and rejected attempts; records short token prefix (`token.slice(0, 8)...`), never the full token or QR image.
+- **Where:** `apps/web/server/modules/attendance/`, `apps/api/src/modules/attendance/`, `apps/web/server/modules/auth/auth.middleware.js`, `apps/api/src/modules/auth/auth.middleware.js`, `apps/web/server/modules/chat/chat.controller.js`, `apps/api/src/modules/chat/chat.controller.js`, `apps/web/server/middleware/rateLimit.middleware.js`, `apps/api/src/middleware/rateLimit.middleware.js`, `apps/web/server/middleware/audit.middleware.js`, `apps/api/src/middleware/audit.middleware.js`, `apps/web/src/pages.jsx`.
+
 ### [2026-10-05] Canonicalize documentation under docs/ and replace root duplicates with redirect links
 - **What:** Designated `docs/` as the single canonical source of truth for all repository documentation (`CHANGELOG-decisions.md`, `TESTING.md`, `architecture.md`, `designe.md`, `memory.md`, `phases.md`, `prd.md`, `rules.md`). Replaced root markdown files with redirect links pointing to `docs/`. Updated cross-document references to point to `docs/`.
 - **Reason:** Eliminates document drift and dual-synchronization maintenance overhead where both root and `docs/` copies were previously updated in parallel.

@@ -374,6 +374,24 @@ catch (error) {
 
 ---
 
+## QR & Link Attendance Security Audit & Resolution (2026-10-06)
+
+| Finding / Audit # | Vulnerability / Issue | Fix Applied | Status |
+|-------------------|----------------------|-------------|--------|
+| **1. IDOR on deactivate (Audit #1)** | Any T3 team member could deactivate any active session link created by another user | Checked `link.createdBy === userId || ['ADMIN', 'SUPER_ADMIN'].includes(user.role)`. Non-owners receive 403 Forbidden | ✅ Applied in both backends (`2d16bf6`) |
+| **2. IDOR & Chat Injection on share-chat (Audit #2)** | Any user could post an attendance QR link to an unrelated team's chat and was silently injected into `room.members` | Enforced pre-check verifying caller leads, belongs to, or is Admin of target team before posting or touching rooms; removed silent room member injection for unauthorized callers | ✅ Applied in both backends (`c009321`) |
+| **3. Unsafe actionUrl in chat (Audit #3)** | `actionUrl` in messages accepted arbitrary schemes (`javascript:`, `data:`, `//evil.com`) | Validated on server in `chat.controller.js` to allow only single-leading-slash relative paths or verified app base URL hosts (dropped to null otherwise). Added `isSafeActionUrl` client check before rendering links in `pages.jsx` | ✅ Applied in both backends & frontend (`dea0460`) |
+| **4. Who can generate/deactivate sessions (Audit #4)** | `ADMIN` and `SUPER_ADMIN` were locked out of `requireTeam('T3')` routes | Added `['ADMIN', 'SUPER_ADMIN'].includes(user.role)` check to `requireTeam` middleware (additive, safe) | ✅ Applied in both backends (`30fda14`) |
+| **4b. Privilege Escalation for T1 with team "T3"** | `T1_VOLUNTEER` with `team: 'T3'` could generate session links | Reported to user for decision per Hard Rule 7 (decision pending) | ⏳ Awaiting user decision |
+| **5. Dedicated Rate Limiting (Audit #6)** | No rate limiting on `POST /link/generate` or `POST /link/:token/mark` | Mounted `attendanceGenerateLimiter` (10/min) on `/generate` and `attendanceScanLimiter` (30/min keyed by authenticated user ID `sub` to avoid throttling shared campus Wi-Fi) on `/mark` | ✅ Applied in both backends (`5de27dc`) |
+| **6. Raw Error Messages (Audit #7)** | Controllers returned unmasked `err.message` for 5xx and untyped errors | `handleAttendanceError` allows only intentional statuses (`400, 403, 404, 409, 410, 425`); returns generic 500 for untyped/5xx errors and logs server-side without PII | ✅ Applied in both backends (`bcd2aa4`) |
+| **7. Audit Logging (Audit #8)** | No audit entries for session lifecycle | Added structured audit logging via `recordAttendanceAudit` for session generation, deactivation, chat sharing, and rejected attempts; records short token prefix (`token.slice(0, 8)...`), never full token or QR data | ✅ Applied in both backends (`eff27cd`) |
+| **Audit #5: Hardcoded team 'T3'** | Link generation is hardcoded to team `'T3'` | Design decision: reported options to user (team query/body param vs user's team) | 📋 Report only (deferred) |
+| **Audit #9: Public certificate route `GET /verify/:hash`** | Documented PRD endpoint missing from router | Planned Phase 5 feature: marked as documented skip in test suite | 📋 Documented skip |
+| **Audit #10: Dead UI elements** | Generate QR button in TeamsPage & unused Team Code field | Identified and reported exact lines | 📋 Report only (deferred) |
+
+---
+
 ## End of Audit
 
 

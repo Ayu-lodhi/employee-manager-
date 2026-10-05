@@ -21,16 +21,17 @@ npm run build   # from repo root — alias for vite build in apps/web
 
 ---
 
-## Latest Test Results (2026-10-05)
+## Latest Test Results (2026-10-06)
 
 ```
-tests 65 | pass 65 | fail 0 | cancelled 0 | skipped 0 | duration ~2.8s
+tests 79 | pass 77 | fail 1 (pending decision on 4b) | cancelled 0 | skipped 1 (Phase 5 verify route) | duration ~3.9s
 ```
 
 ### Tests by file (`apps/api/src/__tests__/`)
 
 | File | What it covers |
 |------|---------------|
+| `qr-attendance.unit.test.js` | QR cryptographic token strength & PII protection, end-to-end authorized flow & duplicate prevention, negative security checks (expired/future/tampered/wrong-team), Fix 1 IDOR on deactivate, Fix 2 IDOR & chat room injection on share-chat, Fix 3 unsafe actionUrl server/client drop, Fix 5 dedicated rate limits (429 on generate & scan), Fix 6 generic error masking for 5xx/untyped errors, Fix 7 structured audit logs with token prefixes, Vercel serverless registration |
 | `profile.unit.test.js` | `calculateCompletion`, mass-assignment protection, LinkedIn validator (XSS/SSRF rejection, normalization), future birthday rejection, gender normalization across enum, `fieldOfStudy` casting |
 | `profile.access.unit.test.js` | Profile access matrix, viewer sanitization, tier escalation rules |
 | `profile.progress.unit.test.js` | Engagement calculation, normalization, tier thresholds |

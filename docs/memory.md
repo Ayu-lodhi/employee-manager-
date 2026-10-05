@@ -45,7 +45,7 @@ npm run dev:web
 # Dev — API (port 5000)
 npm run dev:api
 
-# Unit tests (31 tests passing, zero external test deps, ~1.2s)
+# Unit tests (77 tests passing, zero external test deps, ~3.8s)
 node --test apps/api/src/__tests__/*.unit.test.js
 
 # Production build (web only — Vercel runs this)
@@ -85,6 +85,7 @@ MONGODB_URI, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, NODE_ENV=production
 
 | Date | Decision |
 |------|----------|
+| 2026-10-06 | QR & Link Attendance Security Hardening: Fix 1 (IDOR on deactivate), Fix 2 (IDOR & unauthorized chat injection on share-chat), Fix 3 (server/client actionUrl validation), Fix 4a (ADMIN/SUPER_ADMIN added to requireTeam), Fix 5 (dedicated rate limiters: 10/min gen, 30/min scan keyed by userId), Fix 6 (masked 5xx/untyped errors in attendance controller), Fix 7 (structured audit logging with token prefixes, no full tokens) |
 | 2026-10-05 | Bulk import hardening: added POST `/api/v1/admin/users/bulk` (25-row Vercel batching, dedicated limiter, no passwords), server-side phone/name/email validation, export-time formula escaping, crypto.randomInt password generation |
 | 2026-10-05 | Added `markTypeRead` to web `notifications.controller.js` to fix `Route.patch()` undefined callback |
 | 2026-10-05 | Cached lazy MongoDB connection on `global.mongoose` in `apps/web/api/index.js` |
