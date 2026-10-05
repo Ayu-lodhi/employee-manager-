@@ -17,12 +17,11 @@ exports.addUser = async (req, res) => {
         message: 'Only Super Admins can create Super Admin accounts',
       });
     }
-    const { user, tempPassword } = await adminService.createUser(req.body, req.user?.role);
+    const { user } = await adminService.createUser(req.body, req.user?.role);
     res.status(201).json({
       success: true,
       message: 'User created. Credentials sent via email.',
       data: user,
-      tempPassword,
     });
   } catch (error) {
     res.status(error.statusCode || error.status || 400).json({ success: false, message: error.message });
