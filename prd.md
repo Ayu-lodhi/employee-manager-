@@ -1,7 +1,7 @@
 # PRD.md — TBI Student Engagement & Event Workforce Management System
 
 **Last updated:** 2026-10-05  
-**Production commit:** `8a85481`  
+**Production commit:** `59cd804`  
 **Verified against code:** yes  
 
 ---

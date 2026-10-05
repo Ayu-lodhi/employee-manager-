@@ -1,7 +1,7 @@
 # TBI Platform — Performance, Efficiency & Control Audit
 
 **Last updated:** 2026-10-05  
-**Production commit:** `8a85481`  
+**Production commit:** `59cd804`  
 **Verified against code:** yes  
 
 ---
@@ -23,8 +23,8 @@ This audit tracks operational performance, resource efficiency, and reliability 
 | **Single-Session Fail Closed** | DB failure during session check immediately rejects with 401 | `fa7e1fb` |
 | **Mobile & Dashboard Responsiveness** | Tables, forms, and navigation upgraded for mobile viewports | `7c020aa` |
 | **401 Redirect Loop Debounce** | Fixed browser freezing on repeated unauthenticated API calls | `8c8e0d6` |
-| **Gender Enum & Avatar Compression** | Case-insensitive gender validation, client canvas downscaling | `8a85481` |
-| **Route Shadowing** | Fixed `/profile/team` shadowed by `/profile/:userId` | `8a85481` |
+| **Gender Enum & Avatar Compression** | Case-insensitive gender validation, client canvas downscaling | `59cd804` |
+| **Route Shadowing** | Fixed `/profile/team` shadowed by `/profile/:userId` | `59cd804` |
 | **Vercel 503 Startup Crash** | Added missing `markTypeRead` to `notifications.controller.js`, lazy cached DB connection | Verified in code |
 
 ---

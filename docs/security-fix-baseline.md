@@ -1,7 +1,7 @@
 # Security Fix Baseline
 
 **Last updated:** 2026-10-05  
-**Production commit:** `8a85481`  
+**Production commit:** `59cd804`  
 **Verified against code:** yes  
 
 ---
@@ -61,4 +61,4 @@ Total Tests: 31 passed, 0 failed.
 | **3** | Production 500 stack trace leak | Fixed in commit `8b920b2` | Fixed in git; blocked by 503 startup crash |
 | **4** | `teamName` regex injection in requireTeam | Fixed in commit `894a6fe` | Fixed in git; blocked by 503 startup crash |
 | **5** | Queue service email PII exposure | Fixed in commit `97e14a2` | Fixed in git; blocked by 503 startup crash |
-| **6–15** | Profile validation, gender enum, avatar size | Fixed in commit `8a85481` | Fixed in git; blocked by 503 startup crash |
+| **6–15** | Profile validation, gender enum, avatar size | Fixed in commit `59cd804` | Fixed in git; blocked by 503 startup crash |

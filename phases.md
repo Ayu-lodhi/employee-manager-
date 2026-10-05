@@ -1,7 +1,7 @@
 # PHASES.md — Delivery Plan
 
 **Last updated:** 2026-10-05
-**Production commit:** `8a85481`
+**Production commit:** `59cd804`
 **Verified against code:** yes
 
 **Principle**: Build structure first. Every module keeps its full standard shape:
@@ -80,7 +80,7 @@ from Phase 0 onward — later phases are fill-ins, not refactors.
 
 ---
 
-## Phase 6.5 — User Profile Module ✅ DONE (2026-10-04, commit 68b0e4a → 8a85481)
+## Phase 6.5 — User Profile Module ✅ DONE (2026-10-04, commit 68b0e4a → 59cd804)
 
 - Profile model (headline, university, city, gender, birthday, bio, mobile, skills, education, projects, linkedinUrl, avatarUrl)
 - Completion ring (progress percentage)

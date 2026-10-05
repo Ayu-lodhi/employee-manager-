@@ -1,7 +1,7 @@
 # memory.md — Project Memory Snapshot
 
 **Last updated:** 2026-10-05  
-**Production commit:** `8a85481`  
+**Production commit:** `59cd804`  
 **Verified against code:** yes  
 
 **Read this first every session.** Fall back to detailed docs only for specifics.
@@ -23,7 +23,7 @@ Deployed at Vercel (monorepo: web SPA + api serverless function).
 |------|-------|
 | Production URL | `employee-manager-[project].vercel.app` (UNVERIFIED — verify from Vercel dashboard) |
 | Production branch | `main` |
-| Production commit | `8a85481` — Oct 05 2026 |
+| Production commit | `59cd804` — Oct 05 2026 |
 | Local branch | `main` |
 | **Vercel 503 Crash** | **RESOLVED IN CODE** — root cause identified & fixed in web server controller & serverless wrapper |
 | Verification Endpoint | `GET /api/health` — reports DB connected status and any missing required env var names |

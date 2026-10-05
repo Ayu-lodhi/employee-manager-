@@ -1,7 +1,7 @@
 # Profile Authorization Matrix
 
 **Last updated:** 2026-10-05  
-**Production commit:** `8a85481`  
+**Production commit:** `59cd804`  
 **Verified against code:** yes  
 
 ---

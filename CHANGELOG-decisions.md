@@ -1,10 +1,10 @@
 # CHANGELOG-decisions.md
 
-**Last updated:** 2026-10-05 | **Production commit:** `8a85481` | **Verified against code:** yes
+**Last updated:** 2026-10-05 | **Production commit:** `59cd804` | **Verified against code:** yes
 
 ---
 
-### [2026-10-05] Fix gender enum, avatar limit, broken routes — commit `8a85481`
+### [2026-10-05] Fix gender enum, avatar limit, broken routes — commit `59cd804`
 - **What:** Gender setter normalizes Male/Female/Other to lowercase; avatar limit raised to 10MB; canvas compression on client; avatarUrl excluded from PATCH /me; /profile/team route shadow fixed in App.jsx; GET /teams/my-teams alias added; PATCH /admin/users/:id/tier added to web server admin.routes.js; req.user.id/._id aliases attached; fieldOfStudy added to profile model.
 - **Where:** profile.model.js, profile.service.js, profile.controller.js, MyProfilePage.jsx, security.middleware.js, profile.routes.js, App.jsx, teams.routes.js, admin.routes.js, auth.middleware.js
 

@@ -1,7 +1,7 @@
 # Profile Feature Audit
 
 **Last updated:** 2026-10-05  
-**Production commit:** `8a85481`  
+**Production commit:** `59cd804`  
 **Verified against code:** yes  
 
 ---
@@ -23,7 +23,7 @@ All Phase 6.5 User Profile capabilities have been implemented and verified in bo
 
 ---
 
-## 2. Key Bug Fixes Verified in Commit `8a85481`
+## 2. Key Bug Fixes Verified in Commit `59cd804`
 
 1. **Gender Validation Mismatch**:
    - Schema defined lowercase `['male', 'female', 'other', 'prefer_not_to_say']`.

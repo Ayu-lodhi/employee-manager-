@@ -1,7 +1,7 @@
 # TESTING.md
 
 **Last updated:** 2026-10-05
-**Production commit:** `8a85481`
+**Production commit:** `59cd804`
 **Verified against code:** yes
 
 ---
@@ -21,7 +21,7 @@ npm run build   # from repo root — alias for vite build in apps/web
 
 ---
 
-## Latest Test Results (2026-10-05, commit 8a85481)
+## Latest Test Results (2026-10-05, commit 59cd804)
 
 ```
 tests 31 | pass 31 | fail 0 | cancelled 0 | skipped 0 | duration 14.2s
