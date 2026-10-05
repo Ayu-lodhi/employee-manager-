@@ -21,10 +21,10 @@ npm run build   # from repo root — alias for vite build in apps/web
 
 ---
 
-## Latest Test Results (2026-10-05, commit 59cd804)
+## Latest Test Results (2026-10-05)
 
 ```
-tests 31 | pass 31 | fail 0 | cancelled 0 | skipped 0 | duration 14.2s
+tests 65 | pass 65 | fail 0 | cancelled 0 | skipped 0 | duration ~2.8s
 ```
 
 ### Tests by file (`apps/api/src/__tests__/`)
@@ -32,16 +32,19 @@ tests 31 | pass 31 | fail 0 | cancelled 0 | skipped 0 | duration 14.2s
 | File | What it covers |
 |------|---------------|
 | `profile.unit.test.js` | `calculateCompletion`, mass-assignment protection, LinkedIn validator (XSS/SSRF rejection, normalization), future birthday rejection, gender normalization across enum, `fieldOfStudy` casting |
-| `routes.unit.test.js` | Route drift check — verifies all expected routes are registered and no unexpected routes leaked |
-| `auth.*.test.js` (web/server) | MFA TOTP flow, JWT purpose enforcement, session expiry, socket authentication |
-| `password-change.test.js` | Bcrypt 72-byte boundary, mandatory replacement flow |
-| `notifications.test.js` | IDOR read protection, delivery log injection prevention |
-| `attendance.test.js` | Team membership requirement, history interval bounds, cross-team denial |
-| `teams.test.js` | Membership mutation authorization, contact data exposure |
-| `timesheets.test.js` | Team binding to authorized team, bracket selector injection |
-| `chat.test.js` | Team chat room authorization bypass |
-| `email.test.js` | Profile name HTML escaping, STARTTLS enforcement, bulk-import regex ReDoS |
-| `bulk-import.test.js` | Email validation length boundary, separator-exclusive regex |
+| `profile.access.unit.test.js` | Profile access matrix, viewer sanitization, tier escalation rules |
+| `profile.progress.unit.test.js` | Engagement calculation, normalization, tier thresholds |
+| `profile.validation.unit.test.js` | Joi schemas, birth date, gender, education casting |
+| `phase2-secrets.unit.test.js` | Secret leakage and validation tests |
+| `phase3-sessions.unit.test.js` | Session validation, fail-closed handling |
+| `phase4-team.unit.test.js` | Team membership checks, regex metacharacter handling |
+| `phase5-errors.unit.test.js` | Production error masking |
+| `phase6-logs.unit.test.js` | Queue log PII redaction |
+| `session-revocation.unit.test.js` | Single session enforcement, logout revocation, socket disconnection |
+| `rotate-mfa-key.unit.test.js` | MFA encryption rotation script round-trip, idempotency, dry-run |
+| `bulk-import.unit.test.js` | Bulk import client parser, validation rules, intra-file duplicates, role checks, formula rejection |
+| `bulk-import-routes.unit.test.js` | Server-level route tests: SUPER_ADMIN escalation rejection, server phone validation, 500-row limit rejection, zero password exposure, export formula escaping in attendance & timesheets |
+
 
 ---
 

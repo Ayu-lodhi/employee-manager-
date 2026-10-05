@@ -85,6 +85,7 @@ MONGODB_URI, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, NODE_ENV=production
 
 | Date | Decision |
 |------|----------|
+| 2026-10-05 | Bulk import hardening: added POST `/api/v1/admin/users/bulk` (25-row Vercel batching, dedicated limiter, no passwords), server-side phone/name/email validation, export-time formula escaping, crypto.randomInt password generation |
 | 2026-10-05 | Added `markTypeRead` to web `notifications.controller.js` to fix `Route.patch()` undefined callback |
 | 2026-10-05 | Cached lazy MongoDB connection on `global.mongoose` in `apps/web/api/index.js` |
 | 2026-10-05 | Added `/api/health` diagnostic endpoint reporting DB status & missing env var names |

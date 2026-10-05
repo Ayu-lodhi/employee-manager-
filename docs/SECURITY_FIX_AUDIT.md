@@ -360,5 +360,20 @@ catch (error) {
 
 ---
 
-## End of Phase 1 Audit
+## Bulk Import Users Security Audit & Resolution (2026-10-05)
+
+| Finding / Area | Vulnerability / Issue | Fix Applied | Status |
+|----------------|----------------------|-------------|--------|
+| **Fix A: Privilege Escalation** | ADMIN could create SUPER_ADMIN accounts | Controller & Service guard: only callers with `role === 'SUPER_ADMIN'` may create `SUPER_ADMIN` | ✅ Applied in both backends (`a47fb85`) |
+| **Fix B: Credential Disclosure** | `tempPassword` exposed in `addUser` HTTP response | Removed `tempPassword` from response JSON; credentials sent via email only | ✅ Applied in both backends (`991f878`) |
+| **Fix C: Rate Limiting & Bulk API** | `createUserLimiter` (5 req/min) blocked CSV uploads >5 rows | Added dedicated `POST /api/v1/admin/users/bulk` with `bulkImportLimiter` (10 req/5min), max 500 rows, 2MB limit, no passwords returned. Frontend batches in chunks of 25 rows for Vercel 10s timeout safety | ✅ Applied in both backends |
+| **Fix D: Parser Robustness** | Quoted fields with commas failed, 2MB file limit missing, non-CSV formats in accept | Added RFC 4180 quoted-field parser, client-side 2MB check, removed `.xlsx,.xls` from file input accept | ✅ Applied in frontend |
+| **Fix E: Server-Side Validation** | Server trusted client for phone, name, email length constraints | Joi schemas validate phone (`/^[0-9 +\-().]*$/`, max 20, empty string allowed), email (max 254), name (max 100), `allowUnknown: false` | ✅ Applied in both backends |
+| **Fix F: Formula Injection** | Previous run added apostrophe prefix to import path, altering database values | Removed apostrophe from import path; added `csvCell()` with RFC 4180 quoting and `=, +, -, @, \t` prefixing at EXPORT time in `attendance.service.js` and `timesheets.service.js`. Zero database alterations stored | ✅ Applied in both backends |
+| **Fix G: Password, Logging & State** | Weak Math.random password generation, unredacted email in logs, raw error.message in addUser, window global for import state | `crypto.randomInt` used in `generateDefaultPassword`, email redacted (`al***@domain`), `error.message` sanitized in controller, `window._lastImportResult` replaced with React state | ✅ Applied in both backends & frontend |
+
+---
+
+## End of Audit
+
 

@@ -204,6 +204,16 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `doc
 - Reason: Confirmed that authorized callers could request unbounded synchronous work. A 30-day cap matches the attendance module's longer reporting defaults and preserves the UI's seven-day request. Fix authorized by the security investigation request.
 - Where: `apps/api/src/modules/attendance/attendance.controller.js`, `apps/api/src/modules/attendance/attendance.service.js`, `apps/api/src/modules/attendance/__tests__/attendance.test.js`, `memory.md`.
 
+### [2026-10-05] Bulk Import Users Security Hardening (Fixes C, D, E, F, G)
+- **What**:
+  - **C**: Added `POST /api/v1/admin/users/bulk` with dedicated `bulkImportLimiter` (10 requests per 5 minutes per user/IP), max 500 rows, 2MB body limit, per-row execution report without passwords. Frontend `BulkImportPage` chunks imports into batches of 25 rows to guarantee execution within Vercel's 10-second serverless execution window.
+  - **E**: Server-side Joi validation added for phone (regex `^[0-9 +\-().]*$`, max 20 chars, optional/empty allowed), email (max 254 chars), name (max 100 chars), with mass-assignment protection (`allowUnknown: false`).
+  - **F**: Formula injection defense relocated from import mutation to export-time escaping. Removed client-side apostrophe prefixing (`neutralize()`); no altered data stored in database. Added `csvCell()` with RFC 4180 double-quoting and apostrophe escaping for `=, +, -, @, \t` in `attendance.service.js` and `timesheets.service.js` in both `apps/api/src` and `apps/web/server`.
+  - **D**: Enforced 2MB file limit client-side, restricted file input to `.csv,.txt` (removed `.xlsx,.xls`), and integrated RFC 4180 quoted-field parser handling commas inside quotes.
+  - **G**: Switched default password generation to `crypto.randomInt`, redacted recipient emails in `EMAIL_SENT` logs, sanitized raw `error.message` disclosure in `addUser`, and replaced `window._lastImportResult` with React component state.
+- **Reason**: Closes CVE vulnerabilities regarding rate-limiting circumvention, CSV injection, information disclosure, and unvalidated server input without changing existing routes or normal UI behavior.
+- **Where**: `apps/api/src/modules/admin/`, `apps/web/server/modules/admin/`, `apps/web/src/pages.jsx`, `apps/api/src/middleware/`, `apps/web/server/middleware/`, `apps/api/src/modules/attendance/`, `apps/api/src/modules/timesheets/`, `apps/web/server/modules/attendance/`, `apps/web/server/modules/timesheets/`.
+
 ### [2026-10-01] Enforce socket session revocation and expiry
 - What: Disconnect the mounted API's user sockets after successful revocation and at access-token expiry; reapply shared account/credential/MFA authentication before subscriptions and broadcasts, including private notifications.
 - Reason: Investigation confirmed existing handshake and chat account checks, but retained sockets could receive notifications after revocation and messages after token expiry. User authorized the scoped security fix.
