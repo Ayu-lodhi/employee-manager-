@@ -203,6 +203,16 @@ class AttendanceLinkService {
       throw err;
     }
 
+    const userId = (user?.sub || user?._id || '').toString();
+    const isOwner = link.createdBy && link.createdBy.toString() === userId;
+    const isAdmin = user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+
+    if (!isOwner && !isAdmin) {
+      const err = new Error('Access denied. Only the link creator or an admin can deactivate this link.');
+      err.statusCode = 403;
+      throw err;
+    }
+
     link.active = false;
     await link.save();
     return link;
