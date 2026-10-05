@@ -437,6 +437,44 @@ const MENUS = {
   ],
 };
 
+// Quick Demo Login Bar (Local development only; tree-shaken from production builds)
+const DemoLoginBar = import.meta.env.DEV
+  ? ({ onSelect }) => {
+      const demoUsers = [
+        { key: 'SUPER', label: 'Super', email: import.meta.env.VITE_DEMO_SUPER_EMAIL, pass: import.meta.env.VITE_DEMO_SUPER_PASSWORD, style: 'border-red-700 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white' },
+        { key: 'ADMIN', label: 'Admin', email: import.meta.env.VITE_DEMO_ADMIN_EMAIL, pass: import.meta.env.VITE_DEMO_ADMIN_PASSWORD, style: 'border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white' },
+        { key: 'T3', label: 'T3 Exec', email: import.meta.env.VITE_DEMO_T3_EMAIL, pass: import.meta.env.VITE_DEMO_T3_PASSWORD, style: 'border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white' },
+        { key: 'T2', label: 'T2 Assoc', email: import.meta.env.VITE_DEMO_T2_EMAIL, pass: import.meta.env.VITE_DEMO_T2_PASSWORD, style: 'border-cyan-700 bg-cyan-50 text-cyan-700 hover:bg-cyan-600 hover:text-white' },
+        { key: 'T1', label: 'T1 Vol', email: import.meta.env.VITE_DEMO_T1_EMAIL, pass: import.meta.env.VITE_DEMO_T1_PASSWORD, style: 'border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white' },
+      ];
+      if (!demoUsers.some((u) => u.email && u.pass)) return null;
+
+      return (
+        <div className="pt-2.5 border-t border-slate-200 mt-1">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-['Space_Mono',monospace] font-bold text-slate-500 uppercase tracking-wider">
+              Quick Role Sign In
+            </span>
+            <span className="text-[9px] text-slate-400 font-medium">Local Dev Demo Login</span>
+          </div>
+          <div className="grid grid-cols-5 gap-1">
+            {demoUsers.map((u) => (
+              <button
+                key={u.key}
+                type="button"
+                onClick={() => onSelect(u.email, u.pass)}
+                className={`px-1 py-1 text-[10px] font-bold rounded-lg border ${u.style} transition-all shadow-xs text-center truncate`}
+                title={`Sign in as ${u.label}`}
+              >
+                {u.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+  : null;
+
 // ====================================================================
 // LOGIN
 // ====================================================================
@@ -445,7 +483,6 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showDemo, setShowDemo] = useState(false);
   const [showMuralOnMobile, setShowMuralOnMobile] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const captchaContainerRef = useRef(null);
@@ -549,12 +586,6 @@ export const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     await performLogin(email, password);
-  };
-
-  const quickLogin = (e, p) => {
-    setEmail(e);
-    setPassword(p);
-    performLogin(e, p);
   };
 
   const emailHasValue = email.trim().length > 0;
@@ -755,57 +786,16 @@ export const Login = () => {
                 </button>
               </div>
 
-              {/* Quick Demo Access Bar */}
-              <div className="pt-2.5 border-t border-slate-200 mt-1">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-['Space_Mono',monospace] font-bold text-slate-500 uppercase tracking-wider">
-                    Quick Role Sign In
-                  </span>
-                  <span className="text-[9px] text-slate-400 font-medium">1-Click Demo Login</span>
-                </div>
-                <div className="grid grid-cols-5 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => quickLogin('super@tbi.org', 'super123')}
-                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-red-700 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white transition-all shadow-xs text-center truncate"
-                    title="Super Admin: super@tbi.org / super123"
-                  >
-                    Super
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => quickLogin('admin@tbi.org', 'admin123')}
-                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white transition-all shadow-xs text-center truncate"
-                    title="Admin: admin@tbi.org / admin123"
-                  >
-                    Admin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => quickLogin('mayank@tbi.org', 'mayank123')}
-                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-all shadow-xs text-center truncate"
-                    title="T3 Executive: mayank@tbi.org / mayank123"
-                  >
-                    T3 Exec
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => quickLogin('abhishek@tbi.org', 'abhishek123')}
-                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-cyan-700 bg-cyan-50 text-cyan-700 hover:bg-cyan-600 hover:text-white transition-all shadow-xs text-center truncate"
-                    title="T2 Associate: abhishek@tbi.org / abhishek123"
-                  >
-                    T2 Assoc
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => quickLogin('ayush@tbi.org', 'ayush123')}
-                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all shadow-xs text-center truncate"
-                    title="T1 Volunteer: ayush@tbi.org / ayush123"
-                  >
-                    T1 Vol
-                  </button>
-                </div>
-              </div>
+              {/* Quick Demo Access Bar (Development only) */}
+              {DemoLoginBar && (
+                <DemoLoginBar
+                  onSelect={(e, p) => {
+                    setEmail(e || '');
+                    setPassword(p || '');
+                    performLogin(e || '', p || '');
+                  }}
+                />
+              )}
             </form>
           </div>
         </div>

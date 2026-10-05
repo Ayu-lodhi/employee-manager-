@@ -5,6 +5,10 @@ const path = require('path');
 require('dotenv').config();
 require('dotenv').config({ path: path.resolve(__dirname, '../../api/.env') });
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+const { validateEnvironment } = require('./core/config/envValidation');
+if (process.env.NODE_ENV !== 'test') {
+  validateEnvironment();
+}
 const http = require('http');
 const express = require('express');
 const cors = require('cors');
