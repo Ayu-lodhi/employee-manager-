@@ -147,9 +147,17 @@ exports.requireTeam = (teamName) => {
       return next();
     }
 
+    // T3 team routes require executive management privileges; T1/T2 junior tiers are not permitted
+    if (teamName === 'T3' && ['T1_VOLUNTEER', 'T2_ASSOCIATE'].includes(role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. T3 executive privileges required.',
+      });
+    }
+
     const isTeamMatch =
       (teamName === 'T3' && (role === 'T3_EXECUTIVE' || role === 'T3')) ||
-      (req.user.team && req.user.team.toUpperCase() === teamName.toUpperCase());
+      (teamName !== 'T3' && req.user.team && req.user.team.toUpperCase() === teamName.toUpperCase());
 
     if (isTeamMatch) {
       return next();

@@ -45,7 +45,7 @@ npm run dev:web
 # Dev — API (port 5000)
 npm run dev:api
 
-# Unit tests (77 tests passing, zero external test deps, ~3.8s)
+# Unit tests (78 tests passing, zero external test deps, ~3.9s)
 node --test apps/api/src/__tests__/*.unit.test.js
 
 # Production build (web only — Vercel runs this)

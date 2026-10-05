@@ -24,7 +24,7 @@ npm run build   # from repo root — alias for vite build in apps/web
 ## Latest Test Results (2026-10-06)
 
 ```
-tests 79 | pass 77 | fail 1 (pending decision on 4b) | cancelled 0 | skipped 1 (Phase 5 verify route) | duration ~3.9s
+tests 79 | pass 78 | fail 0 | cancelled 0 | skipped 1 (Phase 5 verify route) | duration ~3.9s
 ```
 
 ### Tests by file (`apps/api/src/__tests__/`)
