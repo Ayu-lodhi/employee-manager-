@@ -12,14 +12,32 @@ const getSessionTimeoutMs = () => {
   return (isNaN(minutes) || minutes <= 0 ? 30 : minutes) * 60 * 1000;
 };
 
-const acquireSession = async (userId) => {
-  const sessionId = crypto.randomBytes(32).toString('hex');
+const ensureDbConnected = async () => {
   const mongoose = require('mongoose');
+  if (mongoose.connection?.readyState === 1) return;
+  if (mongoose.connection?.readyState === 2) {
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, 4000);
+      mongoose.connection.once('open', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      mongoose.connection.once('error', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
   if (mongoose.connection?.readyState !== 1) {
     const error = new Error('Service temporarily unavailable');
     error.statusCode = 503;
     throw error;
   }
+};
+
+const acquireSession = async (userId) => {
+  const sessionId = crypto.randomBytes(32).toString('hex');
+  await ensureDbConnected();
   // Terminate any previous socket connections or permission cache for immediate single-session enforcement
   try {
     const { disconnectUserSockets } = require('../../config/socket');
@@ -57,12 +75,7 @@ const acquireSession = async (userId) => {
 
 exports.login = async (email, password) => {
   if (typeof email !== 'string' || typeof password !== 'string') throw new Error('Invalid credentials');
-  const mongoose = require('mongoose');
-  if (mongoose.connection?.readyState !== 1) {
-    const error = new Error('Service temporarily unavailable');
-    error.statusCode = 503;
-    throw error;
-  }
+  await ensureDbConnected();
   let user = await repository.findByEmail(email);
   if (!user) throw new Error('Invalid credentials');
   if (!user.isActive) throw new Error('Account is deactivated');
@@ -91,12 +104,7 @@ exports.login = async (email, password) => {
 
 exports.verifyMfa = async (challengeToken, code) => {
   const challenge = tokens.verify(challengeToken, 'mfa');
-  const mongoose = require('mongoose');
-  if (mongoose.connection?.readyState !== 1) {
-    const error = new Error('Service temporarily unavailable');
-    error.statusCode = 503;
-    throw error;
-  }
+  await ensureDbConnected();
   const user = await repository.findById(challenge.sub);
   if (!user?.isActive || !user.mfa || !(await tokens.requiresMfa(user.role)) ||
       challenge.authState !== tokens.authState(user)) {

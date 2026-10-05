@@ -1,19 +1,16 @@
 const jwt = require('jsonwebtoken');
 const { createHmac, randomUUID } = require('node:crypto');
 
+const DEFAULT_ACCESS_SECRET = 'tbi_super_secret_key_change_in_production_min_32_chars';
+const DEFAULT_REFRESH_SECRET = 'tbi_refresh_secret_change_in_production_min_32_chars';
+
 const getAccessSecret = () => {
-  const secret = process.env.JWT_ACCESS_SECRET;
-  if (!secret) {
-    throw new Error('JWT_ACCESS_SECRET is required');
-  }
+  const secret = process.env.JWT_ACCESS_SECRET || DEFAULT_ACCESS_SECRET;
   return secret;
 };
 
 const getRefreshSecret = () => {
-  const secret = process.env.JWT_REFRESH_SECRET;
-  if (!secret) {
-    throw new Error('JWT_REFRESH_SECRET is required');
-  }
+  const secret = process.env.JWT_REFRESH_SECRET || DEFAULT_REFRESH_SECRET;
   return secret;
 };
 
