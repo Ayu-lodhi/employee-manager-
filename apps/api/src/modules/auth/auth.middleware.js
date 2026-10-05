@@ -2,17 +2,46 @@ const repository = require('./auth.repository');
 const tokens = require('./auth.tokens');
 const User = require('../admin/admin.model');
 
+const ensureDbConnected = async () => {
+  const mongoose = require('mongoose');
+  if (mongoose.connection?.readyState === 1) return;
+
+  if (mongoose.connection?.readyState === 0 || mongoose.connection?.readyState === 3) {
+    const uri = process.env.MONGODB_URI;
+    if (uri) {
+      try {
+        await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
+      } catch (_) {}
+    }
+  }
+
+  if (mongoose.connection?.readyState === 2) {
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, 4000);
+      mongoose.connection.once('open', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      mongoose.connection.once('error', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
+
+  if (mongoose.connection?.readyState !== 1) {
+    const error = new Error('Service temporarily unavailable');
+    error.statusCode = 503;
+    throw error;
+  }
+};
+
 // Shared by every mounted HTTP router and the Socket.io handshake.
 const authenticateToken = async (token, allowPasswordChange = false) => {
   const decoded = tokens.verify(token, allowPasswordChange ? ['access', 'password-change'] : 'access');
   let user;
   try {
-    const mongoose = require('mongoose');
-    if (mongoose.connection?.readyState !== 1) {
-      const err = new Error('Service temporarily unavailable');
-      err.statusCode = 503;
-      throw err;
-    }
+    await ensureDbConnected();
     user = await repository.findById(decoded.sub);
   } catch (err) {
     if (err.statusCode) throw err;

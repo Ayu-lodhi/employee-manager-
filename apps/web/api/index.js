@@ -37,8 +37,8 @@ function getMissingEnvVars() {
 }
 
 async function connectToDatabase() {
-  if (cached.conn && mongoose.connection.readyState === 1) {
-    return cached.conn;
+  if (mongoose.connection && mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
 
   const uri = process.env.MONGODB_URI;
@@ -47,8 +47,9 @@ async function connectToDatabase() {
     return null;
   }
 
-  if (!cached.promise) {
-    console.log('[Serverless DB]: Initiating lazy connection to MongoDB...');
+  // If uninitialized, disconnected, or disconnecting, initiate a fresh connection
+  if (!cached.promise || mongoose.connection.readyState === 0 || mongoose.connection.readyState === 3) {
+    console.log('[Serverless DB]: Initiating connection to MongoDB...');
     cached.promise = mongoose
       .connect(uri, {
         serverSelectionTimeoutMS: 8000,
@@ -69,10 +70,24 @@ async function connectToDatabase() {
     cached.conn = await cached.promise;
   } catch (err) {
     cached.promise = null;
-    return null;
   }
 
-  return cached.conn;
+  // If connection is in connecting state (readyState === 2), wait for it to open
+  if (mongoose.connection.readyState === 2) {
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, 4000);
+      mongoose.connection.once('open', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      mongoose.connection.once('error', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
+
+  return mongoose.connection;
 }
 
 export default async function handler(req, res) {

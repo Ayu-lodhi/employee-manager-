@@ -146,7 +146,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       const token = typeof window !== 'undefined' ? (sessionStorage.getItem('tbi_token') || localStorage.getItem('tbi_token')) : null;
       if (token) {
@@ -166,7 +166,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('tbi_user');
       localStorage.removeItem('tbi_token');
     }
-  };
+  }, []);
 
   const updateUser = (updatedFields) => {
     setUser((prev) => {
@@ -626,7 +626,7 @@ export const Login = () => {
         {/* INTERACTIVE LOGIN CARD: EXACT MATCH TO USER IMAGE SPECIFICATION */}
         {/* ----------------------------------------------------------------------- */}
         <div className="w-full lg:w-auto lg:absolute lg:left-[49.9%] lg:top-1/2 lg:-translate-y-1/2 z-20 flex justify-center items-center px-4 py-4 lg:p-0">
-          <div className="w-full max-w-[440px] sm:max-w-[460px] lg:w-[516px] lg:h-[488px] bg-white border-[3px] border-[#1A1A1A] rounded-2xl p-5 sm:p-6 shadow-[7px_7px_0px_0px_#1A1A1A] flex flex-col justify-between">
+          <div className="w-full max-w-[440px] sm:max-w-[460px] lg:w-[516px] lg:min-h-[488px] bg-white border-[3px] border-[#1A1A1A] rounded-2xl p-5 sm:p-6 shadow-[7px_7px_0px_0px_#1A1A1A] flex flex-col justify-between">
             {/* Header: Vintage TBI Round Seal + Titles */}
             <div className="flex items-center gap-3 sm:gap-3.5 mb-3 sm:mb-3.5">
               <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-[2.5px] border-[#1A1A1A] p-1 bg-[#F5F2EB] shadow-[2px_2px_0px_0px_#1A1A1A] shrink-0 flex items-center justify-center">
@@ -753,6 +753,58 @@ export const Login = () => {
                 >
                   {loading ? 'Accessing...' : 'Sign In'}
                 </button>
+              </div>
+
+              {/* Quick Demo Access Bar */}
+              <div className="pt-2.5 border-t border-slate-200 mt-1">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-['Space_Mono',monospace] font-bold text-slate-500 uppercase tracking-wider">
+                    Quick Role Sign In
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-medium">1-Click Demo Login</span>
+                </div>
+                <div className="grid grid-cols-5 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => quickLogin('super@tbi.org', 'super123')}
+                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-red-700 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white transition-all shadow-xs text-center truncate"
+                    title="Super Admin: super@tbi.org / super123"
+                  >
+                    Super
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => quickLogin('admin@tbi.org', 'admin123')}
+                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-blue-700 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white transition-all shadow-xs text-center truncate"
+                    title="Admin: admin@tbi.org / admin123"
+                  >
+                    Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => quickLogin('mayank@tbi.org', 'mayank123')}
+                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-indigo-700 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-all shadow-xs text-center truncate"
+                    title="T3 Executive: mayank@tbi.org / mayank123"
+                  >
+                    T3 Exec
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => quickLogin('abhishek@tbi.org', 'abhishek123')}
+                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-cyan-700 bg-cyan-50 text-cyan-700 hover:bg-cyan-600 hover:text-white transition-all shadow-xs text-center truncate"
+                    title="T2 Associate: abhishek@tbi.org / abhishek123"
+                  >
+                    T2 Assoc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => quickLogin('ayush@tbi.org', 'ayush123')}
+                    className="px-1 py-1 text-[10px] font-bold rounded-lg border border-emerald-700 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all shadow-xs text-center truncate"
+                    title="T1 Volunteer: ayush@tbi.org / ayush123"
+                  >
+                    T1 Vol
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1018,11 +1070,27 @@ export const Sidebar = () => {
           </div>
         ))}
       </nav>
-      <button onClick={() => { logout(); navigate('/login'); setMobileOpen(false); }}
-        className="flex items-center gap-3 h-12 px-4 border-t border-white/10 text-gray-300 hover:bg-white/5 hover:text-white">
-        <LogOut className="w-5 h-5" />
-        {(!collapsed || mobileOpen) && <span className="text-sm">Logout</span>}
-      </button>
+      <div className="border-t border-white/10 p-2 space-y-1">
+        <button
+          onClick={() => {
+            logout();
+            navigate('/login?switch=true');
+            setMobileOpen(false);
+          }}
+          title="Switch to another user role"
+          className="w-full flex items-center gap-3 h-10 px-3 rounded-lg text-xs font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-colors"
+        >
+          <Key className="w-4 h-4 shrink-0 text-amber-400" />
+          {(!collapsed || mobileOpen) && <span className="truncate">Switch Role</span>}
+        </button>
+        <button
+          onClick={() => { logout(); navigate('/login'); setMobileOpen(false); }}
+          className="w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+        >
+          <LogOut className="w-4 h-4 shrink-0" />
+          {(!collapsed || mobileOpen) && <span>Logout</span>}
+        </button>
+      </div>
     </aside>
   );
 };
@@ -6995,20 +7063,141 @@ export const MyShiftsPage = () => {
 // SESSIONS
 // ====================================================================
 export const SessionsPage = () => {
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [terminatingId, setTerminatingId] = useState(null);
+  const [msg, setMsg] = useState('');
+
+  const fetchSessions = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/super-admin/sessions');
+      setSessions(res.data?.data || []);
+    } catch (err) {
+      console.error('Failed to load active sessions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+    const interval = setInterval(fetchSessions, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleTerminate = async (id, name) => {
+    if (!window.confirm(`Terminate active session for ${name}?`)) return;
+    setTerminatingId(id);
+    try {
+      await api.delete(`/super-admin/sessions/${id}`);
+      setMsg(`Terminated session for ${name}`);
+      setTimeout(() => setMsg(''), 4000);
+      fetchSessions();
+    } catch (err) {
+      alert(err.message || 'Failed to terminate session');
+    } finally {
+      setTerminatingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Active Sessions</h1>
-        <p className="text-gray-500">Monitor and manage all logged-in users</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Active Sessions</h1>
+          <p className="text-gray-500 text-sm">Real-time tracking of authenticated user sessions</p>
+        </div>
+        <button
+          onClick={fetchSessions}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors self-start sm:self-auto"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : 'text-slate-600'}`} />
+          <span>Refresh</span>
+        </button>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-        <Monitor className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Session Management</h3>
-        <p className="text-gray-500 max-w-md mx-auto">
-          Real-time session tracking requires a server-side session store (Redis or DB). This feature
-          is planned but not yet implemented. Users can be deactivated via the User Management page.
-        </p>
-      </div>
+
+      {msg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span>{msg}</span>
+        </div>
+      )}
+
+      {loading && sessions.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-500">
+          Loading active sessions...
+        </div>
+      ) : sessions.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <Monitor className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-slate-800 mb-1">No Active Sessions</h3>
+          <p className="text-xs text-gray-500 max-w-sm mx-auto">
+            There are currently no users logged into the platform with an active session token.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-700">
+              <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
+                <tr>
+                  <th className="py-3 px-4">User</th>
+                  <th className="py-3 px-4">Role</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Last Activity</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {sessions.map((s) => {
+                  const isRecent = s.lastActivity && (Date.now() - new Date(s.lastActivity).getTime() < 30 * 60 * 1000);
+                  const lastActStr = s.lastActivity
+                    ? new Date(s.lastActivity).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' (' + new Date(s.lastActivity).toLocaleDateString() + ')'
+                    : 'Unknown';
+                  return (
+                    <tr key={s._id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-900">{s.name}</div>
+                        <div className="text-xs text-slate-500 font-mono">{s.email}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                          {s.role}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {isRecent ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                            <Clock className="w-3 h-3 text-amber-600" /> Idle
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs text-slate-600 font-mono">
+                        {lastActStr}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={() => handleTerminate(s._id, s.name)}
+                          disabled={terminatingId === s._id}
+                          className="px-2.5 py-1 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors disabled:opacity-50"
+                        >
+                          {terminatingId === s._id ? 'Revoking...' : 'Revoke Session'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

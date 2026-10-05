@@ -68,6 +68,23 @@ const parseResponseJson = async (res) => {
   }
 };
 
+const fetchWithRetry = async (url, options = {}, retries = 1) => {
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 503 && retries > 0) {
+      await new Promise((r) => setTimeout(r, 800));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    return res;
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise((r) => setTimeout(r, 800));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw err;
+  }
+};
+
 export const api = {
   get: async (url, options = {}) => {
     touchActivity();
@@ -82,7 +99,7 @@ export const api = {
     }
 
     const token = getToken();
-    const res = await fetch(`${API_BASE}${url}`, {
+    const res = await fetchWithRetry(`${API_BASE}${url}`, {
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -110,7 +127,7 @@ export const api = {
     touchActivity();
     clearClientCache(); // Mutating request invalidates safe cache
     const token = getToken();
-    const res = await fetch(`${API_BASE}${url}`, {
+    const res = await fetchWithRetry(`${API_BASE}${url}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -131,7 +148,7 @@ export const api = {
     touchActivity();
     clearClientCache();
     const token = getToken();
-    const res = await fetch(`${API_BASE}${url}`, {
+    const res = await fetchWithRetry(`${API_BASE}${url}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -152,7 +169,7 @@ export const api = {
     touchActivity();
     clearClientCache();
     const token = getToken();
-    const res = await fetch(`${API_BASE}${url}`, {
+    const res = await fetchWithRetry(`${API_BASE}${url}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',

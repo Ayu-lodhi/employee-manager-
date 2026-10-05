@@ -15,6 +15,16 @@ const getSessionTimeoutMs = () => {
 const ensureDbConnected = async () => {
   const mongoose = require('mongoose');
   if (mongoose.connection?.readyState === 1) return;
+
+  if (mongoose.connection?.readyState === 0 || mongoose.connection?.readyState === 3) {
+    const uri = process.env.MONGODB_URI;
+    if (uri) {
+      try {
+        await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
+      } catch (_) {}
+    }
+  }
+
   if (mongoose.connection?.readyState === 2) {
     await new Promise((resolve) => {
       const timer = setTimeout(resolve, 4000);
