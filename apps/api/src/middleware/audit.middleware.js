@@ -7,6 +7,7 @@ const actionToTargetType = (action) => {
   if (action.includes('EVENT')) return 'Event';
   if (action.includes('TEAM')) return 'Team';
   if (action.includes('APPLICATION')) return 'Application';
+  if (action.includes('ATTENDANCE')) return 'Attendance';
   return 'System';
 };
 

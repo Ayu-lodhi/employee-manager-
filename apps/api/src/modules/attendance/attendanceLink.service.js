@@ -1,8 +1,48 @@
 const crypto = require('crypto');
 const QRCode = require('qrcode');
+const mongoose = require('mongoose');
 const AttendanceLink = require('./attendanceLink.model');
 const Attendance = require('./attendance.model');
 const User = require('../admin/admin.model');
+const AuditLog = require('../../models/AuditLog.model');
+
+async function recordAttendanceAudit({ action, performedBy, performedByName, token, team, details = {}, ipAddress = null }) {
+  const tokenPrefix = token ? `${String(token).slice(0, 8)}...` : null;
+  const auditData = {
+    action,
+    performedBy: performedBy || null,
+    performedByName: performedByName || 'Unknown',
+    targetType: 'Attendance',
+    ipAddress,
+    tokenPrefix,
+    team: team || 'T3',
+    ...details,
+    timestamp: new Date().toISOString(),
+  };
+
+  // Structured console log for monitoring / SIEM (contains only prefix, NEVER full token or QR data)
+  console.info(`[AUDIT] attendance_${action.toLowerCase()}`, JSON.stringify(auditData));
+
+  try {
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      await AuditLog.create({
+        action,
+        performedBy: performedBy || null,
+        performedByName: performedByName || '',
+        targetType: 'Attendance',
+        ipAddress,
+        details: {
+          tokenPrefix,
+          team: team || 'T3',
+          ...details,
+        },
+        timestamp: new Date(),
+      });
+    }
+  } catch (err) {
+    console.error('AuditLog error:', err.message);
+  }
+}
 
 /**
  * Returns today's date in Asia/Kolkata timezone in YYYY-MM-DD format
@@ -52,6 +92,19 @@ class AttendanceLinkService {
       expiresAt,
       date,
       active: true,
+    });
+
+    await recordAttendanceAudit({
+      action: 'ATTENDANCE_SESSION_GENERATE',
+      performedBy: user.sub || user._id,
+      performedByName: user.name || user.email || 'T3 Member',
+      token: link.token,
+      team: link.team,
+      details: {
+        validMinutes,
+        startsAt: link.startsAt,
+        expiresAt: link.expiresAt,
+      },
     });
 
     return {
@@ -208,6 +261,14 @@ class AttendanceLinkService {
     const isAdmin = user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
 
     if (!isOwner && !isAdmin) {
+      await recordAttendanceAudit({
+        action: 'ATTENDANCE_SESSION_DEACTIVATE_REJECTED',
+        performedBy: user?.sub || user?._id,
+        performedByName: user?.name || user?.email || '',
+        token: link.token,
+        team: link.team,
+        details: { reason: 'Unauthorized caller' },
+      });
       const err = new Error('Access denied. Only the link creator or an admin can deactivate this link.');
       err.statusCode = 403;
       throw err;
@@ -215,6 +276,15 @@ class AttendanceLinkService {
 
     link.active = false;
     await link.save();
+
+    await recordAttendanceAudit({
+      action: 'ATTENDANCE_SESSION_DEACTIVATE',
+      performedBy: user?.sub || user?._id,
+      performedByName: user?.name || user?.email || '',
+      token: link.token,
+      team: link.team,
+    });
+
     return link;
   }
 
@@ -315,6 +385,14 @@ class AttendanceLinkService {
     const isAdmin = user && ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
 
     if (!isLead && !isMember && !isAdmin) {
+      await recordAttendanceAudit({
+        action: 'ATTENDANCE_SESSION_SHARE_CHAT_REJECTED',
+        performedBy: user?.sub || user?._id,
+        performedByName: user?.name || user?.email || '',
+        token: link.token,
+        team: team.name,
+        details: { targetTeamId: team._id, reason: 'Caller neither leads nor belongs to target team' },
+      });
       const err = new Error('Access denied. You are not a member or lead of this team.');
       err.statusCode = 403;
       throw err;
@@ -415,6 +493,18 @@ class AttendanceLinkService {
       }
     }
 
+    await recordAttendanceAudit({
+      action: 'ATTENDANCE_SESSION_SHARE_CHAT',
+      performedBy: user.sub || user._id,
+      performedByName: user.name || user.email || '',
+      token: link.token,
+      team: team.name,
+      details: {
+        targetTeamId: team._id,
+        roomId: room._id,
+      },
+    });
+
     return {
       messageId: message._id,
       roomId: room._id,
@@ -426,4 +516,6 @@ class AttendanceLinkService {
   }
 }
 
-module.exports = new AttendanceLinkService();
+const serviceInstance = new AttendanceLinkService();
+serviceInstance.recordAttendanceAudit = recordAttendanceAudit;
+module.exports = serviceInstance;
