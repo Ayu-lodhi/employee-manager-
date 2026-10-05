@@ -278,7 +278,7 @@ test('7. NoSQL injection payloads are not executed', () => {
 // ----------------------------------------------------------------------
 // Test 8: Formula injection values are neutralized or rejected
 // ----------------------------------------------------------------------
-test('8. Formula injection values are neutralized or rejected', () => {
+test('8. Formula injection values are rejected (not silently stored with apostrophe prefix)', () => {
   const formulaCsv = [
     'name,email,phone,role',
     '=cmd|\'/C calc\'!A0,formula1@example.com,123,T1_VOLUNTEER',
@@ -289,15 +289,24 @@ test('8. Formula injection values are neutralized or rejected', () => {
 
   const { rows, errs } = clientParseCSV(formulaCsv);
 
-  // The parser or validator should neutralize (prefix with ') or reject formula characters
-  const allNeutralized = rows.every(r => {
+  // F: Formula-starting names must produce per-row errors and must NOT appear in valid rows
+  // The parser must reject them (not silently prefix with apostrophe and store altered data)
+  const formulaRows = rows.filter(r => {
     const firstChar = r.name ? r.name.charAt(0) : '';
-    return !['=', '+', '-', '@'].includes(firstChar);
+    return ['=', '+', '-', '@'].includes(firstChar);
   });
 
+  assert.equal(
+    formulaRows.length,
+    0,
+    'SECURITY BUG: Formula-injection names must not appear unmodified in the rows array'
+  );
+
+  // Each formula row must appear in errs with a descriptive error message
+  const formulaErrors = errs.filter(e => e.errors.some(msg => /formula injection/i.test(msg)));
   assert.ok(
-    allNeutralized,
-    'SECURITY BUG: CSV parser allows formula injection triggers (=, +, -, @) without neutralization'
+    formulaErrors.length >= 4,
+    `Expected at least 4 formula-injection errors, got ${formulaErrors.length}: ${JSON.stringify(errs)}`
   );
 });
 

@@ -395,37 +395,35 @@ class AttendanceService {
     const records = await Attendance.find(query).sort({ date: 1 });
 
     // Build CSV rows
+    const FORMULA_STARTERS = new Set(['=', '+', '-', '@', '\t']);
+    // csvCell: RFC 4180 quoting + formula-injection prefix at export time only
+    const csvCell = (val) => {
+      const s = val === null || val === undefined ? '' : String(val);
+      const escaped = s.replace(/"/g, '""'); // RFC 4180: double every double-quote
+      const safe = FORMULA_STARTERS.has(escaped.charAt(0)) ? "'" + escaped : escaped;
+      return `"${safe}"`;
+    };
+
     const rows = [];
-    rows.push([
-      'Date',
-      'Student Name',
-      'Email',
-      'Team',
-      'Status',
-      'Check In',
-      'Check Out',
-      'Duration (min)',
-      'Method',
-      'Marked By',
-      'Notes',
-    ].join(','));
+    rows.push(['Date', 'Student Name', 'Email', 'Team', 'Status', 'Check In', 'Check Out', 'Duration (min)', 'Method', 'Marked By', 'Notes']
+      .map(csvCell).join(','));
 
     records.forEach((r) => {
       const checkIn = r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString() : '';
       const checkOut = r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString() : '';
       rows.push([
         r.date,
-        `"${r.studentName}"`,
+        r.studentName,
         r.studentEmail,
-        `"${r.teamName}"`,
+        r.teamName,
         r.status,
         checkIn,
         checkOut,
         r.durationMinutes || 0,
         r.method,
-        `"${r.markedByName || ''}"`,
-        `"${(r.notes || '').replace(/"/g, "'")}"`,
-      ].join(','));
+        r.markedByName || '',
+        r.notes || '',
+      ].map(csvCell).join(','));
     });
 
     return {

@@ -218,20 +218,28 @@ class TimesheetService {
     if (from && to) query.date = { $gte: from, $lte: to };
     const list = await Timesheet.find(query).sort({ date: 1 });
 
-    const rows = [['Date', 'Name', 'Email', 'Role', 'Start', 'End', 'Break (min)', 'Total Hours', 'Task', 'Status'].join(',')];
+    const FORMULA_STARTERS = new Set(['=', '+', '-', '@', '\t']);
+    const csvCell = (val) => {
+      const s = val === null || val === undefined ? '' : String(val);
+      const escaped = s.replace(/"/g, '""');
+      const safe = FORMULA_STARTERS.has(escaped.charAt(0)) ? "'" + escaped : escaped;
+      return `"${safe}"`;
+    };
+
+    const rows = [['Date', 'Name', 'Email', 'Role', 'Start', 'End', 'Break (min)', 'Total Hours', 'Task', 'Status'].map(csvCell).join(',')];
     list.forEach((t) => {
       rows.push([
         t.date,
-        `"${t.userName}"`,
+        t.userName,
         t.userEmail,
         t.userRole,
         t.startTime,
         t.endTime,
         t.breakMinutes,
         t.totalHours,
-        `"${(t.taskDescription || '').replace(/"/g, "'").replace(/\n/g, ' ')}"`,
+        (t.taskDescription || '').replace(/\n/g, ' '),
         t.status,
-      ].join(','));
+      ].map(csvCell).join(','));
     });
 
     return { csv: rows.join('\n'), count: list.length };
