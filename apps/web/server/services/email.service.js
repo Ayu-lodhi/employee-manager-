@@ -68,7 +68,8 @@ const sendEmail = async ({ to, subject, html, text }) => {
       text: text || '',
     });
 
-    console.log(`EMAIL_SENT :: to=${to} :: subject="${subject}"`);
+    const redactEmail = (addr) => { const [u, d] = (addr || '').split('@'); return `${u.slice(0, 2)}***@${d || '?'}`; };
+    console.log(`EMAIL_SENT :: to=${redactEmail(to)} :: subject="[redacted]" :: id=${info.messageId}`);
 
     // If using Ethereal, print preview URL
     const previewUrl = nodemailer.getTestMessageUrl(info);
