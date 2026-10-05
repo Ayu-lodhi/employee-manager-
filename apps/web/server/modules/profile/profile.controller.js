@@ -26,6 +26,9 @@ const resolveTier = (role, tier) => {
 exports.getMyProfile = async (req, res, next) => {
   try {
     const callerId = getAuthUserId(req);
+    if (!callerId) {
+      return res.status(401).json({ success: false, message: 'Authentication required: User ID missing' });
+    }
     const { profile, user, completion } = await profileService.getOrCreateProfile(callerId);
     const progress = await profileService.getUserProgress(callerId);
 
@@ -33,11 +36,11 @@ exports.getMyProfile = async (req, res, next) => {
       success: true,
       data: {
         user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          tier: resolveTier(user.role, user.tier),
+          id: user?._id || callerId,
+          name: user?.name || '',
+          email: user?.email || '',
+          role: user?.role || 'T1_VOLUNTEER',
+          tier: resolveTier(user?.role, user?.tier),
         },
         profile,
         completion,
@@ -55,6 +58,9 @@ exports.getMyProfile = async (req, res, next) => {
 exports.updateMyProfile = async (req, res, next) => {
   try {
     const callerId = getAuthUserId(req);
+    if (!callerId) {
+      return res.status(401).json({ success: false, message: 'Authentication required: User ID missing' });
+    }
     const { profile, completion } = await profileService.updateMyProfile(callerId, req.body);
     return res.status(200).json({
       success: true,

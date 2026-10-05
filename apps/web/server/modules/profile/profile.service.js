@@ -50,6 +50,11 @@ const EDITABLE_FIELDS = [
  * Get or create profile for a given user.
  */
 async function getOrCreateProfile(userId) {
+  if (!userId) {
+    const err = new Error('User ID is required to retrieve or create profile');
+    err.statusCode = 400;
+    throw err;
+  }
   let profile = await Profile.findOne({ userId });
   const user = await User.findById(userId).select('-password');
 

@@ -1,5 +1,42 @@
 # CHANGELOG-decisions.md
 
+**Last updated:** 2026-10-05 | **Production commit:** `8a85481` | **Verified against code:** yes
+
+---
+
+### [2026-10-05] Fix gender enum, avatar limit, broken routes — commit `8a85481`
+- **What:** Gender setter normalizes Male/Female/Other to lowercase; avatar limit raised to 10MB; canvas compression on client; avatarUrl excluded from PATCH /me; /profile/team route shadow fixed in App.jsx; GET /teams/my-teams alias added; PATCH /admin/users/:id/tier added to web server admin.routes.js; req.user.id/._id aliases attached; fieldOfStudy added to profile model.
+- **Where:** profile.model.js, profile.service.js, profile.controller.js, MyProfilePage.jsx, security.middleware.js, profile.routes.js, App.jsx, teams.routes.js, admin.routes.js, auth.middleware.js
+
+### [2026-10-05] Resolved: Vercel 503 startup crash, lazy cached MongoDB connection, and added /api/health endpoint
+- **What:** Added missing `markTypeRead` to `apps/web/server/modules/notifications/notifications.controller.js`; implemented lazy cached MongoDB connection on `global.mongoose` in `apps/web/api/index.js` and gated module-level connection behind `!process.env.VERCEL`; added `/api/health` and `/health` diagnostic endpoint returning connection state and missing env var names; converted ESM files (`env.config.js`, `cacheInvalidator.js`, `redis-*.client.js`) in `apps/web/server/core/` to CommonJS.
+- **Root Cause:** Express crashed during `require('../server/server.js')` because `notifications.routes.js:10` mounted `router.patch('/read-type/:type', controller.markTypeRead)` while `controller.markTypeRead` was not exported. `apps/web/api/index.js` caught `initError` and returned a generic 503 message (`Service is temporarily unavailable. Please try again shortly.`) for all routes. In addition, unawaited module-level MongoDB connection in `server.js` was racing on serverless cold starts.
+- **Where:** `apps/web/server/modules/notifications/notifications.controller.js`, `apps/web/server/server.js`, `apps/web/api/index.js`, `apps/web/server/core/cache/cacheInvalidator.js`, `apps/web/server/core/config/env.config.js`, `apps/web/server/core/config/redis-*.client.js`
+
+
+### [2026-10-04] Security hardening Phase 1 merged — commits 77a884e to 97e14a2
+- **What:** Enforce validated env secrets; mask production errors; sanitize requireTeam regex; fail closed on session/DB failure; redact email PII in logs.
+- **Where:** auth.tokens.js (both server trees), error handler, auth.middleware.js, queue service
+
+### [2026-10-04] Vercel monorepo deployment — commit 197e914
+- **What:** Root vercel.json: @vercel/static-build (web) + @vercel/node (API). apps/web/api/index.js is the serverless wrapper for apps/web/server/server.js.
+- **Where:** vercel.json, apps/web/vercel.json, apps/web/api/index.js
+
+### [2026-10-04] Login redesign + removed Forgot Password links — commits bfe83b6, 2eda444
+- **What:** Retro-industrial TBI-GEU login design; Forgot Password and Already have an Account links removed (admin-only provisioning).
+- **Where:** apps/web/src/pages.jsx (LoginPage)
+
+### [2026-10-04] Profile module full implementation — commits 68b0e4a to 82edc97
+- **What:** Full profile backend + frontend: model, service, controller, routes, access, completion, progress, LinkedIn validator, avatar upload, MyProfilePage.jsx with completion ring.
+- **Where:** apps/api/src/modules/profile/, apps/web/server/modules/profile/, apps/web/src/pages/profile/MyProfilePage.jsx
+
+### [2026-10-04] reCAPTCHA v2 added to login — commit dc9f1ba
+- **What:** Google reCAPTCHA v2 on login; bypassed when CAPTCHA_ENABLED != true or secret key absent.
+- **Where:** apps/web/src/pages.jsx, apps/web/server/middleware/verifyCaptcha.js
+
+---
+# CHANGELOG-decisions.md
+
 Registry of approved changes, per the Change Approval & Logging Protocol in `rules.md`. Entries below this line are backfilled from decisions made earlier in this project’s design discussion, before the protocol itself was added.
 
 ---
@@ -167,3 +204,4 @@ Registry of approved changes, per the Change Approval & Logging Protocol in `rul
 - Reason: Investigation confirmed existing handshake and chat account checks, but retained sockets could receive notifications after revocation and messages after token expiry. User authorized the scoped security fix.
 - Where: `apps/api/src/config/socket.js`, its `__tests__/`, `modules/admin/admin.service.js`, `modules/notifications/notifications.service.js`, and `modules/chat/chat.controller.js` under `apps/api/src/`.
 - Review: Authentication changes require human review before merge. The mounted CommonJS API uses the in-memory Socket.IO adapter; the Redis-based `core/session/sessionTerminator.js` is an unmounted scaffold with unavailable imports. Revocation disconnects local sockets, and every protected delivery rechecks persisted account state.
+

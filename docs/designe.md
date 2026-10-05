@@ -1,93 +1,71 @@
-# DESIGNE.md — Design Brief for the Frontend Designer
+# DESIGNE.md — Frontend Design Rules & Design Tokens
 
-## 1. Who’s Using This
-
-Five roles, five distinct dashboards — the codebase scaffolds a separate layout per role (`SuperAdminLayout`, `AdminLayout`, `T3Layout`, `T2Layout`, `T1Layout`). Design each with a shared visual language but a noticeably different information density:
-
-- **Super Admin / Admin**: Dense, data-heavy — tables, audit logs, forms, metrics, batch actions.
-- **T3 Executive**: Moderate density — review queues, team rosters, attendance marking, approvals.
-- **T2 Associate**: Lighter — shift coordination, team chat, duty schedules.
-- **T1 Volunteer**: Lightest, mobile-first — apply, check in, chat, certificates. **Most T1s will be on a phone browser, not a desktop.**
+**Last updated:** 2026-10-05  
+**Production commit:** `8a85481`  
+**Verified against code:** yes  
 
 ---
 
-## 2. Tone
+## 1. Visual Identity & Design Philosophy
 
-**Professional but not corporate-cold** — this is a student community platform, not enterprise SaaS. Approachable, clear, a little energetic. Avoid anything that reads as *"internal tool nobody wanted to use."*
-
----
-
-## 3. Screens to Design (By Role)
-
-### Auth (All Roles)
-- Login screen.
-- Forced first-login password change.
-- MFA setup + TOTP verification (Admin / Super Admin only).
-- Forgot / reset password flow.
-
-### Super Admin
-- Dashboard (system health, active sessions at a glance, throughput).
-- Admin management (create / deactivate / revoke Admins).
-- Audit logs (searchable, filterable by actor, date range, action type).
-- Active sessions viewer (session inspection & kill switch).
-- System configuration settings.
-
-### Admin
-- Dashboard (overall events, active volunteer counts, upcoming shifts).
-- Add user / bulk import (CSV drag-and-drop, validation preview).
-- User management (role changes, deactivate user, reset password — each with a reason-required modal).
-- Event creation wizard (multi-step: Details → Teams → Shifts).
-- Event list / detail / edit view.
-
-### T3 Executive
-- Team roster overview.
-- Review applications (approve / reject queue with batch triage).
-- Attendance marking (QR scanning assistant + manual override).
-- Team analytics & attendance breakdown.
-
-### T2 Associate
-- Shift coordination view (volunteer assignments, roster check).
-- Dedicated team chat room.
-
-### T1 Volunteer
-- Event discovery / browse (cards, filter by tags, dates).
-- My applications (pending, approved, rejected status).
-- QR check-in (mobile camera scanner UI, high contrast).
-- Team chat (real-time chat with fellow volunteers & lead).
-- My certificates / certificate gallery (instant preview & PDF download).
-- Public certificate verification page (accessible without login).
-
-### Shared Across Roles
-- Chat window (message bubbles, typing indicator, read receipts, member list).
-- Notifications panel (read/unread badges, push alerts).
-- Profile page (contact details, password rotation, active devices).
+The TBI-GEU interface employs a **Retro-Industrial Engineering Console** visual aesthetic combined with modern, high-density utility dashboards:
+- Industrial chassis inputs, screw rivets, tactile buttons, and live LED indicators for authentication and critical control panels.
+- Blueprint grid backgrounds and warm neutrals for card containers.
+- High-contrast, clean data density for administrative tables and rosters.
+- Mobile-first, single-thumb ergonomics for student volunteers on phone browsers.
 
 ---
 
-## 4. Key Flows Worth Storyboarding
+## 2. Typography & Fonts
 
-1. **First Login**: Temporary password → Forced password change → (Admin/Super Admin only) MFA setup → Direct entry to dashboard. *This is every user’s first impression — make it quick, frictionless, not bureaucratic.*
-2. **Apply → Get Approved → Land in Team Chat**: The core loop for a T1 volunteer. *Should feel like a door opening up for them, accompanied by a clear welcome state.*
-3. **Event-Day QR Check-in**: Must work lightning-fast, one-handed, in poor lighting and fluctuating mobile network conditions. *This is the highest-pressure real-world moment in the entire product.*
-4. **Certificate Delivery**: Replaces a traditional 2-week paper wait with an instant high-res PDF download. *The design should celebrate this achievement (e.g., celebratory micro-animation, confetti/badge highlight), not just be a quiet file drop.*
+Configured in [apps/web/src/index.css](file:///e:/project%20emp/tbi/apps/web/src/index.css) and [apps/web/tailwind.config.js](file:///e:/project%20emp/tbi/apps/web/tailwind.config.js):
 
----
-
-## 5. Component System
-
-Base components exist as standard primitives in the design system:
-- **Core Primitives**: `Button`, `Input`, `Modal`, `Table`, `Loader`, `Card`, `Pagination`, `Toast`, `EmptyState`, `ErrorBoundary`.
-- Design against this foundational set rather than introducing net-new primitives unless an essential gap is identified.
-- **Color Tokens**: Base palette (neutral slate/zinc) + distinct accent/status color per role layout for subtle identification in navigation headers.
-- **Type Scale & Spacing**: Strict rem-based scale with responsive adjustments for mobile viewports.
-- **Empty States**: Customized empty states for every list view (event list, applications, certificates, chat).
-- **Error & Toast States**: Clear, actionable error notifications and feedback banners.
+| Font Family | Usage | Fallback |
+|-------------|-------|----------|
+| **Inter** | Primary UI font across all body, tables, navigation, inputs | `system-ui`, `sans-serif` |
+| **Space Mono / Monospace** | Badges, hashes, token displays, timestamp logs, codes | `monospace` |
+| **Barlow Condensed / Rajdhani** | Industrial section headers, uppercase stamp tags | `sans-serif` |
 
 ---
 
-## 6. Constraints to Design Within
+## 3. Color Tokens & Industrial Classes
 
-- **Mobile-First for T1 Screens Especially**: QR check-in, chat, application workflow, and certificate downloads must feel native on mobile web.
-- **Localization**: English and Hindi (`en.json`, `hi.json` scaffolded) — avoid baking text into images; UI elements must accommodate variable translated string lengths.
-- **Accessibility**: WCAG AA compliance minimum — high contrast ratios, full keyboard navigation for desktop admin screens, screen-reader labels on icon-only buttons.
-- **No Geofencing UI for v1**: The QR check-in screen must not prompt for browser location permissions in this phase.
+Defined in [apps/web/src/index.css](file:///e:/project%20emp/tbi/apps/web/src/index.css):
+
+| Class / Token | Value / Gradient | Visual Effect |
+|---------------|------------------|---------------|
+| `industrial-chassis` | `linear-gradient(180deg, #373b43 0%, #26292f 100%)` | Dark cast-metal casing with inset bevel |
+| `screw-rivet` | `#b0b7c3` with 45° slotted screw head | Mechanical rivet detail on panel corners |
+| `industrial-button` | `linear-gradient(180deg, #a82d2d 0%, #821c1c 55%, #661414 100%)` | Crimson-to-dark-red stamped actuation button |
+| `blueprint-grid` | `#f0ede6` background with `#d5ccbf` 24px grid dots | Technical drafting paper backdrop |
+| `led-green` | `#4ade80` with `0 0 8px #22c55e` glow | Active session / Connected status |
+| `led-amber` | `#fde047` with `0 0 7px #eab308` glow | Pending / Standby / MFA challenge |
+| `led-red` | `#f87171` with `0 0 7px #ef4444` glow | Revoked / Error / Inactive status |
+
+---
+
+## 4. Role-Based Layout Hierarchy
+
+Layouts managed in [apps/web/src/pages.jsx](file:///e:/project%20emp/tbi/apps/web/src/pages.jsx):
+
+| Role | Information Density | Key Focus |
+|------|---------------------|-----------|
+| `SUPER_ADMIN` | Maximum / High | Audit logs, session termination, token revoke, platform health |
+| `ADMIN` | High | Event creation wizards, user provisioning, CSV bulk import, statistics |
+| `T3_EXECUTIVE` | Moderate | Applicant review queues, team roster viewer, attendance check-in |
+| `T2_ASSOCIATE` | Moderate | Shift assignments, event coordination, team chat |
+| `T1_VOLUNTEER` | Streamlined / Mobile-First | Event discovery cards, shift apply, QR check-in scanner, profile completion |
+
+---
+
+## 5. UI Components & Mobile Rules
+
+### Form Inputs & Buttons:
+- Minimum touch target: `44px` on mobile screens.
+- Avoid low-contrast gray text; adhere strictly to WCAG AA.
+- Form submissions require clear disabled states with spinners during async API calls.
+
+### Image & Avatar Uploads:
+- Handled in [apps/web/src/pages/profile/MyProfilePage.jsx](file:///e:/project%20emp/tbi/apps/web/src/pages/profile/MyProfilePage.jsx).
+- Native `<input type="file" accept="image/*">`.
+- Canvas-based client-side downscaling and compression before upload to keep payloads `< 10MB`.

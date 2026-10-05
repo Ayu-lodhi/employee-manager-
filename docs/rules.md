@@ -1,80 +1,50 @@
 # RULES.md — Engineering & AI Guardrails
 
-## 0. Memory Protocol — Read This Before Anything Else
-
-**Session start rule**: The moment Antigravity (or any agent) begins work on this project — a new session, a new task, resuming after any gap — its first action is to read `memory.md` in full and treat it as the base of everything it does next. Not the repo, not the other docs, not prior chat context: **`memory.md` first, always, every time work begins.**
-
-`memory.md` is a self-contained snapshot of the project — summary, current phase, finalized role/architecture facts, out-of-scope items, condensed decision log, and open gaps. Any agent (AI or human) starting work on this project reads `memory.md` first, instead of re-scanning the full repository or full doc set.
-
-- Only consult a detailed doc (`prd.md`, `architecture.md`, `rules.md`, `phases.md`, `designe.md`, `CHANGELOG-decisions.md`) when `memory.md` doesn’t have the specific detail a task needs.
-- If a detailed doc is consulted and something useful is learned that isn’t already in `memory.md`, add a condensed version of it back into `memory.md` before finishing the task.
-- Every change logged in `CHANGELOG-decisions.md` per the protocol below must also be reflected in `memory.md` in the same pass — the two must never drift out of sync.
-- If `memory.md` and a detailed doc ever disagree, the detailed doc wins — fix `memory.md` to match, don’t trust `memory.md` blindly.
+**Last updated:** 2026-10-05  
+**Production commit:** `8a85481`  
+**Verified against code:** yes  
 
 ---
 
-## 1. What to Use
+## 1. Memory Protocol
 
-- **Auth**: JWT (short-lived access token + refresh token), bcrypt (12 rounds) for passwords, TOTP for MFA.
-- **RBAC**: Permission-based only. Never check `role === '...'` directly in business logic — always go through `rbac.middleware.js`, which resolves role-default grants + per-user access-grant overrides.
-- **Data access**: Mongoose, always through a `*.repository.js` — controllers and services never call Mongoose models directly.
-- **Error handling**: `ApiError` / `ApiResponse` / `asyncHandler` wrapper on every route handler; typed errors only (`ValidationError`, `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `ConflictError`).
-- **Logging**: Winston structured logger only — never `console.log` in committed code.
-- **Background jobs**: BullMQ, every worker must be idempotent (check `idempotency.util.js` before side-effecting).
-- **Caching**: `cacheService.js` for reads, `cacheInvalidator.js` explicitly called on every write that touches a cached key — never rely on TTL alone for write-path correctness.
-- **Sessions**: `sessionTerminator.js` for any action that must kill active sessions (Deactivate, Revoke) — one shared code path, not two.
-- **Constants**: `roles.js` and `permissions.js` from `packages/shared-constants` are the single source of truth for both frontend and backend — never redefine role/permission strings locally in a module.
-- **Testing**: Every module touching auth, RBAC, revocation, transactions, or concurrency must ship with a corresponding test in `__tests__/` before merge — this is not optional for red-zone files.
+- **Start of Session**: Read [memory.md](file:///e:/project%20emp/tbi/memory.md) first. It is the single source of truth for high-level state, open issues, and doc references.
+- **Code is Truth**: If a document and the codebase disagree, inspect and follow the code, then update the documentation to match.
+- **Log Decisions**: Any architectural decision or non-trivial change must be logged in [docs/CHANGELOG-decisions.md](file:///e:/project%20emp/tbi/docs/CHANGELOG-decisions.md) and summarized in [memory.md](file:///e:/project%20emp/tbi/memory.md).
 
 ---
 
-## 2. What to Avoid
+## 2. Engineering Conventions & What to Use
 
-- **Hardcoded role/tier strings anywhere outside shared-constants** (e.g. `if (user.role === 'T2')`) — use the permission check, not a role comparison, unless in the middleware itself.
-- **A separate tier field used for auth decisions** — `tiers.js` is display-labels only.
-- **Storing JWTs in localStorage on the frontend** — use `httpOnly` secure cookies or in-memory storage with refresh rotation.
-- **Synchronous/blocking bcrypt calls on the request thread** — always `await bcrypt.hash(...)`, never the sync variant.
-- **Direct Mongoose queries inside controllers or React components** — always through the repository/service layer.
-- **Skipping cacheInvalidator.js on a write path "because TTL will handle it"** — this created a real stale-read bug in an earlier design pass and must not recur.
-- **Adding a new external library without checking it’s actively maintained and doesn’t duplicate something already in `packages/shared-utils`**.
-- **Committing `.env` files, API keys, or any secret** — use `.env.example` as the template, real values only in AWS Secrets Manager.
-- **Logging passwords, tokens, OTPs, or full PII** (mask email/phone in logs).
-- **Cross-module imports that reach into another module’s repository or model directly** — go through that module’s public `*.service.js` or `*.index.js` only.
-- **Disabling an ESLint rule inline without a one-line comment explaining why**.
-
----
-
-## 3. Change Approval & Logging Protocol
-
-Applies to every change — code, architecture, schema, or docs — proposed by an AI assistant (or any contributor working from this doc set), no exceptions:
-
-1. **Ask before making the change**: Present the change as a multiple-choice question (MCQ) — the options being considered, not just a yes/no on one option. Never make the change first and explain it after.
-2. **Wait for the person’s selection**: Do not proceed on an assumed default, even if one option seems obviously best.
-3. **Register the change once approved**: Log it in `docs/CHANGELOG-decisions.md` with:
-   - **What changed** (one line)
-   - **Reason** — why this option was chosen over the others offered
-   - **Where** — exact file(s)/module(s)/doc(s) it was made in
-   - **Date**
-
-### Log entry format:
-```markdown
-### [YYYY-MM-DD] <short title>
-- What: <one-line description of the change>
-- Reason: <why this option, chosen from the MCQ>
-- Where: <file path(s) / module(s) / doc(s)>
-```
-
-This applies retroactively too — any change already made in this conversation without going through this protocol should be backfilled into the changelog the next time that area is touched.
+| Domain | Rule / Practice | File Path / Implementation |
+|--------|----------------|----------------------------|
+| **Auth** | Short-lived JWT access + refresh tokens, bcrypt (12 rounds) for passwords, TOTP for MFA | [apps/web/server/modules/auth/](file:///e:/project%20emp/tbi/apps/web/server/modules/auth/) |
+| **RBAC** | Permission-based checks via middleware; never check hardcoded role strings in controllers | [packages/shared-constants/permissions.js](file:///e:/project%20emp/tbi/packages/shared-constants/permissions.js), [apps/web/server/middleware/rbac.middleware.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/rbac.middleware.js) |
+| **Roles & Tiers** | 5 canonical roles; `tier` (T1/T2/T3) is progression/display metadata only | [packages/shared-constants/roles.js](file:///e:/project%20emp/tbi/packages/shared-constants/roles.js), [packages/shared-constants/tiers.js](file:///e:/project%20emp/tbi/packages/shared-constants/tiers.js) |
+| **Data Access** | Always query Mongoose through repository layer; never directly in controllers | `*.repository.js` in each module |
+| **Errors** | Throw typed errors (`ValidationError`, `AuthenticationError`, etc.) caught by centralized handler | [apps/web/server/middleware/error.middleware.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/error.middleware.js) |
+| **Logging** | Structured logging; strictly redact PII, tokens, and passwords | Winston / centralized logger |
+| **Sessions** | Single active session per user via `activeSessionId`; fail closed on DB errors | [apps/web/server/middleware/auth.middleware.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/auth.middleware.js) |
+| **Transactions**| Multi-document writes must execute inside an atomic session | `BaseRepository.js` |
 
 ---
 
-## 4. Guardrails Specifically for AI Coding Assistants
+## 3. Strict Prohibitions (What NOT to Do)
 
-- **Red-Zone Files**: Before touching any file marked Red-Zone in the directory tree (auth, RBAC, revocation, transactions, provisioning, MFA), flag the change explicitly for human review rather than merging autonomously.
-- **Schema Discipline**: Never invent a new database field or collection without also updating `packages/shared-types` and the ER diagram in `docs/database/`.
-- **Atomic Transactions**: Never bypass `BaseRepository.js`'s transaction handling for a multi-document write (e.g. event + team + chat room creation) — if a new atomic operation is needed, extend `BaseRepository`, don’t write a one-off `Model.save()` sequence.
-- **Permission Registration**: When adding a new permission-gated action, add the permission code to `shared-constants/permissions.js` first, then wire the check — don't inline a new ad-hoc check in the controller.
-- **Worker Jobs**: When adding a new scheduled job, register it in `apps/workers/src/jobs/scheduler.js` — don’t spin up a separate cron mechanism.
-- **Core Blast Radius**: Any change to `core/` (framework-level code) should come with a note on which modules it affects, since `core/` is shared by every feature module.
-- **Security Posture**: If a request implies bypassing rate limiting, MFA, or RBAC "just for testing" in a way that could ship to production, decline and suggest a feature flag or a dedicated test fixture instead.
-- **Module Architecture**: Match the existing module shape (`*.routes.js`, `*.controller.js`, `*.service.js`, `*.repository.js`, `*.model.js`, `*.validator.js`, `*.permissions.js`, `*.index.js`, `__tests__/`) when creating a new module — don't introduce a divergent structure for a single feature.
+- ❌ **NO secrets or keys in git**: Never commit `.env` files, API keys, or JWT secrets. Document only variable names.
+- ❌ **NO direct role strings in business logic**: Do not write `if (user.role === 'T2')` — use permission checks (`user.permissions.includes(...)`).
+- ❌ **NO storing tokens in insecure client storage**: Access tokens are kept in-memory or secure cookies.
+- ❌ **NO sync crypto**: Never use `bcrypt.hashSync()` on the main event loop thread.
+- ❌ **NO bypass of rate limiting or MFA** in production code for convenience.
+- ❌ **NO unvalidated regex queries**: Escape user-supplied strings before constructing regular expressions (e.g. `teamName` search).
+- ❌ **NO direct cross-module model imports**: Modules must import each other via service interfaces or public index exports.
+
+---
+
+## 4. Red-Zone Files (High-Risk Areas)
+
+Changes to these files require explicit verification and testing before committing:
+- Authentication & Tokens: [apps/web/server/modules/auth/](file:///e:/project%20emp/tbi/apps/web/server/modules/auth/), `auth.tokens.js`
+- RBAC Middleware & Constants: [apps/web/server/middleware/rbac.middleware.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/rbac.middleware.js), [packages/shared-constants/](file:///e:/project%20emp/tbi/packages/shared-constants)
+- Super Admin Revocation: [apps/web/server/modules/super-admin/](file:///e:/project%20emp/tbi/apps/web/server/modules/super-admin/)
+- Error Handler & Sanitizer: [apps/web/server/middleware/error.middleware.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/error.middleware.js)

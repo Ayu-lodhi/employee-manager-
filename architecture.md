@@ -1,350 +1,146 @@
 # ARCHITECTURE.md — System Architecture & Technical Specifications
 
-## 1. Flow & Architecture
+**Last updated:** 2026-10-05  
+**Production commit:** `8a85481`  
+**Verified against code:** yes  
 
-### 1.1 High-Level System Architecture
+---
+
+## 1. High-Level Architecture
+
+TBI-GEU is a monorepo consisting of a React frontend and Node.js/Express API deployed to Vercel (production serverless) and Docker/local Node (development).
 
 ```mermaid
 flowchart TD
-    Client["Clients\n(Web / Mobile Browser)"] -->|HTTPS / WSS| CF["AWS CloudFront + WAF / Shield"]
-    CF -->|TLS 1.3| ALB["Application Load Balancer"]
-    ALB -->|HTTP REST| API["ECS Fargate: API Service\n(Node.js / Express Modular Monolith)"]
-    ALB -->|WebSocket| WSS["ECS Fargate: Chat Service\n(Socket.io Nodes)"]
+    Client["Browser (Desktop / Mobile)"] -->|HTTPS / WSS| Vercel["Vercel Edge & CDN"]
+    Vercel -->|Static Assets| WebDist["Vite SPA (apps/web/dist)"]
+    Vercel -->|/api/*| Serverless["Vercel Node Serverless Function"]
     
-    API -->|Read/Write Session & Cache| R_Cache["Redis Instance 1:\nCache & Sessions"]
-    WSS -->|Pub/Sub Adapter| R_PubSub["Redis Instance 2:\nSocket.io Pub/Sub"]
-    API -->|Enqueue Jobs| R_Queue["Redis Instance 3:\nBullMQ Queue"]
+    subgraph Vercel Function
+        Handler["apps/web/api/index.js"] --> App["apps/web/server/server.js (Express)"]
+        DevAPI["apps/api/src/server.js (Dev / Docker / Tests)"]
+    end
     
-    Workers["ECS Fargate: Workers\n(BullMQ Idempotent Workers)"] -->|Process Jobs| R_Queue
-    Workers -->|Send Email| SES["AWS SES / SendGrid"]
-    Workers -->|Send SMS| SMS["Twilio / MSG91"]
-    Workers -->|Upload Artifacts| S3["AWS S3 Bucket\n(PDF Certificates)"]
+    App -->|Mongoose ODM| Mongo[("MongoDB Atlas")]
+    App -->|In-Memory Map| LocalCache["In-Memory Cache & Limiter"]
     
-    API -->|Mongoose Repositories\nTransactions & Sharding| Mongo["MongoDB Atlas Cluster\n(Primary + Read Replicas + Shards)"]
-    Workers -->|Read / Write Status| Mongo
+    subgraph Target Infra (Phase 7)
+        Redis[("Redis Cluster")]
+        BullMQ["BullMQ Workers (apps/workers/)"]
+    end
 ```
 
 ---
 
-### 1.2 Core Architectural Principles & Flows
+## 2. Monorepo Structure & File Paths
 
-#### 1.2.1 Modular Monolith Architecture
-The backend application is organized into:
-- `apps/api/src/core/`: Application runtime, config, base classes (`BaseRepository`, `BaseService`, `BaseController`, `BaseModel`), global error handling, logging, caching, and shared security middlewares.
-- `apps/api/src/modules/`: Domain feature modules (`auth`, `users`, `admin`, `super-admin`, `events`, `teams`, `shifts`, `applications`, `attendance`, `certificates`, `reviews`, `chat`, `notifications`, `analytics`).
-- **Standard Module Shape**: Every module strictly follows:
-  `*.routes.js` → `*.controller.js` → `*.service.js` → `*.repository.js` → `*.model.js`
-  along with `*.validator.js`, `*.permissions.js`, `*.index.js`, and `__tests__/`.
-
-#### 1.2.2 Authentication & Permission-Based RBAC Flow
-- **Token Design**: Short-lived JWT access tokens + rotating refresh tokens.
-- **Session Revocation**: Stored in Redis cache. `sessionTerminator.js` acts as the single unified engine for both Admin "Deactivate" and Super Admin "Revoke", immediately blacklisting tokens.
-- **RBAC Pipeline**: Requests pass through `auth.middleware.js` (validates signature, expiration, and blacklist status), followed by `rbac.middleware.js`. The middleware resolves the user's role-default permissions from `shared-constants/permissions.js` and applies any per-user `ACCESS_GRANT` overrides stored in the database.
-
-#### 1.2.3 Atomic Event Creation
-- Creating an Event requires generating the Event record, initial default Teams, and Team Chat Rooms.
-- Handled atomically within a single MongoDB multi-document transaction managed by `BaseRepository.js`. Failure in any sub-step rolls back the entire operation.
-
-#### 1.2.4 Event-Driven Application Approval
-- When an applicant is approved by a T2 or T3 lead via `applications.service.js`, the service emits `APPLICATION_APPROVED`.
-- An asynchronous event listener (`applicationApproved.listener.js`) catches the event and adds the volunteer to the corresponding team chat room and roster. The HTTP response is not blocked by chat room enrollment.
-
-#### 1.2.5 Real-Time Chat Architecture
-- Implemented with Socket.io backed by a dedicated Redis Pub/Sub instance.
-- **Room Authentication**: Sockets authenticate with the JWT during connection handshake.
-- **Rate Limiting**: Sockets enforce a per-connection rate limit to mitigate flood abuse.
-- **Lifecycle**: When an event transitions to `COMPLETED` or `ARCHIVED`, its associated chat rooms are switched to read-only mode.
-
-#### 1.2.6 QR Attendance Verification
-- Dynamic QR codes generated for shifts.
-- On event day, volunteers present the QR code or scan event station QRs.
-- Verification updates the attendance state via `attendance.service.js` with optimistic locking to prevent race conditions.
-
-#### 1.2.7 Write-Path Cache Invalidation
-- Writes never rely on passive TTL expiration.
-- Mutating services must invoke `cacheInvalidator.js` explicitly on the exact affected cache keys to avoid stale reads.
+| Path | Purpose | Runtime / Build |
+|------|---------|-----------------|
+| [apps/web/](file:///e:/project%20emp/tbi/apps/web) | Frontend SPA + Vercel serverless API wrapper | Vite 5, React 18, TailwindCSS 3 |
+| [apps/web/src/](file:///e:/project%20emp/tbi/apps/web/src) | Client UI components, routes, API clients | Browser JS / JSX |
+| [apps/web/server/](file:///e:/project%20emp/tbi/apps/web/server) | Serverless production Express API backend | Node.js CommonJS |
+| [apps/web/api/index.js](file:///e:/project%20emp/tbi/apps/web/api/index.js) | Vercel Serverless Function entry point | Node.js ES module wrapper |
+| [apps/api/](file:///e:/project%20emp/tbi/apps/api) | Full-featured standalone Express API + test runner | Node.js CommonJS (port 5000) |
+| [apps/workers/](file:///e:/project%20emp/tbi/apps/workers) | BullMQ worker stubs (certificates, notifications) | Node.js (inactive in Vercel) |
+| [packages/shared-constants/](file:///e:/project%20emp/tbi/packages/shared-constants) | Roles, permissions, tier constants | Shared npm package |
+| [packages/shared-types/](file:///e:/project%20emp/tbi/packages/shared-types) | JSDoc typedefs & schema contracts | Shared npm package |
+| [packages/shared-utils/](file:///e:/project%20emp/tbi/packages/shared-utils) | Idempotency & helper utilities | Shared npm package |
+| [infrastructure/terraform/](file:///e:/project%20emp/tbi/infrastructure/terraform) | Terraform config for AWS/Atlas target infra | HCL (Phase 7 scale plan) |
 
 ---
 
-## 2. Tech Stack
+## 3. Backend Module Map
 
-| Layer | Technology | Rationale |
-|---|---|---|
-| **Frontend Web** | React 18 (Vite), Tailwind CSS | Fast bundling, responsive mobile-first UI, lightweight client bundle |
-| **Icons & UI** | Lucide React, Custom Base UI | Lightweight, accessible, consistent design tokens |
-| **Backend API** | Node.js (v24 LTS), Express.js | Mature ecosystem, non-blocking I/O, modular architecture |
-| **Database** | MongoDB Atlas (Mongoose ODM) | Flexible document model for events/shifts, atomic transactions, sharding support |
-| **Caching & Pub/Sub** | Redis (ElastiCache) — 3 isolated instances | Dedicated instances for: 1. Sessions/Cache, 2. Chat Pub/Sub, 3. BullMQ queue |
-| **Real-Time Chat** | Socket.io + `@socket.io/redis-adapter` | Reliable WebSocket fallback, room management, horizontal scaling |
-| **Job Queue** | BullMQ | Distributed, robust background processing with Redis |
-| **Certificate Gen** | PDFKit / Canvas QR generator | Fast server-side vector PDF generation with embedded QR codes |
-| **Infra & Cloud** | AWS ECS Fargate, CloudFront, ALB, WAF | Serverless containers, global edge caching, DDoS perimeter defense |
-| **IaC** | Terraform | Reproducible multi-environment provisioning (VPC, ECS, Redis, Atlas) |
+Every domain module follows the standard shape:
+`*.routes.js` → `*.controller.js` → `*.service.js` → `*.repository.js` → `*.model.js` + `*.permissions.js` + `*.validator.js` + `__tests__/`
+
+| Module | Location | Primary Purpose | Key Routes |
+|--------|----------|-----------------|------------|
+| **Auth** | [apps/web/server/modules/auth/](file:///e:/project%20emp/tbi/apps/web/server/modules/auth/) | Login, JWT lifecycle, TOTP MFA, single session | `POST /api/v1/auth/login`, `POST /refresh`, `POST /mfa/verify` |
+| **Users** | [apps/web/server/modules/users/](file:///e:/project%20emp/tbi/apps/web/server/modules/users/) | User listings, account profiles, preferences | `GET /api/v1/users`, `GET /api/v1/users/me` |
+| **Profile** | [apps/web/server/modules/profile/](file:///e:/project%20emp/tbi/apps/web/server/modules/profile/) | Naukri-style profile, completion %, avatars | `GET /api/v1/profile/me`, `PATCH /me`, `POST /avatar`, `GET /user/:userId` |
+| **Admin** | [apps/web/server/modules/admin/](file:///e:/project%20emp/tbi/apps/web/server/modules/admin/) | Provisioning, bulk CSV import, deactivation | `POST /api/v1/admin/users`, `POST /bulk-import`, `PATCH /users/:id/tier` |
+| **Super Admin**| [apps/web/server/modules/super-admin/](file:///e:/project%20emp/tbi/apps/web/server/modules/super-admin/) | Security audits, token revocation, RBAC grant | `POST /api/v1/super-admin/revoke-user` |
+| **Events** | [apps/web/server/modules/events/](file:///e:/project%20emp/tbi/apps/web/server/modules/events/) | Event CRUD, phases, station QRs | `GET /api/v1/events`, `POST /api/v1/events` |
+| **Teams** | [apps/web/server/modules/teams/](file:///e:/project%20emp/tbi/apps/web/server/modules/teams/) | Teams, lead assignment, user team lists | `GET /api/v1/teams`, `GET /my-teams`, `POST /members` |
+| **Shifts** | [apps/web/server/modules/shifts/](file:///e:/project%20emp/tbi/apps/web/server/modules/shifts/) | Shift capacity, timings, assignments | `GET /api/v1/shifts`, `POST /api/v1/shifts` |
+| **Applications**| [apps/web/server/modules/applications/](file:///e:/project%20emp/tbi/apps/web/server/modules/applications/) | Volunteer application & approval flow | `POST /api/v1/applications`, `PATCH /:id/status` |
+| **Attendance** | [apps/web/server/modules/attendance/](file:///e:/project%20emp/tbi/apps/web/server/modules/attendance/) | QR check-in, manual marking, shift roster | `POST /api/v1/attendance/check-in`, `GET /history` |
+| **Timesheets** | [apps/web/server/modules/timesheets/](file:///e:/project%20emp/tbi/apps/web/server/modules/timesheets/) | Volunteer hours logging and verification | `GET /api/v1/timesheets`, `POST /api/v1/timesheets` |
+| **Certificates**| [apps/web/server/modules/certificates/](file:///e:/project%20emp/tbi/apps/web/server/modules/certificates/) | Certificate metadata & verification (PDF stub) | `GET /api/v1/certificates`, `GET /verify/:hash` |
+| **Reviews** | [apps/web/server/modules/reviews/](file:///e:/project%20emp/tbi/apps/web/server/modules/reviews/) | Volunteer performance ratings & feedback | `POST /api/v1/reviews`, `GET /events/:id` |
+| **Chat** | [apps/web/server/modules/chat/](file:///e:/project%20emp/tbi/apps/web/server/modules/chat/) | Room chat, message history (polling + socket) | `GET /api/v1/chat/rooms`, `POST /messages` |
+| **Notifications**| [apps/web/server/modules/notifications/](file:///e:/project%20emp/tbi/apps/web/server/modules/notifications/) | In-app notification delivery & dispatch | `GET /api/v1/notifications`, `PATCH /read` |
+| **Stats** | [apps/web/server/modules/stats/](file:///e:/project%20emp/tbi/apps/web/server/modules/stats/) | Aggregate KPI stats for Admin dashboards | `GET /api/v1/stats/overview` |
 
 ---
 
-## 3. Folder & File Structure
+## 4. Data Flow & Security Pipeline
 
-```text
-tbi/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                           # Lint, test, and type-check
-│       └── deploy.yml                       # ECS deployment pipeline
-├── apps/
-│   ├── api/
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   └── src/
-│   │       ├── core/
-│   │       │   ├── config/
-│   │       │   │   ├── env.config.js
-│   │       │   │   ├── rbac.config.js
-│   │       │   │   ├── redis-cache.client.js
-│   │       │   │   ├── redis-pubsub.client.js
-│   │       │   │   └── redis-queue.client.js
-│   │       │   ├── database/
-│   │       │   │   ├── connection.js
-│   │       │   │   ├── BaseRepository.js   # [Red-Zone] Atomic transaction support
-│   │       │   │   └── BaseModel.js
-│   │       │   ├── middleware/
-│   │       │   │   ├── auth.middleware.js  # [Red-Zone] JWT verification & blacklist check
-│   │       │   │   ├── rbac.middleware.js  # [Red-Zone] Granular permission resolution
-│   │       │   │   ├── mfa.middleware.js   # [Red-Zone] Admin/Super Admin TOTP enforcement
-│   │       │   │   ├── rateLimiter.middleware.js
-│   │       │   │   └── error.middleware.js # ApiError centralized handler
-│   │       │   ├── session/
-│   │       │   │   └── sessionTerminator.js # [Red-Zone] Unified session termination
-│   │       │   ├── cache/
-│   │       │   │   ├── cacheService.js
-│   │       │   │   └── cacheInvalidator.js # Explicit write-path invalidation
-│   │       │   ├── errors/
-│   │       │   │   ├── ApiError.js
-│   │       │   │   └── typedErrors.js
-│   │       │   ├── utils/
-│   │       │   │   ├── logger.js           # Winston structured logger
-│   │       │   │   ├── asyncHandler.js
-│   │       │   │   └── apiResponse.js
-│   │       │   └── app.js
-│   │       ├── modules/
-│   │       │   ├── auth/                    # [Red-Zone] Authentication module
-│   │       │   │   ├── auth.routes.js
-│   │       │   │   ├── auth.controller.js
-│   │       │   │   ├── auth.service.js
-│   │       │   │   ├── mfa.service.js
-│   │       │   │   ├── auth.validator.js
-│   │       │   │   ├── auth.permissions.js
-│   │       │   │   ├── auth.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── users/                   # User profiles & management
-│   │       │   │   ├── users.routes.js
-│   │       │   │   ├── users.controller.js
-│   │       │   │   ├── users.service.js
-│   │       │   │   ├── users.repository.js
-│   │       │   │   ├── users.model.js
-│   │       │   │   ├── users.validator.js
-│   │       │   │   ├── users.permissions.js
-│   │       │   │   ├── users.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── admin/                   # Admin user & CSV provisioning
-│   │       │   │   ├── admin.routes.js
-│   │       │   │   ├── admin.controller.js
-│   │       │   │   ├── admin.service.js    # [Red-Zone] Provisioning & deactivation
-│   │       │   │   ├── admin.repository.js
-│   │       │   │   ├── admin.validator.js
-│   │       │   │   ├── admin.permissions.js
-│   │       │   │   ├── admin.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── super-admin/             # Super Admin controls & audits
-│   │       │   │   ├── super-admin.routes.js
-│   │       │   │   ├── super-admin.controller.js
-│   │       │   │   ├── revocation.service.js # [Red-Zone] Revocation engine
-│   │       │   │   ├── super-admin.repository.js
-│   │       │   │   ├── super-admin.validator.js
-│   │       │   │   ├── super-admin.permissions.js
-│   │       │   │   ├── super-admin.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── events/                  # Atomic event creation & listing
-│   │       │   │   ├── events.routes.js
-│   │       │   │   ├── events.controller.js
-│   │       │   │   ├── events.service.js
-│   │       │   │   ├── events.repository.js
-│   │       │   │   ├── events.model.js
-│   │       │   │   ├── events.validator.js
-│   │       │   │   ├── events.permissions.js
-│   │       │   │   ├── events.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── teams/                   # Team structure & leads
-│   │       │   │   ├── teams.routes.js
-│   │       │   │   ├── teams.controller.js
-│   │       │   │   ├── teams.service.js
-│   │       │   │   ├── teams.repository.js
-│   │       │   │   ├── teams.model.js
-│   │       │   │   ├── teams.validator.js
-│   │       │   │   ├── teams.permissions.js
-│   │       │   │   ├── teams.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── shifts/                  # Shifts & capacity reservation
-│   │       │   │   ├── shifts.routes.js
-│   │       │   │   ├── shifts.controller.js
-│   │       │   │   ├── shifts.service.js
-│   │       │   │   ├── shifts.repository.js
-│   │       │   │   ├── shifts.model.js
-│   │       │   │   ├── shifts.validator.js
-│   │       │   │   ├── shifts.permissions.js
-│   │       │   │   ├── shifts.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── applications/            # Volunteer applications
-│   │       │   │   ├── applications.routes.js
-│   │       │   │   ├── applications.controller.js
-│   │       │   │   ├── applications.service.js
-│   │       │   │   ├── applicationApproved.listener.js # Event-driven chat add
-│   │       │   │   ├── applications.repository.js
-│   │       │   │   ├── applications.model.js
-│   │       │   │   ├── applications.validator.js
-│   │       │   │   ├── applications.permissions.js
-│   │       │   │   ├── applications.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── attendance/              # QR-based check-in
-│   │       │   │   ├── attendance.routes.js
-│   │       │   │   ├── attendance.controller.js
-│   │       │   │   ├── attendance.service.js
-│   │       │   │   ├── qr.service.js
-│   │       │   │   ├── attendance.repository.js
-│   │       │   │   ├── attendance.model.js
-│   │       │   │   ├── attendance.validator.js
-│   │       │   │   ├── attendance.permissions.js
-│   │       │   │   ├── attendance.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── certificates/            # PDF generation & verification
-│   │       │   │   ├── certificates.routes.js
-│   │       │   │   ├── certificates.controller.js
-│   │       │   │   ├── certificates.service.js
-│   │       │   │   ├── pdfGenerator.js
-│   │       │   │   ├── certificates.repository.js
-│   │       │   │   ├── certificates.model.js
-│   │       │   │   ├── certificates.validator.js
-│   │       │   │   ├── certificates.permissions.js
-│   │       │   │   ├── certificates.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── reviews/                 # Post-event ratings
-│   │       │   │   ├── reviews.routes.js
-│   │       │   │   ├── reviews.controller.js
-│   │       │   │   ├── reviews.service.js
-│   │       │   │   ├── reviews.repository.js
-│   │       │   │   ├── reviews.model.js
-│   │       │   │   ├── reviews.validator.js
-│   │       │   │   ├── reviews.permissions.js
-│   │       │   │   ├── reviews.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── chat/                    # Real-time chat & socket handlers
-│   │       │   │   ├── chat.socket.js
-│   │       │   │   ├── chat.service.js
-│   │       │   │   ├── chat.rateLimiter.js
-│   │       │   │   ├── chat.repository.js
-│   │       │   │   ├── chat.model.js
-│   │       │   │   ├── chat.permissions.js
-│   │       │   │   ├── chat.index.js
-│   │       │   │   └── __tests__/
-│   │       │   ├── notifications/           # In-app push & dispatchers
-│   │       │   │   ├── notifications.routes.js
-│   │       │   │   ├── notifications.service.js
-│   │       │   │   ├── notifications.repository.js
-│   │       │   │   ├── notifications.model.js
-│   │       │   │   └── __tests__/
-│   │       │   └── analytics/               # Dashboards & metrics
-│   │       │       ├── analytics.routes.js
-│   │       │       ├── analytics.controller.js
-│   │       │       ├── analytics.service.js
-│   │       │       └── __tests__/
-│   │       └── server.js
-│   ├── web/
-│   │   ├── Dockerfile
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   ├── vite.config.js
-│   │   └── src/
-│   │       ├── assets/
-│   │       ├── core/
-│   │       │   ├── api/apiClient.js
-│   │       │   ├── auth/AuthContext.jsx
-│   │       │   ├── router/
-│   │       │   │   ├── AppRoutes.jsx
-│   │       │   │   └── RoleRoute.jsx
-│   │       │   └── layouts/
-│   │       │       ├── SuperAdminLayout.jsx
-│   │       │       ├── AdminLayout.jsx
-│   │       │       ├── T3Layout.jsx
-│   │       │       ├── T2Layout.jsx
-│   │       │       └── T1Layout.jsx
-│   │       ├── components/
-│   │       │   ├── Button.jsx
-│   │       │   ├── Input.jsx
-│   │       │   ├── Modal.jsx
-│   │       │   ├── Table.jsx
-│   │       │   ├── Loader.jsx
-│   │       │   ├── Card.jsx
-│   │       │   ├── Pagination.jsx
-│   │       │   ├── Toast.jsx
-│   │       │   ├── EmptyState.jsx
-│   │       │   └── ErrorBoundary.jsx
-│   │       ├── locales/
-│   │       │   ├── en.json
-│   │       │   └── hi.json
-│   │       ├── modules/
-│   │       │   ├── auth/
-│   │       │   ├── events/
-│   │       │   ├── applications/
-│   │       │   ├── attendance/
-│   │       │   ├── chat/
-│   │       │   ├── certificates/
-│   │       │   ├── admin/
-│   │       │   └── super-admin/
-│   │       ├── App.jsx
-│   │       └── main.jsx
-│   └── workers/
-│       ├── Dockerfile
-│       ├── package.json
-│       └── src/
-│           ├── index.js
-│           ├── jobs/
-│           │   ├── scheduler.js
-│           │   └── definitions/
-│           │       ├── sendEmail.job.js
-│           │       ├── sendSMS.job.js
-│           │       ├── generateCertificate.job.js
-│           │       └── preScaleForEvent.job.js
-│           └── workers/
-│               ├── notification.worker.js
-│               └── certificate.worker.js
-├── packages/
-│   ├── shared-constants/
-│   │   ├── package.json
-│   │   ├── index.js
-│   │   ├── roles.js
-│   │   ├── permissions.js
-│   │   └── tiers.js
-│   ├── shared-types/
-│   │   ├── package.json
-│   │   └── index.js
-│   └── shared-utils/
-│       ├── package.json
-│       ├── index.js
-│       └── idempotency.util.js
-├── infrastructure/
-│   └── terraform/
-│       ├── main.tf
-│       ├── variables.tf
-│       └── modules/
-│           ├── vpc/
-│           ├── ecs/
-│           ├── elasticache/
-│           ├── mongodb-atlas/
-│           └── autoscaling/
-│               └── scheduled-scaling.tf
-├── docker-compose.yml
-├── .env.example
-├── pnpm-workspace.yaml
-├── package.json
-└── turbo.json
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User Browser
+    participant Vercel as Vercel Edge / API
+    participant MW as Security & Auth Middleware
+    participant Controller as Module Controller
+    participant Service as Business Service
+    participant Repo as Mongoose Repository
+    participant DB as MongoDB Atlas
+
+    User->>Vercel: HTTP Request (Bearer JWT)
+    Vercel->>MW: Invoke apps/web/api/index.js
+    MW->>MW: verifyToken() -> check activeSessionId
+    MW->>MW: rbac.middleware() -> check role/permissions
+    MW->>Controller: req.user { id, role, tier, permissions }
+    Controller->>Service: Call domain method
+    Service->>Repo: Validate schema & execute query
+    Repo->>DB: MongoDB Read/Write Operation
+    DB-->>Repo: Document / Result
+    Repo-->>Service: Sanitized Model
+    Service-->>Controller: DTO
+    Controller-->>User: 200 JSON Response
 ```
+
+### Core Security Middlewares:
+- [auth.middleware.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/auth.middleware.js): Validates JWT signature, expiration, token purpose, and active session ID.
+- [rbac.middleware.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/rbac.middleware.js): Compares required permission against resolved permissions.
+- [verifyCaptcha.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/verifyCaptcha.js): Validates Google reCAPTCHA v2 token on login requests.
+- [security.middleware.js](file:///e:/project%20emp/tbi/apps/web/server/middleware/security.middleware.js): Security headers, body limiters, rate limiting.
+
+---
+
+## 5. Vercel Production Setup
+
+### Configuration Files:
+- [vercel.json (Root)](file:///e:/project%20emp/tbi/vercel.json):
+  - Builds: `@vercel/node` for `apps/api/src/server.js`, `@vercel/static-build` for `apps/web/package.json` (`distDir: "dist"`).
+  - Routes: `/api/(.*)` to API handler, `/(.*)` to static dist with SPA fallback.
+- [apps/web/vercel.json](file:///e:/project%20emp/tbi/apps/web/vercel.json): Rewrites `/api/(.*)` to `/api` and non-API paths to `/index.html`.
+- [apps/web/api/index.js](file:///e:/project%20emp/tbi/apps/web/api/index.js): Serverless function entrypoint connecting to MongoDB on warm/cold start and delegating to `apps/web/server/server.js`.
+
+### Environment Variable Names (Secrets NEVER committed):
+
+| Variable Name | Required | Purpose |
+|---------------|----------|---------|
+| `MONGODB_URI` | 🔴 Required | MongoDB Atlas connection string |
+| `JWT_ACCESS_SECRET` | 🔴 Required | HMAC key for signing access tokens |
+| `JWT_REFRESH_SECRET` | 🔴 Required | HMAC key for signing refresh tokens |
+| `NODE_ENV` | 🔴 Required | Must be `production` |
+| `JWT_ACCESS_EXPIRY` | 🟡 Important | e.g. `15m` |
+| `JWT_REFRESH_EXPIRY` | 🟡 Important | e.g. `7d` |
+| `RECAPTCHA_SECRET_KEY` | 🟡 Important | Google reCAPTCHA v2 verification key |
+| `CAPTCHA_ENABLED` | 🟡 Important | `true` or `false` |
+| `SESSION_TIMEOUT_MINUTES` | 🟡 Important | Inactivity session timeout |
+| `ALLOWED_ORIGINS` | 🟢 Optional | CORS whitelist URL(s) |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` | 🟢 Optional | SMTP credentials |
+| `MFA_ENCRYPTION_KEY` | 🟢 Optional | 32-byte hex key for TOTP secrets |
+
+---
+
+## 6. Integrations & External Services
+
+- **MongoDB Atlas**: Primary persistent database.
+- **Google reCAPTCHA v2**: Bot prevention on authentication routes.
+- **Google Fonts CDN**: Typography (`Barlow Condensed`, `Rajdhani`, `Space Mono`, `Inter`).
+- **Socket.io**: Real-time room chat (functional in local/persistent mode; polling fallback in serverless).

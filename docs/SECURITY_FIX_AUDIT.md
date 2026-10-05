@@ -1,5 +1,25 @@
 # Security Fix Audit — Phase 1
 
+**Last updated:** 2026-10-05 | **Production commit:** `8a85481` | **Verified against code:** yes
+
+## Production Deployment Status Summary
+
+| Issue | Git Status | Vercel Production Status |
+|-------|-----------|--------------------------|
+| #1 Hardcoded JWT/MongoDB secrets | ✅ Fixed in git (`77a884e`) | ⚠️ DEPLOYED but missing env vars — still fails with 503 |
+| #2 Session fail-open | ✅ Fixed in git (`fa7e1fb`) | ⚠️ Not functional — API crashes before reaching this code |
+| #3 Production error details exposed | ✅ Fixed in git (`8b920b2`) | ⚠️ Not functional — API crashes at startup |
+| #4 TeamName regex injection | ✅ Fixed in git (`894a6fe`) | ⚠️ Not functional — API crashes at startup |
+| #5 Email PII in queue logs | ✅ Fixed in git (`97e14a2`) | ⚠️ Not functional — API crashes at startup |
+| #6–#15 (auth, teams, chat, attendance, etc.) | ✅ Fixed in git | ⚠️ Not functional — API crashes at startup |
+| **Vercel 503 Startup Crash (Route.patch undefined callback)** | ✅ Fixed in code | Resolved (ready for redeploy with env vars) |
+
+**Root cause of 503:** `apps/web/server/modules/notifications/notifications.routes.js:10` registered `router.patch('/read-type/:type', controller.markTypeRead)` where `controller.markTypeRead` was not defined in `notifications.controller.js`. Express threw `Route.patch() requires a callback function but got a [object Undefined]` at module boot. `apps/web/api/index.js` caught `initError` and returned generic 503 on every request.
+
+**Fix:** Added `exports.markTypeRead` to `apps/web/server/modules/notifications/notifications.controller.js`, implemented lazy cached MongoDB connection in `apps/web/api/index.js`, and added `/api/health` diagnostic endpoint.
+
+---
+
 ## Issue 1: Hardcoded Secrets in Source
 
 ### CONFIRMED ✓

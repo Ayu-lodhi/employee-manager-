@@ -3,42 +3,124 @@ import mongoose from 'mongoose';
 
 const require = createRequire(import.meta.url);
 
-let app;
+let app = null;
 let initError = null;
+
 try {
+  process.env.VERCEL = '1';
   app = require('../server/server.js');
 } catch (e) {
   initError = e;
-  console.error('Server module load error:', e);
+  console.error('[Serverless Startup Error]: Failed to load server.js:', e.message);
+  if (e.stack) {
+    console.error(e.stack);
+  }
 }
 
-const MONGODB_URI = process.env.MONGODB_URI;
+// Global cached connection for serverless invocation reuse
+let cached = global.mongoose;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
-export default async function handler(req, res) {
-  if (initError) {
-    console.error('Server initialization error:', initError);
-    return res.status(503).json({
-      success: false,
-      message: 'Service is temporarily unavailable. Please try again shortly.',
-    });
+const REQUIRED_ENV_VARS = ['MONGODB_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
+
+function getMissingEnvVars() {
+  return REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+}
+
+async function connectToDatabase() {
+  if (cached.conn && mongoose.connection.readyState === 1) {
+    return cached.conn;
+  }
+
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    console.error('[Serverless DB Error]: MONGODB_URI environment variable is not defined');
+    return null;
+  }
+
+  if (!cached.promise) {
+    console.log('[Serverless DB]: Initiating lazy connection to MongoDB...');
+    cached.promise = mongoose
+      .connect(uri, {
+        serverSelectionTimeoutMS: 8000,
+      })
+      .then((m) => {
+        console.log('[Serverless DB]: Connected to MongoDB');
+        cached.conn = m;
+        return m;
+      })
+      .catch((err) => {
+        cached.promise = null;
+        console.error('[Serverless DB Error]: Failed to connect to MongoDB:', err.message);
+        throw err;
+      });
   }
 
   try {
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
-    }
+    cached.conn = await cached.promise;
   } catch (err) {
-    console.error('MongoDB serverless connection error:', err.message);
+    cached.promise = null;
+    return null;
   }
 
+  return cached.conn;
+}
+
+export default async function handler(req, res) {
+  const url = req.url || '';
+
+  // 1. Health check endpoint — works unconditionally even if initError occurred
+  if (
+    url === '/api/health' ||
+    url === '/health' ||
+    url.startsWith('/api/health?') ||
+    url.startsWith('/health?')
+  ) {
+    const missingEnvs = getMissingEnvVars();
+    try {
+      await connectToDatabase();
+    } catch (_) {}
+
+    const dbConnected = mongoose.connection.readyState === 1;
+    const isHealthy = dbConnected && missingEnvs.length === 0 && !initError;
+
+    return res.status(isHealthy ? 200 : 503).json({
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      dbConnected,
+      dbReadyState: mongoose.connection.readyState,
+      missingEnvVars: missingEnvs,
+      initError: initError ? initError.message : null,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // 2. Fatal server module initialization error
+  if (initError) {
+    const missingEnvs = getMissingEnvVars();
+    console.error('[Serverless Request Error]: Cannot service request due to initError:', initError.message);
+    return res.status(503).json({
+      success: false,
+      message: 'Service is temporarily unavailable. Server failed to initialize.',
+      error: initError.message,
+      missingEnvVars: missingEnvs,
+    });
+  }
+
+  // 3. Connect to database lazily before routing request
+  await connectToDatabase();
+
+  // 4. Normalize URL path for Express router if needed
   if (req.url && !req.url.startsWith('/api') && req.url.startsWith('/v1')) {
     req.url = '/api' + req.url;
   }
 
+  // 5. Delegate request to Express app
   try {
     return app(req, res);
   } catch (err) {
-    console.error('Unhandled serverless error:', err);
+    console.error('[Serverless Request Unhandled Error]:', err);
     return res.status(500).json({
       success: false,
       message: 'An unexpected error occurred. Please try again shortly.',
