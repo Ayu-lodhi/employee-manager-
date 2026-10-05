@@ -76,8 +76,72 @@ test('Phase 2 - Token signed with old hardcoded fallback placeholder is rejected
   );
 });
 
+test('Phase 2 - Both token modules throw when JWT_ACCESS_SECRET or JWT_REFRESH_SECRET is missing', () => {
+  const apiTokens = require('../modules/auth/auth.tokens');
+  const webTokens = require('../../../web/server/modules/auth/auth.tokens');
+  const modules = [
+    { name: 'apps/api/src/modules/auth/auth.tokens', mod: apiTokens },
+    { name: 'apps/web/server/modules/auth/auth.tokens', mod: webTokens },
+  ];
+
+  for (const { name, mod } of modules) {
+    const origAccess = process.env.JWT_ACCESS_SECRET;
+    const origRefresh = process.env.JWT_REFRESH_SECRET;
+
+    try {
+      delete process.env.JWT_ACCESS_SECRET;
+      assert.throws(
+        () => mod.sign({ _id: '123' }, 'access', '15m'),
+        (err) => {
+          assert.equal(err.status || err.statusCode, 500);
+          assert.match(err.message, /Authentication service configuration error/);
+          return true;
+        },
+        `${name} must throw 500 when JWT_ACCESS_SECRET is missing`
+      );
+
+      delete process.env.JWT_REFRESH_SECRET;
+      process.env.JWT_ACCESS_SECRET = origAccess;
+      assert.throws(
+        () => mod.sign({ _id: '123' }, 'refresh', '7d'),
+        (err) => {
+          assert.equal(err.status || err.statusCode, 500);
+          assert.match(err.message, /Authentication service configuration error/);
+          return true;
+        },
+        `${name} must throw 500 when JWT_REFRESH_SECRET is missing`
+      );
+    } finally {
+      process.env.JWT_ACCESS_SECRET = origAccess;
+      process.env.JWT_REFRESH_SECRET = origRefresh;
+    }
+  }
+});
+
+test('Phase 2 - reset-demo-users refuses to run with NODE_ENV=production', () => {
+  const scriptPath = path.resolve(__dirname, '../../scripts/reset-demo-users.js');
+  const res = spawnSync(process.execPath, [scriptPath], {
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      MONGODB_URI: 'mongodb://localhost:27017/test_db',
+    },
+    encoding: 'utf8',
+    timeout: 5000,
+  });
+
+  assert.notEqual(res.status, 0, 'Script must exit non-zero when NODE_ENV is production');
+  const output = (res.stdout || '') + (res.stderr || '');
+  assert.match(output, /cannot be executed in production/);
+});
+
 test('Phase 2 - Static scan of apps/ source confirms NO hardcoded credentials or fallback secrets', () => {
-  const appsDir = path.resolve(__dirname, '../../..');
+  const targetDirs = [
+    path.resolve(__dirname, '..'), // apps/api/src
+    path.resolve(__dirname, '../../../web/server'),
+    path.resolve(__dirname, '../../../web/api'),
+    path.resolve(__dirname, '../../../web/src'),
+  ];
 
   function scanDir(dir) {
     const files = [];
@@ -98,7 +162,8 @@ test('Phase 2 - Static scan of apps/ source confirms NO hardcoded credentials or
       } else if (
         /\.(jsx?|tsx?|mjs|cjs)$/.test(entry.name) &&
         !/\.test\./.test(entry.name) &&
-        !/\.spec\./.test(entry.name)
+        !/\.spec\./.test(entry.name) &&
+        !/^test-/.test(entry.name)
       ) {
         files.push(fullPath);
       }
@@ -106,23 +171,40 @@ test('Phase 2 - Static scan of apps/ source confirms NO hardcoded credentials or
     return files;
   }
 
-  const scannedFiles = scanDir(appsDir);
+  const scannedFiles = targetDirs.flatMap((d) => (fs.existsSync(d) ? scanDir(d) : []));
   assert.ok(scannedFiles.length > 0, 'Must find production source files to scan');
 
   // Regex patterns that must NEVER match production code:
   // 1. mongodb:// or mongodb+srv:// with embedded credentials user:password@
   const embeddedCredentialsRegex = /mongodb(?:\+srv)?:\/\/[^/\s:@]+:[^/\s:@]+@/i;
   // 2. Known fallback patterns for secrets
-  const fallbackSecretRegex = /process\.env\.JWT_SECRET\s*\|\|\s*['"][^'"]+['"]/;
+  const fallbackSecretRegex = /process\.env\.(JWT_SECRET|JWT_ACCESS_SECRET|JWT_REFRESH_SECRET)\s*\|\|\s*['"][^'"]+['"]/;
+  // 3. Fallback constant names
+  const defaultSecretConstantRegex = /\b(DEFAULT_ACCESS_SECRET|DEFAULT_REFRESH_SECRET)\b/;
+  // 4. Literal fallback assignment into process.env
+  const fallbackAssignmentRegex = /process\.env\.(JWT_ACCESS_SECRET|JWT_REFRESH_SECRET)\s*=\s*['"][^'"]+['"]/;
+  // 5. quickLogin with literal password argument
+  const quickLoginLiteralRegex = /quickLogin\s*\([^)]*['"][^'"]+['"]\s*,\s*['"][^'"]+['"]\s*\)/;
 
+  const appsDir = path.resolve(__dirname, '../../..');
   const violations = [];
   for (const file of scannedFiles) {
     const content = fs.readFileSync(file, 'utf8');
+    const rel = path.relative(appsDir, file);
     if (embeddedCredentialsRegex.test(content)) {
-      violations.push(`${path.relative(appsDir, file)} contains embedded database credentials`);
+      violations.push(`${rel} contains embedded database credentials`);
     }
     if (fallbackSecretRegex.test(content)) {
-      violations.push(`${path.relative(appsDir, file)} contains hardcoded JWT fallback`);
+      violations.push(`${rel} contains hardcoded JWT fallback`);
+    }
+    if (defaultSecretConstantRegex.test(content)) {
+      violations.push(`${rel} contains DEFAULT_ACCESS_SECRET or DEFAULT_REFRESH_SECRET constant`);
+    }
+    if (fallbackAssignmentRegex.test(content)) {
+      violations.push(`${rel} contains literal process.env fallback assignment`);
+    }
+    if (quickLoginLiteralRegex.test(content)) {
+      violations.push(`${rel} contains quickLogin call with literal password`);
     }
   }
 

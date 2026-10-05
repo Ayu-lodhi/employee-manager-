@@ -3,13 +3,6 @@ import mongoose from 'mongoose';
 
 const require = createRequire(import.meta.url);
 
-if (!process.env.JWT_ACCESS_SECRET) {
-  process.env.JWT_ACCESS_SECRET = 'tbi_super_secret_key_change_in_production_min_32_chars';
-}
-if (!process.env.JWT_REFRESH_SECRET) {
-  process.env.JWT_REFRESH_SECRET = 'tbi_refresh_secret_change_in_production_min_32_chars';
-}
-
 let app = null;
 let initError = null;
 
@@ -30,7 +23,7 @@ if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
-const REQUIRED_ENV_VARS = ['MONGODB_URI'];
+const REQUIRED_ENV_VARS = ['MONGODB_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
 
 function getMissingEnvVars() {
   return REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
@@ -127,6 +120,16 @@ export default async function handler(req, res) {
       message: 'Service is temporarily unavailable. Server failed to initialize.',
       error: initError.message,
       missingEnvVars: missingEnvs,
+    });
+  }
+
+  // 2b. Missing required environment variables
+  const missingEnvs = getMissingEnvVars();
+  if (missingEnvs.length > 0) {
+    console.error('[Serverless Request Error]: Missing required environment variables:', missingEnvs.join(', '));
+    return res.status(503).json({
+      success: false,
+      message: 'Service is temporarily unavailable due to server configuration error.',
     });
   }
 
