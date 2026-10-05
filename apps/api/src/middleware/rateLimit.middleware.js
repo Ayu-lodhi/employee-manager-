@@ -222,3 +222,63 @@ exports.bulkImportLimiter = async (req, res, next) => {
   return inMemoryBulkImportLimiter(req, res, next, identifier);
 };
 
+const ATTENDANCE_GENERATE_WINDOW_MS = 60 * 1000;
+const ATTENDANCE_GENERATE_MAX_REQUESTS = 10;
+const ATTENDANCE_SCAN_WINDOW_MS = 60 * 1000;
+const ATTENDANCE_SCAN_MAX_REQUESTS = 30;
+
+const inMemoryAttendanceGenRequests = new Map();
+const inMemoryAttendanceScanRequests = new Map();
+
+exports.attendanceGenerateLimiter = (req, res, next) => {
+  const identifier = (req.user?.sub || req.user?._id || req.user?.id || getClientIdentifier(req) || 'unknown').toString();
+  const now = Date.now();
+  const record = inMemoryAttendanceGenRequests.get(identifier) || { count: 0, resetTime: now + ATTENDANCE_GENERATE_WINDOW_MS };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + ATTENDANCE_GENERATE_WINDOW_MS;
+  } else {
+    record.count++;
+  }
+
+  inMemoryAttendanceGenRequests.set(identifier, record);
+
+  if (record.count > ATTENDANCE_GENERATE_MAX_REQUESTS) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many session generation requests, please try again later.',
+    });
+  }
+
+  next();
+};
+
+exports.attendanceScanLimiter = (req, res, next) => {
+  // Key by authenticated user ID so a whole class of students scanning from one campus Wi-Fi IP is not throttled together
+  const identifier = (req.user?.sub || req.user?._id || req.user?.id || getClientIdentifier(req) || 'unknown').toString();
+  const now = Date.now();
+  const record = inMemoryAttendanceScanRequests.get(identifier) || { count: 0, resetTime: now + ATTENDANCE_SCAN_WINDOW_MS };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + ATTENDANCE_SCAN_WINDOW_MS;
+  } else {
+    record.count++;
+  }
+
+  inMemoryAttendanceScanRequests.set(identifier, record);
+
+  if (record.count > ATTENDANCE_SCAN_MAX_REQUESTS) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many attendance submissions, please try again later.',
+    });
+  }
+
+  next();
+};
+
+exports._inMemoryAttendanceGenRequests = inMemoryAttendanceGenRequests;
+exports._inMemoryAttendanceScanRequests = inMemoryAttendanceScanRequests;
+

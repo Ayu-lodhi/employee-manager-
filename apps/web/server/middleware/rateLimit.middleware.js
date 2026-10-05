@@ -86,4 +86,58 @@ exports.bulkImportLimiter = (req, res, next) => {
   next();
 };
 
+const attendanceGenRequests = new Map();
+exports.attendanceGenerateLimiter = (req, res, next) => {
+  const key = (req.user?.sub || req.user?._id || req.user?.id || req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').toString();
+  const now = Date.now();
+  const record = attendanceGenRequests.get(key) || { count: 0, resetTime: now + 60 * 1000 };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + 60 * 1000;
+  } else {
+    record.count++;
+  }
+
+  attendanceGenRequests.set(key, record);
+
+  if (record.count > 10) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many session generation requests, please try again later.',
+    });
+  }
+
+  next();
+};
+
+const attendanceScanRequests = new Map();
+exports.attendanceScanLimiter = (req, res, next) => {
+  // Key by authenticated userId so multiple students on the same campus Wi-Fi / NAT IP are not throttled together
+  const key = (req.user?.sub || req.user?._id || req.user?.id || req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').toString();
+  const now = Date.now();
+  const record = attendanceScanRequests.get(key) || { count: 0, resetTime: now + 60 * 1000 };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + 60 * 1000;
+  } else {
+    record.count++;
+  }
+
+  attendanceScanRequests.set(key, record);
+
+  if (record.count > 30) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many attendance submissions, please try again later.',
+    });
+  }
+
+  next();
+};
+
+exports._inMemoryAttendanceGenRequests = attendanceGenRequests;
+exports._inMemoryAttendanceScanRequests = attendanceScanRequests;
+
 

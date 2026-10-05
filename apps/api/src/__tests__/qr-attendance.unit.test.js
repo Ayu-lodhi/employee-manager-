@@ -8,6 +8,9 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_ACCESS_SECRET = 'unit_test_access_secret_32_characters_long';
 process.env.JWT_REFRESH_SECRET = 'unit_test_refresh_secret_32_characters_long';
 process.env.MONGODB_URI = 'mongodb://localhost:27017/test_db';
+process.env.REDIS_CACHE_URL = 'redis://localhost:6379/0';
+process.env.REDIS_PUBSUB_URL = 'redis://localhost:6379/1';
+process.env.REDIS_QUEUE_URL = 'redis://localhost:6379/2';
 
 // Require models FIRST before any connection readyState mocking
 const AttendanceLink = require('../modules/attendance/attendanceLink.model');
@@ -648,6 +651,49 @@ test('VULNERABILITY AUDIT: Dedicated rate limiter must be mounted on attendance 
     markStackCount >= 2,
     'SECURITY FLAW DETECTED: /link/:token/mark has no dedicated rate limiter mounted!'
   );
+});
+
+// FIX 5 TEST: Rate limit returns 429 after exceeding limit
+test('FIX 5: Rate limiter returns 429 after exceeding request threshold', () => {
+  const { attendanceGenerateLimiter, attendanceScanLimiter } = require('../middleware/rateLimit.middleware');
+  const dummyUser = { sub: 'rate-limit-test-user-' + Date.now() };
+
+  // 1. Generate limiter: 10 requests allowed, 11th blocked
+  let blocked = false;
+  for (let i = 0; i < 11; i++) {
+    const req = { user: dummyUser, headers: {} };
+    const res = {
+      statusCode: 200,
+      status(c) { this.statusCode = c; return this; },
+      json(d) { this.body = d; return this; },
+    };
+    attendanceGenerateLimiter(req, res, () => {});
+    if (res.statusCode === 429) {
+      blocked = true;
+      assert.equal(i, 10, '11th request must be blocked');
+      assert.match(res.body.message, /Too many session generation requests/);
+    }
+  }
+  assert.equal(blocked, true, 'attendanceGenerateLimiter must return 429 on 11th attempt');
+
+  // 2. Scan limiter: 30 requests allowed, 31st blocked
+  let scanBlocked = false;
+  const scanUser = { sub: 'rate-limit-scan-user-' + Date.now() };
+  for (let i = 0; i < 31; i++) {
+    const req = { user: scanUser, headers: {} };
+    const res = {
+      statusCode: 200,
+      status(c) { this.statusCode = c; return this; },
+      json(d) { this.body = d; return this; },
+    };
+    attendanceScanLimiter(req, res, () => {});
+    if (res.statusCode === 429) {
+      scanBlocked = true;
+      assert.equal(i, 30, '31st request must be blocked');
+      assert.match(res.body.message, /Too many attendance submissions/);
+    }
+  }
+  assert.equal(scanBlocked, true, 'attendanceScanLimiter must return 429 on 31st attempt');
 });
 
 // BUG 5: Audit logging missing on attendance generation and lifecycle
