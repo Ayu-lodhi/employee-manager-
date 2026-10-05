@@ -696,6 +696,39 @@ test('FIX 5: Rate limiter returns 429 after exceeding request threshold', () => 
   assert.equal(scanBlocked, true, 'attendanceScanLimiter must return 429 on 31st attempt');
 });
 
+// FIX 6 TEST: Attendance controller masks unexpected 5xx and untyped errors
+test('FIX 6: Attendance controller masks unexpected 5xx and untyped errors with generic message', async () => {
+  const attendanceController = require('../modules/attendance/attendance.controller');
+  const attendanceLinkService = require('../modules/attendance/attendanceLink.service');
+
+  const origGenerateLink = attendanceLinkService.generateLink;
+  try {
+    // Simulate an unexpected internal database error (no statusCode or 500)
+    attendanceLinkService.generateLink = async () => {
+      const err = new Error('MongoNetworkError: failed to connect to server [10.0.0.5:27017] with password secret123');
+      throw err;
+    };
+
+    const mockRes = {
+      statusCode: 200,
+      status(code) { this.statusCode = code; return this; },
+      json(data) { this.body = data; return this; },
+    };
+
+    await attendanceController.generateLink(
+      { body: { minutes: 15 }, user: { sub: '507f1f77bcf86cd799439001' } },
+      mockRes
+    );
+
+    assert.equal(mockRes.statusCode, 500, 'Unexpected error must return 500');
+    assert.equal(mockRes.body.success, false);
+    assert.equal(mockRes.body.message, 'An unexpected error occurred. Please try again shortly.');
+    assert.ok(!JSON.stringify(mockRes.body).includes('secret123'), 'Internal error details must not leak');
+  } finally {
+    attendanceLinkService.generateLink = origGenerateLink;
+  }
+});
+
 // BUG 5: Audit logging missing on attendance generation and lifecycle
 test('VULNERABILITY AUDIT: Audit log entry must be created when an attendance session is generated', async () => {
   const store = createInMemoryStore();

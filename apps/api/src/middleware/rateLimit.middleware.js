@@ -2,7 +2,12 @@
 // Distributed Redis Rate Limiter with In-Memory Fallback
 // ====================================================================
 
-const { redisCache } = require('../core/config/redis-cache.client');
+let redisCache = null;
+try {
+  redisCache = require('../core/config/redis-cache.client').redisCache;
+} catch (err) {
+  // In environments where REDIS_CACHE_URL is not configured (or test suites), fallback to in-memory limiters
+}
 const { logger } = require('../core/utils/logger');
 
 // --- In-Memory Fallback State ---

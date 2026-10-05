@@ -40,32 +40,52 @@ class AttendanceService {
       shiftLabel,
     } = data;
 
-    if (!studentId || !teamId) throw new Error('studentId and teamId are required');
+    if (!studentId || !teamId) {
+      const err = new Error('studentId and teamId are required');
+      err.statusCode = 400;
+      throw err;
+    }
     if (!['present', 'late', 'absent', 'on_leave', 'half_day'].includes(status)) {
-      throw new Error('Invalid status');
+      const err = new Error('Invalid status');
+      err.statusCode = 400;
+      throw err;
     }
 
     const targetDate = date || today();
 
     // Verify team + marker is lead or admin
     const team = await Team.findById(teamId);
-    if (!team) throw new Error('Team not found');
+    if (!team) {
+      const err = new Error('Team not found');
+      err.statusCode = 404;
+      throw err;
+    }
 
     const isLead = team.leadId && team.leadId.toString() === marker.sub;
     const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(marker.role);
     if (!isLead && !isAdmin) {
-      throw new Error('Only the team lead or admin can mark attendance');
+      const err = new Error('Only the team lead or admin can mark attendance');
+      err.statusCode = 403;
+      throw err;
     }
 
     const student = await User.findById(studentId).select('name email');
-    if (!student) throw new Error('Student not found');
+    if (!student) {
+      const err = new Error('Student not found');
+      err.statusCode = 404;
+      throw err;
+    }
 
     // All markers, including admins, may only mark members or the team lead.
     const targetId = student._id.toString();
     const isMember =
       team.members.some((m) => m.toString() === targetId) ||
       (team.leadId && team.leadId.toString() === targetId);
-    if (!isMember) throw new Error('Student is not a member of this team');
+    if (!isMember) {
+      const err = new Error('Student is not a member of this team');
+      err.statusCode = 400;
+      throw err;
+    }
 
     // Upsert — one record per student per team per day
     let record;
@@ -117,16 +137,28 @@ class AttendanceService {
   // T1/T2 self check-in
   async selfCheckIn(user, data) {
     const { teamId } = data;
-    if (!teamId) throw new Error('teamId is required');
+    if (!teamId) {
+      const err = new Error('teamId is required');
+      err.statusCode = 400;
+      throw err;
+    }
 
     const team = await Team.findById(teamId);
-    if (!team) throw new Error('Team not found');
+    if (!team) {
+      const err = new Error('Team not found');
+      err.statusCode = 404;
+      throw err;
+    }
 
     // Confirm user is a team member
     const isMember =
       team.members.some((m) => m.toString() === user.sub) ||
       (team.leadId && team.leadId.toString() === user.sub);
-    if (!isMember) throw new Error('You are not a member of this team');
+    if (!isMember) {
+      const err = new Error('You are not a member of this team');
+      err.statusCode = 403;
+      throw err;
+    }
 
     const targetDate = today();
 
@@ -138,7 +170,9 @@ class AttendanceService {
     });
 
     if (existing && existing.checkInTime) {
-      throw new Error('Already checked in today');
+      const err = new Error('Already checked in today');
+      err.statusCode = 409;
+      throw err;
     }
 
     const userDoc = await User.findById(user.sub).select('name email');
@@ -168,7 +202,11 @@ class AttendanceService {
   // T1/T2 self check-out
   async selfCheckOut(user, data) {
     const { teamId } = data;
-    if (!teamId) throw new Error('teamId is required');
+    if (!teamId) {
+      const err = new Error('teamId is required');
+      err.statusCode = 400;
+      throw err;
+    }
 
     const targetDate = today();
 
@@ -178,9 +216,21 @@ class AttendanceService {
       date: targetDate,
     });
 
-    if (!record) throw new Error('You have not checked in today');
-    if (!record.checkInTime) throw new Error('No check-in found');
-    if (record.checkOutTime) throw new Error('Already checked out');
+    if (!record) {
+      const err = new Error('You have not checked in today');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!record.checkInTime) {
+      const err = new Error('No check-in found');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (record.checkOutTime) {
+      const err = new Error('Already checked out');
+      err.statusCode = 409;
+      throw err;
+    }
 
     record.checkOutTime = new Date();
     record.durationMinutes = Math.round((record.checkOutTime - record.checkInTime) / 60000);
