@@ -93,7 +93,7 @@ const authenticateToken = async (token, allowPasswordChange = false) => {
     }
   }
 
-  return { ...decoded, id: decoded.sub, _id: decoded.sub, name: user.name, email: user.email, role: user.role };
+  return { ...decoded, id: decoded.sub, _id: decoded.sub, name: user.name, email: user.email, role: user.role, customGrants: user.customGrants };
 };
 exports.authenticateToken = authenticateToken;
 
@@ -194,5 +194,34 @@ exports.requireTeam = (teamName) => {
       success: false,
       message: `Access denied. ${teamName} team membership required.`,
     });
+  };
+};
+// Admin granular permission check (only checks if role is ADMIN)
+exports.requireAdminPermission = (requiredPermission) => {
+  return (req, res, next) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return next();
+    }
+    const { customGrants } = req.user;
+    let effectivePermissions;
+    if (customGrants && Array.isArray(customGrants)) {
+      effectivePermissions = customGrants;
+    } else {
+      let ROLE_DEFAULT_PERMISSIONS;
+      try {
+        ROLE_DEFAULT_PERMISSIONS = require('../../../../../packages/shared-constants/permissions.js').ROLE_DEFAULT_PERMISSIONS;
+      } catch (err) {
+        // Fallback for different build structures if needed
+        ROLE_DEFAULT_PERMISSIONS = { ADMIN: [] };
+      }
+      effectivePermissions = ROLE_DEFAULT_PERMISSIONS['ADMIN'] || [];
+    }
+    if (!effectivePermissions.includes(requiredPermission)) {
+      return res.status(403).json({
+        success: false,
+        message: `Access denied. Missing permission: ${requiredPermission}`
+      });
+    }
+    next();
   };
 };

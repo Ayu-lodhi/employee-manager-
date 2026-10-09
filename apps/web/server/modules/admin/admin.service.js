@@ -19,8 +19,8 @@ exports.getAllUsers = async () => {
 };
 
 exports.createUser = async (data, callerRole = null) => {
-  if (data.role === 'SUPER_ADMIN' && callerRole && callerRole !== 'SUPER_ADMIN') {
-    const err = new Error('Only Super Admins can create Super Admin accounts');
+  if ((data.role === 'SUPER_ADMIN' || data.role === 'ADMIN') && callerRole && callerRole !== 'SUPER_ADMIN') {
+    const err = new Error('Only Super Admins can create Super Admin or Admin accounts');
     err.statusCode = 403;
     err.status = 403;
     throw err;
@@ -365,4 +365,54 @@ exports.resetUserSession = async (id) => {
   ).select('-password');
   if (!user) throw new Error('User not found');
   return user.toObject({ virtuals: false });
+};
+// PERMISSIONS (ACCESS_GRANT overrides) UPDATE — with audit log & immediate permission cache invalidation
+exports.updateUserPermissions = async (targetUserId, customGrants, adminUser, ipAddress = null) => {
+  const user = await User.findById(targetUserId);
+  if (!user) throw new Error('User not found');
+
+  if (user.role === 'SUPER_ADMIN') throw new Error('Cannot change permissions of a Super Admin');
+  if (user.role !== 'ADMIN') throw new Error('Permissions can only be managed for ADMIN accounts');
+
+  let ROLE_DEFAULT_PERMISSIONS;
+  try {
+    ROLE_DEFAULT_PERMISSIONS = require('../../../../../packages/shared-constants/permissions.js').ROLE_DEFAULT_PERMISSIONS;
+  } catch (err) {
+    ROLE_DEFAULT_PERMISSIONS = { ADMIN: [] };
+  }
+
+  const adminDefaults = ROLE_DEFAULT_PERMISSIONS['ADMIN'] || [];
+
+  let newGrants;
+  if (customGrants === null || customGrants === undefined) {
+    newGrants = undefined;
+  } else {
+    if (!Array.isArray(customGrants)) throw new Error('customGrants must be an array of permissions or null to reset');
+    for (const grant of customGrants) {
+      if (!adminDefaults.includes(grant)) {
+        throw new Error(`Invalid permission: ${grant}. Must be a subset of default Admin permissions.`);
+      }
+    }
+    newGrants = customGrants;
+  }
+
+  const oldGrants = user.customGrants;
+  user.customGrants = newGrants;
+  await user.save();
+
+  try {
+    const { recordPermissionAudit } = require('../../core/utils/auditLogger');
+    await recordPermissionAudit({
+      performedBy: adminUser.sub,
+      performedByName: adminUser.name || adminUser.email,
+      targetId: user._id,
+      targetType: 'User',
+      action: 'USER_PERMISSIONS_CHANGED',
+      oldValue: { customGrants: oldGrants },
+      newValue: { customGrants: newGrants },
+      ipAddress,
+    });
+  } catch (err) {}
+
+  return { userId: user._id, customGrants: newGrants };
 };

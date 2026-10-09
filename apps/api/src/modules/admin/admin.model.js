@@ -36,6 +36,9 @@ const userSchema = new mongoose.Schema({
   activeSessionId: { type: String, default: null },
   lastActivity: { type: Date, default: null },
 
+  // Admin explicit permission overrides
+  customGrants: { type: [String], default: undefined },
+
   // Profile fields
   skills: { type: String, default: '' },
   availability: { type: String, default: '' },
@@ -78,4 +81,4 @@ userSchema.pre('save', function (next) {
   next();
 });
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);

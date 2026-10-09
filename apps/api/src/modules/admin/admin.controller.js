@@ -11,10 +11,10 @@ exports.getUsers = async (req, res) => {
 
 exports.addUser = async (req, res) => {
   try {
-    if (req.body.role === 'SUPER_ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
+    if ((req.body.role === 'SUPER_ADMIN' || req.body.role === 'ADMIN') && req.user?.role !== 'SUPER_ADMIN') {
       return res.status(403).json({
         success: false,
-        message: 'Only Super Admins can create Super Admin accounts',
+        message: 'Only Super Admins can create Super Admin or Admin accounts',
       });
     }
     const { user } = await adminService.createUser(req.body, req.user?.role);
@@ -37,10 +37,10 @@ exports.addUser = async (req, res) => {
 exports.bulkImportUsers = async (req, res) => {
   try {
     const rows = req.body?.rows || [];
-    if (req.user?.role !== 'SUPER_ADMIN' && rows.some((r) => r.role === 'SUPER_ADMIN')) {
+    if (req.user?.role !== 'SUPER_ADMIN' && rows.some((r) => r.role === 'SUPER_ADMIN' || r.role === 'ADMIN')) {
       return res.status(403).json({
         success: false,
-        message: 'Only Super Admins can create Super Admin accounts',
+        message: 'Only Super Admins can create Super Admin or Admin accounts',
       });
     }
 
