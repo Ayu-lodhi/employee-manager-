@@ -2,22 +2,22 @@
 // pages.jsx — All Page Components for TBI Management System
 // ====================================================================
 
-import React, { useState, createContext, useContext, useEffect, useRef, useCallback } from 'react';
+import React, { useState, createContext, useContext, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Navigate, NavLink, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ScrollText, Monitor, Settings, Shield, FileText,
   User as UserIcon, LogOut, Calendar, TrendingUp, UserPlus, Upload,
   UsersRound, Clock, Award, CheckCircle, MessageSquare, Star, Bell,
-  Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, Crown, AlertTriangle,
+  Search, Mail, Lock, Plus, X, QrCode, ChevronLeft, AlertTriangle,
   Eye, EyeOff, Key,
   Info, Trash2, Construction, MapPin, Timer, BarChart3, ExternalLink, ChevronRight,
-  FileCheck, Download, Check, AlertCircle, Copy, RefreshCw, Radio, CheckCircle2, XCircle, Send,
+  FileCheck, Download, Check, AlertCircle, Copy, RefreshCw, CheckCircle2, XCircle, Send,
   Menu
 } from 'lucide-react';
 import api from './lib/api';
 import { io } from 'socket.io-client';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, LineChart, Line,
+  PieChart, Pie, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   AreaChart, Area,
 } from 'recharts';
@@ -135,7 +135,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = (u, t) => {
+  const login = useCallback((u, t) => {
     setUser(u);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('tbi_user', JSON.stringify(u));
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('tbi_user');
       localStorage.removeItem('tbi_token');
     }
-  };
+  }, []);
 
   const logout = useCallback(async () => {
     try {
@@ -168,7 +168,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const updateUser = (updatedFields) => {
+  const updateUser = useCallback((updatedFields) => {
     setUser((prev) => {
       const next = { ...prev, ...updatedFields };
       if (typeof window !== 'undefined') {
@@ -176,10 +176,10 @@ export const AuthProvider = ({ children }) => {
       }
       return next;
     });
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, initializing, updateUser }}>
+    <AuthContext.Provider value={useMemo(() => ({ user, login, logout, initializing, updateUser }), [user, login, logout, initializing, updateUser])}>
       {children}
       {user && <IdleTimeoutWatcher logout={logout} />}
     </AuthContext.Provider>
@@ -515,7 +515,7 @@ export const Login = () => {
       script.defer = true;
       window.onRecaptchaLoad = renderWidget;
       document.head.appendChild(script);
-    } else if (window.grecaptcha && window.grecaptcha.render) {
+    } else if (window.grecaptcha?.render) {
       renderWidget();
     } else {
       window.onRecaptchaLoad = renderWidget;
@@ -702,7 +702,7 @@ export const Login = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Username / Email"
                     required
-                    autoFocus
+
                     className="flex-1 min-w-0 bg-transparent font-['Space_Mono',monospace] text-xs sm:text-sm text-[#1A1A1A] placeholder-[#8A8A8A] outline-none py-2 sm:py-2.5 px-2.5 font-medium"
                   />
                   <div className="pr-3 shrink-0">
@@ -792,7 +792,7 @@ export const Login = () => {
                   onSelect={(e, p) => {
                     setEmail(e || '');
                     setPassword(p || '');
-                    performLogin(e || '', p || '');
+                    void performLogin(e || '', p || '');
                   }}
                 />
               )}
@@ -853,14 +853,14 @@ export const Sidebar = () => {
           const appRes = await api.get('/applications');
           const apps = appRes.data?.data || [];
           pendingAppsCount = apps.filter((a) => a.status === 'pending').length;
-        } catch (_) {}
+        } catch { /* ignore badge fetch error */ }
       }
 
       setBadges({
         // For managers, pending applications waiting for review is paramount, plus unread updates
-        applications: ['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role)
-          ? (pendingAppsCount > 0 ? pendingAppsCount : unreadApp)
-          : unreadApp,
+        applications: (['T3_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN'].includes(user.role) && pendingAppsCount > 0) ? pendingAppsCount : unreadApp,
+
+
         chat: unreadChat,
         announcements: unreadAnn,
       });
@@ -870,7 +870,7 @@ export const Sidebar = () => {
   };
 
   useEffect(() => {
-    fetchBadges();
+    void fetchBadges();
     const interval = setInterval(fetchBadges, 30000);
     const handleCustomRefresh = () => fetchBadges();
     window.addEventListener('app:badge-refresh', handleCustomRefresh);
@@ -886,7 +886,7 @@ export const Sidebar = () => {
       api.patch('/notifications/read-type/chat').catch(() => {});
       setBadges((prev) => ({ ...prev, chat: 0 }));
     }
-    fetchBadges();
+    void fetchBadges();
   }, [location.pathname]);
 
   // Real-time socket events
@@ -924,7 +924,7 @@ export const Sidebar = () => {
   }, [socket, location.pathname]);
 
   const getItemBadge = (item) => {
-    if (item.to && item.to.includes('applications')) {
+    if (item.to?.includes('applications')) {
       return badges.applications;
     }
     if (item.to === '/chat') {
@@ -1105,7 +1105,7 @@ export const Topbar = () => {
         // silent
       }
     };
-    fetchCount();
+    void fetchCount();
     const interval = setInterval(fetchCount, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -1203,7 +1203,7 @@ export const Layout = ({ children }) => {
   }, [location.pathname]);
 
   return (
-    <LayoutContext.Provider value={{ collapsed, setCollapsed, mobileOpen, setMobileOpen }}>
+    <LayoutContext.Provider value={useMemo(() => ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }), [collapsed, mobileOpen])}>
       <div className="flex h-screen overflow-hidden bg-slate-50">
         {/* Mobile Backdrop Overlay */}
         {mobileOpen && (
@@ -1246,13 +1246,14 @@ export const Layout = ({ children }) => {
 // ====================================================================
 // SHARED
 // ====================================================================
-export const KPI = ({ label, value, change }) => (
+export const Kpi = ({ label, value, change }) => (
   <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-gray-200 hover:shadow-md transition-shadow min-w-0">
     <p className="text-xs sm:text-sm text-gray-500 truncate">{label}</p>
     <p className="text-xl sm:text-2xl md:text-3xl font-bold mt-1 sm:mt-2 truncate text-gray-900">{value}</p>
     {change && <p className="text-[10px] sm:text-xs text-green-500 mt-1">+{change}</p>}
   </div>
 );
+export const KPI = Kpi;
 
 // ====================================================================
 // ANNOUNCEMENT BANNER — Shows on dashboards when there are new announcements
@@ -1275,7 +1276,7 @@ export const AnnouncementBanner = () => {
         // Silent
       }
     };
-    fetchCount();
+    void fetchCount();
   }, []);
 
   if (count === 0) return null;
@@ -1350,7 +1351,7 @@ export const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const [statsRes, tiersRes, trendRes, attendRes] = await Promise.all([
           api.get('/stats/admin'),
@@ -1386,10 +1387,10 @@ export const AdminDashboard = () => {
   }
 
   const tierPieData = tiers ? [
-    { name: 'T1 Volunteers', value: tiers.T1 || 0, color: '#059669' },
-    { name: 'T2 Associates', value: tiers.T2 || 0, color: '#0284C7' },
-    { name: 'T3 Executives', value: tiers.T3 || 0, color: '#7C3AED' },
-    { name: 'Admins', value: (tiers.Admin || 0) + (tiers.SuperAdmin || 0), color: '#DC2626' },
+    { name: 'T1 Volunteers', value: tiers.T1 || 0, color: '#059669', fill: '#059669' },
+    { name: 'T2 Associates', value: tiers.T2 || 0, color: '#0284C7', fill: '#0284C7' },
+    { name: 'T3 Executives', value: tiers.T3 || 0, color: '#7C3AED', fill: '#7C3AED' },
+    { name: 'Admins', value: (tiers.Admin || 0) + (tiers.SuperAdmin || 0), color: '#DC2626', fill: '#DC2626' },
   ].filter((d) => d.value > 0) : [];
 
   return (
@@ -1401,10 +1402,10 @@ export const AdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="Total Users" value={stats?.totalUsers ?? 0} />
-        <KPI label="Active Events" value={stats?.activeEvents ?? 0} />
-        <KPI label="Approval Rate" value={`${stats?.approvalRate ?? 0}%`} />
-        <KPI label="Teams" value={stats?.totalTeams ?? 0} />
+        <Kpi label="Total Users" value={stats?.totalUsers ?? 0} />
+        <Kpi label="Active Events" value={stats?.activeEvents ?? 0} />
+        <Kpi label="Approval Rate" value={`${stats?.approvalRate ?? 0}%`} />
+        <Kpi label="Teams" value={stats?.totalTeams ?? 0} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1429,11 +1430,11 @@ export const AdminDashboard = () => {
                   dataKey="value"
                   label={({ name, value }) => `${name}: ${value}`}
                   labelLine={false}
-                >
-                  {tierPieData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
+                />
+
+
+
+
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
@@ -1469,9 +1470,9 @@ export const AdminDashboard = () => {
             <ResponsiveContainer width="100%" height={280}>
               <BarChart
                 data={[
-                  { status: 'Present', count: attendance.present },
-                  { status: 'Late', count: attendance.late },
-                  { status: 'Absent', count: attendance.absent },
+                  { status: 'Present', count: attendance.present, fill: '#10B981' },
+                  { status: 'Late', count: attendance.late, fill: '#F59E0B' },
+                  { status: 'Absent', count: attendance.absent, fill: '#EF4444' },
                 ]}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
               >
@@ -1479,11 +1480,11 @@ export const AdminDashboard = () => {
                 <XAxis dataKey="status" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
-                <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-                  <Cell fill="#10B981" />
-                  <Cell fill="#F59E0B" />
-                  <Cell fill="#EF4444" />
-                </Bar>
+                <Bar dataKey="count" radius={[8, 8, 0, 0]} />
+
+
+
+
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -1524,7 +1525,7 @@ export const SuperAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const [statsRes, tiersRes, trendRes] = await Promise.all([
           api.get('/stats/super-admin'),
@@ -1554,10 +1555,10 @@ export const SuperAdminDashboard = () => {
   }
 
   const tierPieData = tiers ? [
-    { name: 'T1', value: tiers.T1 || 0, color: '#059669' },
-    { name: 'T2', value: tiers.T2 || 0, color: '#0284C7' },
-    { name: 'T3', value: tiers.T3 || 0, color: '#7C3AED' },
-    { name: 'Admin', value: (tiers.Admin || 0) + (tiers.SuperAdmin || 0), color: '#DC2626' },
+    { name: 'T1', value: tiers.T1 || 0, color: '#059669', fill: '#059669' },
+    { name: 'T2', value: tiers.T2 || 0, color: '#0284C7', fill: '#0284C7' },
+    { name: 'T3', value: tiers.T3 || 0, color: '#7C3AED', fill: '#7C3AED' },
+    { name: 'Admin', value: (tiers.Admin || 0) + (tiers.SuperAdmin || 0), color: '#DC2626', fill: '#DC2626' },
   ].filter((d) => d.value > 0) : [];
 
   return (
@@ -1569,10 +1570,10 @@ export const SuperAdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="Admins" value={stats?.admins ?? 0} />
-        <KPI label="Total Users" value={stats?.totalUsers ?? 0} />
-        <KPI label="Active Events" value={stats?.activeEvents ?? 0} />
-        <KPI label="Check-ins Today" value={stats?.sessionsToday ?? 0} />
+        <Kpi label="Admins" value={stats?.admins ?? 0} />
+        <Kpi label="Total Users" value={stats?.totalUsers ?? 0} />
+        <Kpi label="Active Events" value={stats?.activeEvents ?? 0} />
+        <Kpi label="Check-ins Today" value={stats?.sessionsToday ?? 0} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1583,11 +1584,11 @@ export const SuperAdminDashboard = () => {
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={tierPieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value">
-                  {tierPieData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
+                <Pie data={tierPieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" />
+
+
+
+
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: '12px' }} iconType="circle" />
               </PieChart>
@@ -1619,7 +1620,7 @@ export const T1Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const res = await api.get('/stats/t1');
         setStats(res.data.data);
@@ -1634,7 +1635,7 @@ export const T1Dashboard = () => {
   const [myAttendance, setMyAttendance] = useState(null);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const res = await api.get('/attendance/my-stats?days=30');
         setMyAttendance(res.data.data);
@@ -1654,6 +1655,12 @@ export const T1Dashboard = () => {
   }
 
   const safeStats = stats || {};
+  let todayStatusMessage = 'You have not checked in yet today.';
+  if (safeStats.todayCheckedIn) {
+    todayStatusMessage = safeStats.todayCheckedOut
+      ? 'Your shift is complete for today.'
+      : 'You are checked in. Remember to check out.';
+  }
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -1661,11 +1668,11 @@ export const T1Dashboard = () => {
       <div>
         <h1 className="text-2xl font-bold">Hi {user.name.split(' ')[0]}</h1>
         <p className="text-gray-500">
-          {safeStats.todayCheckedIn
-            ? safeStats.todayCheckedOut
-              ? 'Your shift is complete for today.'
-              : 'You are checked in. Remember to check out.'
-            : 'You have not checked in yet today.'}
+          {todayStatusMessage}
+
+
+
+
         </p>
       </div>
 
@@ -1742,15 +1749,15 @@ export const T1Dashboard = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <KPI label="Applications" value={stats.myApplications} />
-        <KPI label="Approved" value={stats.approved} />
-        <KPI label="Certificates" value={stats.certificates} />
+        <Kpi label="Applications" value={stats.myApplications} />
+        <Kpi label="Approved" value={stats.approved} />
+        <Kpi label="Certificates" value={stats.certificates} />
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <KPI label="Pending" value={stats.pending} />
-        <KPI label="Days Attended" value={stats.attendanceDays} />
-        <KPI label="My Teams" value={stats.myTeams} />
+        <Kpi label="Pending" value={stats.pending} />
+        <Kpi label="Days Attended" value={stats.attendanceDays} />
+        <Kpi label="My Teams" value={stats.myTeams} />
       </div>
     </div>
   );
@@ -1759,6 +1766,25 @@ export const T1Dashboard = () => {
 // ====================================================================
 // USER MANAGEMENT — Connected to real backend
 // ====================================================================
+const ENFORCED_ADMIN_PERMISSIONS = [
+  { key: 'users:read', label: 'View Users (users:read)', desc: 'Access user directory and search' },
+  { key: 'users:create', label: 'Create Users (users:create)', desc: 'Add new users manually' },
+  { key: 'users:bulk_import', label: 'Bulk Import Users (users:bulk_import)', desc: 'Import users via CSV/spreadsheet' },
+  { key: 'users:assign_role', label: 'Assign Roles & Tiers (users:assign_role)', desc: 'Update user profiles, roles, and progression tiers' },
+  { key: 'users:deactivate', label: 'Reset User Sessions (users:deactivate)', desc: 'Force-terminate active user sessions' },
+];
+
+const ALL_ADMIN_DEFAULT_PERMISSIONS = [
+  'users:read', 'users:create', 'users:bulk_import', 'users:deactivate', 'users:reset_password',
+  'users:assign_role', 'users:grant_permission',
+  'events:read', 'events:create', 'events:update', 'events:close', 'shifts:manage',
+  'applications:read_all', 'applications:review',
+  'attendance:generate_qr', 'attendance:mark_manual', 'attendance:read',
+  'chat:read', 'chat:write', 'chat:moderate',
+  'certificates:generate',
+  'analytics:platform_read', 'analytics:team_read', 'audit_logs:read'
+];
+
 export const UserManagement = () => {
   const { user: currentUser } = useAuth();
   const canManageAccess = currentUser.role === 'SUPER_ADMIN';
@@ -1788,6 +1814,10 @@ export const UserManagement = () => {
   const [changingEmail, setChangingEmail] = useState(false);
   const [changeEmailError, setChangeEmailError] = useState('');
   const [changeEmailSuccess, setChangeEmailSuccess] = useState('');
+  const [permissionsModal, setPermissionsModal] = useState(null);
+  const [selectedGrants, setSelectedGrants] = useState([]);
+  const [savingPermissions, setSavingPermissions] = useState(false);
+  const [permissionsError, setPermissionsError] = useState('');
 
   // Fetch users
   const fetchUsers = async () => {
@@ -1802,7 +1832,7 @@ export const UserManagement = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
+    void fetchUsers();
   }, []);
 
   // Add user
@@ -1850,7 +1880,7 @@ export const UserManagement = () => {
       setSetPasswordError('Password must be at least 8 characters');
       return;
     }
-    if (!/[A-Z]/.test(targetNewPassword) || !/[a-z]/.test(targetNewPassword) || !/[0-9]/.test(targetNewPassword) || !/[^A-Za-z0-9]/.test(targetNewPassword)) {
+    if (!/[A-Z]/.test(targetNewPassword) || !/[a-z]/.test(targetNewPassword) || !/\d/.test(targetNewPassword) || !/[^A-Za-z0-9]/.test(targetNewPassword)) {
       setSetPasswordError('Password must contain uppercase, lowercase, number, and special character');
       return;
     }
@@ -1883,7 +1913,7 @@ export const UserManagement = () => {
     setChangeEmailError('');
     setChangeEmailSuccess('');
 
-    if (!targetNewEmail || !targetNewEmail.includes('@')) {
+    if (!targetNewEmail?.includes('@')) {
       setChangeEmailError('Please enter a valid email address');
       return;
     }
@@ -1960,6 +1990,57 @@ export const UserManagement = () => {
       alert(err.response?.data?.message || 'Failed to revoke');
     } finally {
       setRevoking(false);
+    }
+  };
+
+
+  const openPermissionsModal = (u) => {
+    setPermissionsModal(u);
+    setPermissionsError('');
+    if (u.customGrants === undefined || u.customGrants === null) {
+      setSelectedGrants(ENFORCED_ADMIN_PERMISSIONS.map((p) => p.key));
+    } else {
+      setSelectedGrants(ENFORCED_ADMIN_PERMISSIONS.map((p) => p.key).filter((k) => u.customGrants.includes(k)));
+    }
+  };
+
+  // Save custom permissions: sends all admin defaults minus unticked enforced permissions
+  const handleSavePermissions = async () => {
+    if (!permissionsModal) return;
+    setSavingPermissions(true);
+    setPermissionsError('');
+    try {
+      const otherDefaults = ALL_ADMIN_DEFAULT_PERMISSIONS.filter(
+        (p) => !ENFORCED_ADMIN_PERMISSIONS.some((e) => e.key === p)
+      );
+      const fullListToSend = [...otherDefaults, ...selectedGrants];
+      const res = await api.patch('/admin/users/' + permissionsModal._id + '/permissions', {
+        customGrants: fullListToSend,
+      });
+      setUsers(users.map((u) => u._id === permissionsModal._id ? { ...u, customGrants: res.data.data.customGrants } : u));
+      setPermissionsModal(null);
+    } catch (err) {
+      setPermissionsError(err.response?.data?.message || err.message || 'Failed to update permissions');
+    } finally {
+      setSavingPermissions(false);
+    }
+  };
+
+  const handleResetPermissions = async () => {
+    if (!permissionsModal) return;
+    if (!confirm('Reset this Admin to default permissions? This will remove all custom overrides.')) return;
+    setSavingPermissions(true);
+    setPermissionsError('');
+    try {
+      await api.patch('/admin/users/' + permissionsModal._id + '/permissions', {
+        customGrants: null,
+      });
+      setUsers(users.map((u) => u._id === permissionsModal._id ? { ...u, customGrants: undefined } : u));
+      setPermissionsModal(null);
+    } catch (err) {
+      setPermissionsError(err.response?.data?.message || err.message || 'Failed to reset permissions');
+    } finally {
+      setSavingPermissions(false);
     }
   };
 
@@ -2096,6 +2177,14 @@ export const UserManagement = () => {
                             >
                               Change Email
                             </button>
+                            {u.role === 'ADMIN' && (
+                              <button
+                                onClick={() => openPermissionsModal(u)}
+                                className="text-indigo-600 hover:underline text-xs font-medium"
+                              >
+                                Manage Permissions
+                              </button>
+                            )}
                           </>
                         )}
                         <button
@@ -2372,7 +2461,7 @@ export const UserManagement = () => {
                   <span className={targetNewPassword.length >= 8 ? 'text-green-600 font-medium' : ''}>• Min 8 chars</span>
                   <span className={/[A-Z]/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Uppercase</span>
                   <span className={/[a-z]/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Lowercase</span>
-                  <span className={/[0-9]/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Number (0-9)</span>
+                  <span className={/\d/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Number (0-9)</span>
                   <span className={/[^A-Za-z0-9]/.test(targetNewPassword) ? 'text-green-600 font-medium' : ''}>• Special char</span>
                   <span className={targetNewPassword && targetNewPassword === targetConfirmPassword ? 'text-green-600 font-medium' : ''}>• Passwords match</span>
                 </div>
@@ -2474,6 +2563,97 @@ export const UserManagement = () => {
           </div>
         </div>
       )}
+      {/* Manage Permissions Modal (Super Admin only) */}
+      {permissionsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setPermissionsModal(null)} />
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-xl p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Manage Admin Permissions</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Configure route privileges for {permissionsModal.name} ({permissionsModal.email})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPermissionsModal(null)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {permissionsError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-start gap-2">
+                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                <span>{permissionsError}</span>
+              </div>
+            )}
+
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+              <span className="font-semibold">Notice:</span> Only permissions enforced on real backend routes are listed below. Unchecking a permission will deny access (HTTP 403) to that specific route.
+            </div>
+
+            <div className="space-y-2 mb-6 max-h-64 overflow-y-auto pr-1">
+              {ENFORCED_ADMIN_PERMISSIONS.map((perm) => {
+                const isChecked = selectedGrants.includes(perm.key);
+                return (
+                  <label
+                    key={perm.key}
+                    className="flex items-start p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedGrants([...selectedGrants, perm.key]);
+                        } else {
+                          setSelectedGrants(selectedGrants.filter((k) => k !== perm.key));
+                        }
+                      }}
+                      className="mt-0.5 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <div className="ml-3">
+                      <div className="text-xs font-semibold text-gray-800">{perm.label}</div>
+                      <div className="text-[11px] text-gray-500">{perm.desc}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleResetPermissions}
+                disabled={savingPermissions || permissionsModal.customGrants === undefined}
+                className="px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+              >
+                Reset to Default
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPermissionsModal(null)}
+                  className="px-4 py-2 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePermissions}
+                  disabled={savingPermissions}
+                  className="px-4 py-2 text-xs font-medium bg-blue-500 hover:bg-blue-600 text-white rounded-lg disabled:opacity-50"
+                >
+                  {savingPermissions ? 'Saving...' : 'Save Permissions'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2491,7 +2671,8 @@ const isSafeActionUrl = (url) => {
     const isLocalhost = host === 'localhost' || host === '127.0.0.1';
     const isAllowed = isLocalhost || host.endsWith('.vercel.app') || (typeof window !== 'undefined' && host === window.location.hostname);
     return (parsed.protocol === 'https:' || (isLocalhost && parsed.protocol === 'http:')) && isAllowed;
-  } catch (_) {
+  } catch {
+    // URL parsing failed; consider untrusted
     return false;
   }
 };
@@ -2529,11 +2710,11 @@ export const Chat = () => {
         const teamsRes = await api.get(teamsEndpoint);
         teamsList = teamsRes.data?.data || teamsRes.data || [];
         if (!Array.isArray(teamsList)) teamsList = [];
-      } catch (err) {
+      } catch {
         try {
           const fallback = await api.get('/teams');
           teamsList = fallback.data?.data || fallback.data || [];
-        } catch (_) {}
+        } catch { /* ignore fallback teams endpoint error */ }
       }
       setTeams(teamsList);
 
@@ -2617,7 +2798,7 @@ export const Chat = () => {
 
   // Fetch rooms + users on mount
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const roomsRes = await api.get('/chat/rooms');
         setRooms(roomsRes.data.data);
@@ -2631,13 +2812,13 @@ export const Chat = () => {
       }
     })();
 
-    if (canCreateRoom) fetchEligibleUsers();
+    if (canCreateRoom) void fetchEligibleUsers();
   }, [canCreateRoom]);
 
   // Auto-refresh eligible users every time modal opens
   useEffect(() => {
     if ((createModal || addMemberModal) && canCreateRoom) {
-      fetchEligibleUsers();
+      void fetchEligibleUsers();
     }
   }, [createModal, addMemberModal]);
 
@@ -2661,7 +2842,7 @@ export const Chat = () => {
         const incoming = res.data?.data || [];
         setMessages((prev) => {
           if (silent && prev.length === incoming.length &&
-              prev[prev.length - 1]?._id === incoming[incoming.length - 1]?._id) {
+              prev.at(-1)?._id === incoming.at(-1)?._id) {
             return prev;
           }
           return incoming;
@@ -2673,11 +2854,11 @@ export const Chat = () => {
       }
     };
 
-    fetchRoomMessages(false);
+    void fetchRoomMessages(false);
 
     // Reliable 3.5s background polling fallback for serverless environments
     const pollInterval = setInterval(() => {
-      fetchRoomMessages(true);
+      void fetchRoomMessages(true);
     }, 3500);
 
     return () => {
@@ -2778,6 +2959,7 @@ export const Chat = () => {
         });
       }
     } catch (err) {
+      console.error('Send message error:', err);
       alert('Failed to send');
       setMessage(text);
     }
@@ -2887,10 +3069,10 @@ export const Chat = () => {
                 <Skeleton className="h-8 w-64" />
               ) : messages.length === 0 ? (
                 <p className="text-center text-gray-400 text-sm mt-8">No messages yet. Say hello</p>
-              ) : messages.map((m) => {
+              ) : messages.map((m, idx) => {
                 const own = (m.senderId?._id || m.senderId)?.toString() === (user._id || user.id || user.sub)?.toString();
                 return (
-                  <div key={m._id || Math.random()} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
+                  <div key={m._id || m.createdAt || idx} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-md flex flex-col ${own ? 'items-end' : 'items-start'}`}>
                       {!own && (
                         <p className="text-xs font-medium text-gray-600 mb-1 ml-1">{m.senderName}</p>
@@ -3389,8 +3571,8 @@ export const QRCheckIn = () => {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
-  useEffect(() => { loadTeamData(); }, [selectedTeamId]);
+  useEffect(() => { void loadData(); }, []);
+  useEffect(() => { void loadTeamData(); }, [selectedTeamId]);
 
   const handleCheckIn = async () => {
     if (!selectedTeamId) return alert('Select a team first');
@@ -3603,7 +3785,7 @@ export const EventsPage = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { void fetchData(); }, []);
 
   // Open apply modal → fetch teams for this event
   const openApplyModal = async (ev) => {
@@ -3614,6 +3796,7 @@ export const EventsPage = () => {
       setApplyForm({ teamId: eventTeams[0]?._id || '', role: 'Team Member', notes: '' });
       setApplyModal(ev);
     } catch (err) {
+      console.error('Failed to load teams:', err);
       alert('Failed to load teams');
     }
   };
@@ -3913,7 +4096,7 @@ export const RaiseApprovalModal = ({ isOpen, onClose, onSuccess, initialTeams = 
     setRequestType('leave');
     setTargetDate(new Date().toISOString().split('T')[0]);
 
-    (async () => {
+    void (async () => {
       try {
         const res = await api.get('/teams/my-teams');
         const list = res.data?.data || res.data || [];
@@ -4179,6 +4362,28 @@ export const DenyApprovalModal = ({ isOpen, onClose, onConfirm, app }) => {
   );
 };
 
+const renderApplicationTypeBadge = (type) => {
+  if (type === 'half_day') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+        <Clock className="w-3 h-3" /> Half Day
+      </span>
+    );
+  }
+  if (type === 'leave') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+        <Calendar className="w-3 h-3" /> Full Day Leave
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200">
+      <FileText className="w-3 h-3" /> Application
+    </span>
+  );
+};
+
 // ====================================================================
 // APPROVAL REQUESTS — T3 & Admin Management View
 // ====================================================================
@@ -4215,7 +4420,7 @@ export const ApplicationsPage = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, []);
 
   const updateStatus = async (id, status, rejectionReason = '') => {
@@ -4257,7 +4462,7 @@ export const ApplicationsPage = () => {
       link.download = filename || `attendance_sheet_${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to download attendance sheet');
@@ -4290,27 +4495,7 @@ export const ApplicationsPage = () => {
     return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Pending</span>;
   };
 
-  const typeBadge = (type) => {
-    if (type === 'half_day') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-          <Clock className="w-3 h-3" /> Half Day
-        </span>
-      );
-    }
-    if (type === 'leave') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-          <Calendar className="w-3 h-3" /> Full Day Leave
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200">
-        <FileText className="w-3 h-3" /> Application
-      </span>
-    );
-  };
+  const typeBadge = renderApplicationTypeBadge;
 
   if (loading) {
     return (
@@ -4545,7 +4730,7 @@ export const ApplicationsPage = () => {
         isOpen={showRaiseModal}
         onClose={() => setShowRaiseModal(false)}
         onSuccess={() => {
-          fetchData();
+          void fetchData();
           setActionSuccess('Your approval request has been submitted to your team lead!');
           setTimeout(() => setActionSuccess(''), 4500);
         }}
@@ -4567,7 +4752,7 @@ export const ApplicationsPage = () => {
 // ATTENDANCE — T3 view: Generate QR, mark manually, view stats
 // ====================================================================
 export const AttendancePage = () => {
-  const { user } = useAuth();
+
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('t3_link'); // 't3_link' or 'roster'
 
@@ -4591,7 +4776,7 @@ export const AttendancePage = () => {
   // --- T3 Today Attendance Panel State ---
   const [panelData, setPanelData] = useState(null);
   const [loadingPanel, setLoadingPanel] = useState(true);
-  const [panelError, setPanelError] = useState('');
+
 
   // --- Team Roster State ---
   const [teams, setTeams] = useState([]);
@@ -4600,8 +4785,8 @@ export const AttendancePage = () => {
   const [roster, setRoster] = useState([]);
   const [teamInfo, setTeamInfo] = useState(null);
   const [stats, setStats] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [loadingRoster, setLoadingRoster] = useState(true);
+
+
   const [saving, setSaving] = useState(false);
   const [manualModal, setManualModal] = useState(null);
   const [manualForm, setManualForm] = useState({ status: 'present', notes: '' });
@@ -4623,7 +4808,7 @@ export const AttendancePage = () => {
 
   // Poll panel data every 12 seconds
   useEffect(() => {
-    fetchPanelData();
+    void fetchPanelData();
     const interval = setInterval(fetchPanelData, 12000);
     return () => clearInterval(interval);
   }, []);
@@ -4658,7 +4843,7 @@ export const AttendancePage = () => {
       setGeneratedLink(res.data.data);
       setCopied(false);
       // Refresh panel in case stats changed
-      fetchPanelData();
+      void fetchPanelData();
     } catch (err) {
       setGenError(err.response?.data?.message || err.message || 'Failed to generate link');
     } finally {
@@ -4708,7 +4893,7 @@ export const AttendancePage = () => {
   // Copy link helper
   const handleCopyLink = () => {
     if (!generatedLink?.url) return;
-    navigator.clipboard.writeText(generatedLink.url);
+    void navigator.clipboard.writeText(generatedLink.url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -4723,7 +4908,7 @@ export const AttendancePage = () => {
 
   // Load T3's teams for roster view
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const res = await api.get('/teams/me');
         const list = res.data.data || [];
@@ -4741,15 +4926,15 @@ export const AttendancePage = () => {
   const loadTeamData = async () => {
     if (!selectedTeamId) return;
     try {
-      const [attRes, statsRes, histRes] = await Promise.all([
+      const [attRes, statsRes] = await Promise.all([
         api.get(`/attendance/team?teamId=${selectedTeamId}&date=${selectedDate}`),
         api.get(`/attendance/team/stats?teamId=${selectedTeamId}&date=${selectedDate}`),
-        api.get(`/attendance/team/history?teamId=${selectedTeamId}&days=7`),
+
       ]);
       setRoster(attRes.data.data.roster || []);
       setTeamInfo(attRes.data.data.team || null);
       setStats(statsRes.data.data || null);
-      setHistory(histRes.data.data.history || []);
+
     } catch (err) {
       console.error(err);
     }
@@ -4757,7 +4942,7 @@ export const AttendancePage = () => {
 
   useEffect(() => {
     if (activeTab === 'roster') {
-      loadTeamData();
+      void loadTeamData();
     }
   }, [selectedTeamId, selectedDate, activeTab]);
 
@@ -4797,7 +4982,7 @@ export const AttendancePage = () => {
       link.download = filename;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to download');
@@ -4902,7 +5087,7 @@ export const AttendancePage = () => {
                         min="1"
                         max="120"
                         value={durationMinutes}
-                        onChange={(e) => setDurationMinutes(Math.max(1, Math.min(120, parseInt(e.target.value) || 1)))}
+                        onChange={(e) => setDurationMinutes(Math.max(1, Math.min(120, Number.parseInt(e.target.value, 10) || 1)))}
                         className="w-full h-11 px-3.5 rounded-xl border border-gray-300 outline-none focus:border-indigo-500 font-semibold text-slate-800"
                       />
                       <div className="flex gap-1">
@@ -6340,10 +6525,10 @@ export const AnalyticsPage = () => {
   }
 
   const tierPieData = [
-    { name: 'T1', value: tiers.T1, color: '#059669' },
-    { name: 'T2', value: tiers.T2, color: '#0284C7' },
-    { name: 'T3', value: tiers.T3, color: '#7C3AED' },
-    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#DC2626' },
+    { name: 'T1', value: tiers.T1, color: '#059669', fill: '#059669' },
+    { name: 'T2', value: tiers.T2, color: '#0284C7', fill: '#0284C7' },
+    { name: 'T3', value: tiers.T3, color: '#7C3AED', fill: '#7C3AED' },
+    { name: 'Admin', value: tiers.Admin + tiers.SuperAdmin, color: '#DC2626', fill: '#DC2626' },
   ].filter((d) => d.value > 0);
 
   return (
@@ -6354,10 +6539,10 @@ export const AnalyticsPage = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="Total Users" value={stats.totalUsers} />
-        <KPI label="Active Events" value={stats.activeEvents} />
-        <KPI label="Approval Rate" value={`${stats.approvalRate}%`} />
-        <KPI label="Today Attendance" value={attendance ? `${attendance.rate}%` : '—'} />
+        <Kpi label="Total Users" value={stats.totalUsers} />
+        <Kpi label="Active Events" value={stats.activeEvents} />
+        <Kpi label="Approval Rate" value={`${stats.approvalRate}%`} />
+        <Kpi label="Today Attendance" value={attendance ? `${attendance.rate}%` : '—'} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -6368,11 +6553,11 @@ export const AnalyticsPage = () => {
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={tierPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={3} dataKey="value">
-                  {tierPieData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
+                <Pie data={tierPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={3} dataKey="value" />
+
+
+
+
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: '12px' }} iconType="circle" />
               </PieChart>
@@ -6410,20 +6595,20 @@ export const AnalyticsPage = () => {
               <PieChart>
                 <Pie
                   data={[
-                    { name: 'Present', value: attendance.present },
-                    { name: 'Late', value: attendance.late },
-                    { name: 'Absent', value: attendance.absent },
+                    { name: 'Present', value: attendance.present, fill: '#10B981' },
+                    { name: 'Late', value: attendance.late, fill: '#F59E0B' },
+                    { name: 'Absent', value: attendance.absent, fill: '#EF4444' },
                   ]}
                   cx="50%"
                   cy="50%"
                   outerRadius={90}
                   dataKey="value"
                   label={({ name, value }) => `${name}: ${value}`}
-                >
-                  <Cell fill="#10B981" />
-                  <Cell fill="#F59E0B" />
-                  <Cell fill="#EF4444" />
-                </Pie>
+                />
+
+
+
+
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
@@ -6472,14 +6657,14 @@ export const BulkImportPage = () => {
 
   const parseCSV = (text) => {
     // Strip UTF-8 BOM if present; normalize line endings
-    const cleaned = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const cleaned = text.replace(/^\uFEFF/, '').replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     const lines = cleaned.trim().split('\n');
 
     const rawHeader = lines[0] || '';
     // Binary detection: header must start with a letter and contain no control characters
     const hasControlChar = (str) => {
       for (let c = 0; c < str.length; c++) {
-        const code = str.charCodeAt(c);
+        const code = str.codePointAt(c);
         if ((code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31)) return true;
       }
       return false;
@@ -6507,8 +6692,8 @@ export const BulkImportPage = () => {
     }
 
     // F: Formula injection — characters that spreadsheets interpret as formula starters
-    const FORMULA_STARTERS = ['=', '+', '-', '@', '\t'];
-    const hasFormulaInjection = (val) => val && FORMULA_STARTERS.includes(val.charAt(0));
+    const FORMULA_STARTERS = new Set(['=', '+', '-', '@', '\t']);
+    const hasFormulaInjection = (val) => Boolean(val && FORMULA_STARTERS.has(val.charAt(0)));
 
     const rows = [];
     const errs = [];
@@ -6527,11 +6712,11 @@ export const BulkImportPage = () => {
             if (ch === '"' && line[c + 1] === '"') { cur += '"'; c++; }
             else if (ch === '"') { inQ = false; }
             else { cur += ch; }
-          } else {
-            if (ch === '"') { inQ = true; }
+          } else if (ch === '"') { inQ = true; }
+
             else if (ch === ',') { fields.push(cur.trim()); cur = ''; }
             else { cur += ch; }
-          }
+
         }
         fields.push(cur.trim());
         return fields;
@@ -6588,13 +6773,13 @@ export const BulkImportPage = () => {
     }
     setFile(f);
     setDone(false);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const { rows, preview: previewRows, errs } = parseCSV(e.target.result);
+    f.text().then((text) => {
+
+      const { rows, preview: previewRows, errs } = parseCSV(text);
       setPreview(previewRows || rows);
       setErrors(errs);
-    };
-    reader.readAsText(f);
+    }).catch(console.error);
+
   };
 
   const handleDrop = (e) => {
@@ -6622,6 +6807,7 @@ export const BulkImportPage = () => {
       }));
 
       try {
+        // eslint-disable-next-line no-await-in-loop
         const res = await api.post('/admin/users/bulk', { rows: payloadRows });
         const results = res.data?.results || [];
         results.forEach((resRow, idx) => {
@@ -7320,7 +7506,7 @@ export const SessionsPage = () => {
 // MY APPROVAL REQUESTS — Employee Section (T1/T2/T3)
 // ====================================================================
 export const MyApplicationsPage = () => {
-  const { user } = useAuth();
+
   const { socket } = useSocket();
   const [apps, setApps] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -7362,12 +7548,12 @@ export const MyApplicationsPage = () => {
   }, [socket]);
 
   const filtered = apps.filter((a) => {
-    if (statusFilter !== 'all') {
-      if (statusFilter === 'rejected' && !(a.status === 'rejected' || a.status === 'denied')) return false;
-      if (statusFilter !== 'rejected' && a.status !== statusFilter) return false;
-    }
-    if (typeFilter !== 'all' && a.requestType !== typeFilter) return false;
-    return true;
+    const matchesStatus = statusFilter === 'all' || (statusFilter === 'rejected' ? (a.status === 'rejected' || a.status === 'denied') : a.status === statusFilter);
+    const matchesType = typeFilter === 'all' || a.requestType === typeFilter;
+    return matchesStatus && matchesType;
+
+
+
   });
 
   const total = apps.length;
@@ -7388,27 +7574,7 @@ export const MyApplicationsPage = () => {
     return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Pending Review</span>;
   };
 
-  const typeBadge = (type) => {
-    if (type === 'half_day') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-          <Clock className="w-3 h-3" /> Half Day
-        </span>
-      );
-    }
-    if (type === 'leave') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-          <Calendar className="w-3 h-3" /> Full Day Leave
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200">
-        <FileText className="w-3 h-3" /> Application
-      </span>
-    );
-  };
+  const typeBadge = renderApplicationTypeBadge;
 
   if (loading) {
     return (
@@ -7874,10 +8040,10 @@ export const T3DashboardEnhanced = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="My Events" value={stats?.myEvents ?? 0} />
-        <KPI label="As Head" value={stats?.eventsAsHead ?? 0} />
-        <KPI label="Pending Apps" value={stats?.pendingApps ?? 0} />
-        <KPI label="Present Today" value={stats?.attendanceToday ?? 0} />
+        <Kpi label="My Events" value={stats?.myEvents ?? 0} />
+        <Kpi label="As Head" value={stats?.eventsAsHead ?? 0} />
+        <Kpi label="Pending Apps" value={stats?.pendingApps ?? 0} />
+        <Kpi label="Present Today" value={stats?.attendanceToday ?? 0} />
       </div>
 
       {/* Team Attendance Percentages */}
@@ -8023,16 +8189,16 @@ export const T2DashboardEnhanced = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="My Applications" value={stats?.myApplications ?? 0} />
-        <KPI label="Approved" value={stats?.approved ?? 0} />
-        <KPI label="My Teams" value={stats?.myTeams ?? 0} />
-        <KPI label="Days Attended" value={stats?.attendanceDays ?? 0} />
+        <Kpi label="My Applications" value={stats?.myApplications ?? 0} />
+        <Kpi label="Approved" value={stats?.approved ?? 0} />
+        <Kpi label="My Teams" value={stats?.myTeams ?? 0} />
+        <Kpi label="Days Attended" value={stats?.attendanceDays ?? 0} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KPI label="Pending" value={stats?.pending ?? 0} />
-        <KPI label="Rejected" value={stats?.rejected ?? 0} />
-        <KPI label="Certificates" value={stats?.certificates ?? 0} />
+        <Kpi label="Pending" value={stats?.pending ?? 0} />
+        <Kpi label="Rejected" value={stats?.rejected ?? 0} />
+        <Kpi label="Certificates" value={stats?.certificates ?? 0} />
         <div></div>
       </div>
 
@@ -8301,10 +8467,10 @@ export const EventDetailPage = () => {
 
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPI label="Total Members" value={event.memberCount || event.members?.length || 0} />
-        <KPI label="Teams" value={event.teams || 0} />
-        <KPI label="Total Applicants" value={event.applicants || 0} />
-        <KPI label="Status" value={event.status} />
+        <Kpi label="Total Members" value={event.memberCount || event.members?.length || 0} />
+        <Kpi label="Teams" value={event.teams || 0} />
+        <Kpi label="Total Applicants" value={event.applicants || 0} />
+        <Kpi label="Status" value={event.status} />
       </div>
 
       {/* Description */}
@@ -8551,7 +8717,7 @@ export const ProfilePage = () => {
     setEmailError('');
     setEmailSuccess('');
 
-    if (!newEmail || !newEmail.includes('@')) {
+    if (!newEmail?.includes('@')) {
       setEmailError('Please enter a valid email address');
       return;
     }
@@ -8637,7 +8803,7 @@ export const ProfilePage = () => {
       setPwdError('Password must be at least 8 characters long');
       return;
     }
-    if (!/[A-Z]/.test(pwdForm.newPassword) || !/[a-z]/.test(pwdForm.newPassword) || !/[0-9]/.test(pwdForm.newPassword) || !/[^A-Za-z0-9]/.test(pwdForm.newPassword)) {
+    if (!/[A-Z]/.test(pwdForm.newPassword) || !/[a-z]/.test(pwdForm.newPassword) || !/\d/.test(pwdForm.newPassword) || !/[^A-Za-z0-9]/.test(pwdForm.newPassword)) {
       setPwdError('Password must contain an uppercase letter, lowercase letter, number, and special character');
       return;
     }
@@ -8852,7 +9018,7 @@ export const ProfilePage = () => {
               <span className={pwdForm.newPassword.length >= 8 ? 'text-green-600 font-medium' : ''}>• At least 8 characters</span>
               <span className={/[A-Z]/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Uppercase letter</span>
               <span className={/[a-z]/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Lowercase letter</span>
-              <span className={/[0-9]/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Number (0-9)</span>
+              <span className={/\d/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Number (0-9)</span>
               <span className={/[^A-Za-z0-9]/.test(pwdForm.newPassword) ? 'text-green-600 font-medium' : ''}>• Special character (!@#$%^&*)</span>
               <span className={pwdForm.newPassword && pwdForm.newPassword === pwdForm.confirmPassword ? 'text-green-600 font-medium' : ''}>• Passwords match</span>
             </div>
@@ -9021,7 +9187,7 @@ export const LandingPage = () => {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium mb-6">
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
-                Workforce Management Platform
+                <span>Workforce Management Platform</span>
               </div>
               <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
                 Manage events.<br />Lead teams.<br /><span className="text-blue-500">Track impact.</span>
@@ -9155,7 +9321,7 @@ export const LandingPage = () => {
 
 
 export const ChangePasswordPage = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -9167,7 +9333,7 @@ export const ChangePasswordPage = () => {
     length: newPassword.length >= 8,
     upper: /[A-Z]/.test(newPassword),
     lower: /[a-z]/.test(newPassword),
-    number: /[0-9]/.test(newPassword),
+    number: /\d/.test(newPassword),
     special: /[^A-Za-z0-9]/.test(newPassword),
     match: newPassword && newPassword === confirm,
   };
@@ -9279,7 +9445,7 @@ export const PreferencesPage = () => {
         if (!data.categories.announcement) data.categories.announcement = true;
         if (!data.categories.review) data.categories.review = true;
         setPrefs(data);
-        setOriginal(JSON.parse(JSON.stringify(data)));
+        setOriginal(structuredClone(data));
       } catch (err) {
         console.error(err);
       } finally {
@@ -9305,7 +9471,7 @@ export const PreferencesPage = () => {
     try {
       const res = await api.patch('/preferences/me', prefs);
       setPrefs(res.data.data);
-      setOriginal(JSON.parse(JSON.stringify(res.data.data)));
+      setOriginal(structuredClone(res.data.data));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -9326,7 +9492,7 @@ export const PreferencesPage = () => {
     );
   }
 
-  if (!prefs || !prefs.categories) {
+  if (!prefs?.categories) {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
@@ -9445,7 +9611,7 @@ export const PreferencesPage = () => {
           {saving ? 'Saving...' : 'Save Preferences'}
         </button>
         {hasChanges && (
-          <button onClick={() => setPrefs(JSON.parse(JSON.stringify(original)))} className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">
+          <button onClick={() => setPrefs(structuredClone(original))} className="px-6 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">
             Reset
           </button>
         )}
@@ -9482,8 +9648,8 @@ export const ToggleSwitch = ({ checked, onChange }) => (
 // ====================================================================
 export const AddUserPage = () => {
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
-  const canCreateAdmin = currentUser.role === 'SUPER_ADMIN';
+
+
 
   const [form, setForm] = useState({
     name: '',
@@ -10317,10 +10483,10 @@ export const TimesheetPage = () => {
         <>
           {myStats && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <KPI label="Total Hours (30d)" value={myStats.totalHours} />
-              <KPI label="Approved" value={myStats.approved} />
-              <KPI label="Pending" value={myStats.pending} />
-              <KPI label="Rejected" value={myStats.rejected} />
+              <Kpi label="Total Hours (30d)" value={myStats.totalHours} />
+              <Kpi label="Approved" value={myStats.approved} />
+              <Kpi label="Pending" value={myStats.pending} />
+              <Kpi label="Rejected" value={myStats.rejected} />
             </div>
           )}
 
@@ -10538,7 +10704,7 @@ export const ResetPasswordPage = () => {
     length: newPassword.length >= 8,
     upper: /[A-Z]/.test(newPassword),
     lower: /[a-z]/.test(newPassword),
-    number: /[0-9]/.test(newPassword),
+    number: /\d/.test(newPassword),
     special: /[^A-Za-z0-9]/.test(newPassword),
     match: newPassword && newPassword === confirmPassword,
   };
