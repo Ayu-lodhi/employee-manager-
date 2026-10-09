@@ -4,6 +4,17 @@
 
 ---
 
+### [2026-10-07] Super Admin Permissions Management
+- **What:**
+  1. `customGrants` array field added to `User` model to store explicit permission overrides for `ADMIN` role.
+  2. `requireAdminPermission` middleware added to read `customGrants` dynamically from database without relying on caching.
+  3. Replaced existing `restrictTo('ADMIN', 'SUPER_ADMIN')` on `ADMIN` accessible routes with `restrictTo('ADMIN', 'SUPER_ADMIN'), requireAdminPermission(...)` to apply granular permission checks while ignoring T1/T2/T3/SUPER_ADMIN roles.
+  4. Added `PATCH /admin/users/:id/permissions` to `apps/web/server` and fixed it in `apps/api/src` to securely accept permission arrays, validating against the defaults for `ADMIN`.
+  5. Built `Manage Permissions` modal in `AdminManagementPage` in frontend to list exact default permissions an `ADMIN` gets and allow granular selection.
+  6. Blocked `ADMIN`s from creating `ADMIN` accounts—this is now strictly a `SUPER_ADMIN` capability.
+- **Where:** `apps/api/src/modules/admin/`, `apps/web/server/modules/admin/`, `apps/api/src/modules/auth/`, `apps/web/server/modules/auth/`, `apps/web/src/pages.jsx`, `apps/api/src/__tests__/admin-permissions.unit.test.js`.
+- **Note:** Existing Admins with `customGrants: undefined` keep full default access natively. Only explicit overrides alter permission matrices.
+
 ### [2026-10-06] QR & Link Attendance Security Hardening (Fixes 1, 2, 3, 4a, 5, 6, 7)
 - **What:**
   1. Fix 1 (IDOR on deactivate): Gated `deactivateLink` so only the session creator, `ADMIN`, or `SUPER_ADMIN` can deactivate an active attendance session (returns 403 otherwise).
