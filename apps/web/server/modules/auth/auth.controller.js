@@ -12,10 +12,16 @@ exports.login = async (req, res) => {
 
     const result = await authService.login(email, password);
 
+    let message = 'Login successful';
+    if (result.mfaRequired) {
+      message = 'MFA verification required';
+    } else if (result.mustChangePassword) {
+      message = 'Password replacement required';
+    }
+
     res.status(200).json({
       success: true,
-      message: result.mfaRequired ? 'MFA verification required'
-        : result.mustChangePassword ? 'Password replacement required' : 'Login successful',
+      message,
       data: result,
     });
   } catch (error) {

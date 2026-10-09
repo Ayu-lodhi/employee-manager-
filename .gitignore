@@ -49,3 +49,5 @@ coverage/
 .agents/
 skills-lock.json
 
+targets.txt
+test_sec503.txt
