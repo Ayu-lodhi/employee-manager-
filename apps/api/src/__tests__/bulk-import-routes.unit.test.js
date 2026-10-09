@@ -62,7 +62,7 @@ test('Route Security: SUPER_ADMIN creation rejected for non-SUPER_ADMIN callers'
   await adminController.addUser(reqSingle, resSingle);
 
   assert.equal(resSingle.statusCode, 403, 'addUser must return 403 when ADMIN tries to create SUPER_ADMIN');
-  assert.match(resSingle.body.message, /Only Super Admins can create Super Admin accounts/);
+  assert.match(resSingle.body.message, /Only Super Admins can create Super Admin or Admin accounts/);
 
   // 1b. Bulk user route
   const reqBulk = {
@@ -78,7 +78,7 @@ test('Route Security: SUPER_ADMIN creation rejected for non-SUPER_ADMIN callers'
   await adminController.bulkImportUsers(reqBulk, resBulk);
 
   assert.equal(resBulk.statusCode, 403, 'bulkImportUsers must return 403 when ADMIN tries to create SUPER_ADMIN');
-  assert.match(resBulk.body.message, /Only Super Admins can create Super Admin accounts/);
+  assert.match(resBulk.body.message, /Only Super Admins can create Super Admin or Admin accounts/);
 });
 
 // ----------------------------------------------------------------------
