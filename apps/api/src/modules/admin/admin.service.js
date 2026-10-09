@@ -429,13 +429,7 @@ exports.updateUserPermissions = async (targetUserId, customGrants, adminUser, ip
   if (user.role === 'SUPER_ADMIN') throw new Error('Cannot change permissions of a Super Admin');
   if (user.role !== 'ADMIN') throw new Error('Permissions can only be managed for ADMIN accounts');
 
-  let ROLE_DEFAULT_PERMISSIONS;
-  try {
-    ROLE_DEFAULT_PERMISSIONS = require('../../../../../packages/shared-constants/permissions.js').ROLE_DEFAULT_PERMISSIONS;
-  } catch (err) {
-    ROLE_DEFAULT_PERMISSIONS = { ADMIN: [] };
-  }
-
+  const { ROLE_DEFAULT_PERMISSIONS } = require('@tbi/shared-constants/permissions');
   const adminDefaults = ROLE_DEFAULT_PERMISSIONS['ADMIN'] || [];
 
   let newGrants;
@@ -455,19 +449,17 @@ exports.updateUserPermissions = async (targetUserId, customGrants, adminUser, ip
   user.customGrants = newGrants;
   await user.save();
 
-  try {
-    await invalidateUserPermissions(user._id);
-    await recordPermissionAudit({
-      performedBy: adminUser.sub,
-      performedByName: adminUser.name || adminUser.email,
-      targetId: user._id,
-      targetType: 'User',
-      action: 'USER_PERMISSIONS_CHANGED',
-      oldValue: { customGrants: oldGrants },
-      newValue: { customGrants: newGrants },
-      ipAddress,
-    });
-  } catch (err) {}
+  await invalidateUserPermissions(user._id);
+  await recordPermissionAudit({
+    performedBy: adminUser.sub,
+    performedByName: adminUser.name || adminUser.email,
+    targetId: user._id,
+    targetType: 'User',
+    action: 'USER_PERMISSIONS_CHANGED',
+    oldValue: { customGrants: oldGrants },
+    newValue: { customGrants: newGrants },
+    ipAddress,
+  });
 
   return { userId: user._id, customGrants: newGrants };
 };

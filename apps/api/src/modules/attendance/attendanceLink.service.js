@@ -5,6 +5,7 @@ const AttendanceLink = require('./attendanceLink.model');
 const Attendance = require('./attendance.model');
 const User = require('../admin/admin.model');
 const AuditLog = require('../../models/AuditLog.model');
+const { logger } = require('../../core/utils/logger');
 
 async function recordAttendanceAudit({ action, performedBy, performedByName, token, team, details = {}, ipAddress = null }) {
   const tokenPrefix = token ? `${String(token).slice(0, 8)}...` : null;
@@ -21,7 +22,7 @@ async function recordAttendanceAudit({ action, performedBy, performedByName, tok
   };
 
   // Structured console log for monitoring / SIEM (contains only prefix, NEVER full token or QR data)
-  console.info(`[AUDIT] attendance_${action.toLowerCase()}`, JSON.stringify(auditData));
+  logger.info(`[AUDIT] attendance_${action.toLowerCase()}`, auditData);
 
   try {
     if (mongoose.connection && mongoose.connection.readyState === 1) {
@@ -40,7 +41,7 @@ async function recordAttendanceAudit({ action, performedBy, performedByName, tok
       });
     }
   } catch (err) {
-    console.error('AuditLog error:', err.message);
+    logger.error('AuditLog error', { error: err.message, action });
   }
 }
 
@@ -475,7 +476,7 @@ class AttendanceLinkService {
         });
       }
     } catch (e) {
-      console.error('Socket emit error:', e.message);
+      logger.error('Socket emit error', { error: e.message });
     }
 
     if (Array.isArray(room.members)) {
@@ -488,7 +489,7 @@ class AttendanceLinkService {
             `Attendance Session Active in ${room.name}`,
             `${senderDisplayName} shared attendance QR & link. Expires at ${expiryTime}.`,
             '/chat'
-          ).catch((e) => console.error('Chat notification failed:', e.message));
+          ).catch((e) => logger.error('Chat notification failed', { error: e.message }));
         }
       }
     }

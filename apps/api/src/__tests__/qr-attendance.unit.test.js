@@ -742,15 +742,20 @@ test('VULNERABILITY AUDIT: Audit log entry must be created when an attendance se
   let auditLogCreated = false;
   // Check if any audit log / logger is recorded
   const origConsoleInfo = console.info;
+  const { logger } = require('../core/utils/logger');
+  const origLoggerInfo = logger.info;
   try {
-    console.info = (...args) => {
+    const mockInfo = (...args) => {
       if (args.some((a) => typeof a === 'string' && a.includes('attendance'))) {
         auditLogCreated = true;
       }
     };
+    console.info = mockInfo;
+    logger.info = mockInfo;
     await linkService.generateLink({ minutes: 10 }, t3Lead);
   } finally {
     console.info = origConsoleInfo;
+    logger.info = origLoggerInfo;
   }
 
   assert.equal(
@@ -773,13 +778,17 @@ test('FIX 7: Audit log records short token prefix and never leaks full token or 
 
   const capturedAuditLogs = [];
   const origConsoleInfo = console.info;
+  const { logger } = require('../core/utils/logger');
+  const origLoggerInfo = logger.info;
   try {
-    console.info = (...args) => {
-      const str = args.join(' ');
+    const mockInfo = (...args) => {
+      const str = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
       if (str.includes('[AUDIT]')) {
         capturedAuditLogs.push(str);
       }
     };
+    console.info = mockInfo;
+    logger.info = mockInfo;
 
     // 1. Generate
     const session = await linkService.generateLink({ minutes: 15 }, t3Lead);
@@ -797,6 +806,7 @@ test('FIX 7: Audit log records short token prefix and never leaks full token or 
     }
   } finally {
     console.info = origConsoleInfo;
+    logger.info = origLoggerInfo;
   }
 });
 

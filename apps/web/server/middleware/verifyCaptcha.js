@@ -5,14 +5,21 @@
 const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 
 const verifyCaptcha = async (req, res, next) => {
-  // Bypass if CAPTCHA is not explicitly enabled or if secret key is unconfigured / placeholder
-  const isConfigured =
-    process.env.CAPTCHA_ENABLED === 'true' &&
+  // Bypass only if CAPTCHA is not explicitly enabled
+  if (process.env.CAPTCHA_ENABLED !== 'true') {
+    return next();
+  }
+
+  // Fail closed if CAPTCHA is enabled but secret key is missing / placeholder
+  const hasValidSecret =
     process.env.RECAPTCHA_SECRET_KEY &&
     process.env.RECAPTCHA_SECRET_KEY !== 'REPLACE_WITH_YOUR_RECAPTCHA_SECRET_KEY';
 
-  if (!isConfigured) {
-    return next();
+  if (!hasValidSecret) {
+    return res.status(500).json({
+      success: false,
+      message: 'Server configuration error: CAPTCHA is enabled but no valid secret key is provided.',
+    });
   }
 
   const token = req.body['g-recaptcha-response'];

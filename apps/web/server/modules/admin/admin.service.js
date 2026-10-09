@@ -374,13 +374,7 @@ exports.updateUserPermissions = async (targetUserId, customGrants, adminUser, ip
   if (user.role === 'SUPER_ADMIN') throw new Error('Cannot change permissions of a Super Admin');
   if (user.role !== 'ADMIN') throw new Error('Permissions can only be managed for ADMIN accounts');
 
-  let ROLE_DEFAULT_PERMISSIONS;
-  try {
-    ROLE_DEFAULT_PERMISSIONS = require('../../../../../packages/shared-constants/permissions.js').ROLE_DEFAULT_PERMISSIONS;
-  } catch (err) {
-    ROLE_DEFAULT_PERMISSIONS = { ADMIN: [] };
-  }
-
+  const { ROLE_DEFAULT_PERMISSIONS } = require('@tbi/shared-constants');
   const adminDefaults = ROLE_DEFAULT_PERMISSIONS['ADMIN'] || [];
 
   let newGrants;
