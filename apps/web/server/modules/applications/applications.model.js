@@ -28,4 +28,4 @@ const applicationSchema = new mongoose.Schema({
   reviewedAt: { type: Date, default: null },
 });
 
-module.exports = mongoose.model('Application', applicationSchema);
+module.exports = mongoose.models.Application || mongoose.model('Application', applicationSchema);

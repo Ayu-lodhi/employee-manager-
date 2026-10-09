@@ -61,4 +61,4 @@ attendanceSchema.index({ studentId: 1, teamId: 1, date: 1 }, { sparse: true });
 attendanceSchema.index({ teamId: 1, date: 1 });
 attendanceSchema.index({ studentId: 1, date: -1 });
 
-module.exports = mongoose.model('Attendance', attendanceSchema);
+module.exports = mongoose.models.Attendance || mongoose.model('Attendance', attendanceSchema);

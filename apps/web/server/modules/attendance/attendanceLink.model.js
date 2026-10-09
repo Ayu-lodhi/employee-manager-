@@ -13,4 +13,4 @@ const attendanceLinkSchema = new mongoose.Schema({
 
 // Explicitly do NOT add a TTL index. Keep old links for historical records.
 
-module.exports = mongoose.model('AttendanceLink', attendanceLinkSchema);
+module.exports = mongoose.models.AttendanceLink || mongoose.model('AttendanceLink', attendanceLinkSchema);

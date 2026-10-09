@@ -100,4 +100,4 @@ profileSchema.pre('save', function (next) {
   next();
 });
 
-module.exports = mongoose.model('Profile', profileSchema);
+module.exports = mongoose.models.Profile || mongoose.model('Profile', profileSchema);

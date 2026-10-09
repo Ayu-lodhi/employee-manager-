@@ -42,4 +42,4 @@ timesheetSchema.pre('save', function (next) {
   next();
 });
 
-module.exports = mongoose.model('Timesheet', timesheetSchema);
+module.exports = mongoose.models.Timesheet || mongoose.model('Timesheet', timesheetSchema);
