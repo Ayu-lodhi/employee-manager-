@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../pages';
 import api from '../../api';
 import {
-  User, Mail, Phone, MapPin, Briefcase, GraduationCap, Award,
+  User, Mail, Phone, MapPin,
   ExternalLink, CheckCircle2, AlertCircle, Sparkles, TrendingUp,
-  Camera, Plus, Trash2, Edit3, ShieldCheck
+  Camera, Plus, Trash2, ShieldCheck
 } from 'lucide-react';
 
 const ROLE_LABELS = {
@@ -151,7 +151,7 @@ export const MyProfilePage = () => {
         let formattedBirthday = '';
         if (p.birthday) {
           const bdayDate = new Date(p.birthday);
-          if (!isNaN(bdayDate.getTime())) {
+          if (!Number.isNaN(bdayDate.getTime())) {
             formattedBirthday = bdayDate.toISOString().split('T')[0];
           }
         }
@@ -167,14 +167,16 @@ export const MyProfilePage = () => {
           avatarUrl: p.avatarUrl || '',
           bio: p.bio || '',
           skills: p.skills || [],
-          education: (p.education || []).map((e) => ({
+          education: (p.education || []).map((e, index) => ({
+            id: e._id || e.id || `edu-${index}-${Date.now()}`,
             institution: e.institution || '',
             degree: e.degree || '',
             fieldOfStudy: e.fieldOfStudy || e.field || '',
             startYear: e.startYear || '',
             endYear: e.endYear || '',
           })),
-          projects: (p.projects || []).map((proj) => ({
+          projects: (p.projects || []).map((proj, index) => ({
+            id: proj._id || proj.id || `proj-${index}-${Date.now()}`,
             title: proj.title || '',
             description: proj.description || '',
             url: proj.url || '',
@@ -191,7 +193,7 @@ export const MyProfilePage = () => {
   };
 
   useEffect(() => {
-    fetchProfile();
+    void fetchProfile();
   }, []);
 
   const handleSaveProfile = async (e) => {
@@ -201,7 +203,8 @@ export const MyProfilePage = () => {
 
     try {
       // Exclude avatarUrl from PATCH /profile/me to prevent multi-megabyte payloads
-      const { avatarUrl, ...saveData } = profileData;
+      const saveData = { ...profileData };
+      delete saveData.avatarUrl;
 
       // Auto-prefix https:// if user entered linkedin.com without protocol
       if (saveData.linkedinUrl && !/^https?:\/\//i.test(saveData.linkedinUrl.trim())) {
@@ -249,7 +252,7 @@ export const MyProfilePage = () => {
     if (!eduForm.institution.trim()) return;
     setProfileData((prev) => ({
       ...prev,
-      education: [...prev.education, { ...eduForm }],
+      education: [...prev.education, { ...eduForm, id: `edu-${Date.now()}` }],
     }));
     setEduForm({ institution: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' });
     setEduModal(false);
@@ -266,7 +269,7 @@ export const MyProfilePage = () => {
     if (!projForm.title.trim()) return;
     setProfileData((prev) => ({
       ...prev,
-      projects: [...prev.projects, { ...projForm }],
+      projects: [...prev.projects, { ...projForm, id: `proj-${Date.now()}` }],
     }));
     setProjForm({ title: '', description: '', url: '' });
     setProjModal(false);
@@ -532,8 +535,9 @@ export const MyProfilePage = () => {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">Course / Headline</label>
+                <label htmlFor="profile-headline" className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">Course / Headline</label>
                 <input
+                  id="profile-headline"
                   type="text"
                   placeholder="e.g. MCA 2nd Year, AI Researcher"
                   value={profileData.headline}
@@ -543,8 +547,9 @@ export const MyProfilePage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">University / Institute</label>
+                <label htmlFor="profile-university" className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">University / Institute</label>
                 <input
+                  id="profile-university"
                   type="text"
                   placeholder="e.g. Graphic Era University"
                   value={profileData.university}
@@ -554,8 +559,9 @@ export const MyProfilePage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">City</label>
+                <label htmlFor="profile-city" className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">City</label>
                 <input
+                  id="profile-city"
                   type="text"
                   placeholder="e.g. Dehradun"
                   value={profileData.city}
@@ -565,8 +571,9 @@ export const MyProfilePage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">Gender</label>
+                <label htmlFor="profile-gender" className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">Gender</label>
                 <select
+                  id="profile-gender"
                   value={profileData.gender}
                   onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
                   className="w-full p-2.5 text-xs font-['Space_Mono',monospace] border-2 border-[#1A1A1A] rounded-xl focus:outline-none focus:border-[#1B5299]"
@@ -580,8 +587,9 @@ export const MyProfilePage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">Birthday</label>
+                <label htmlFor="profile-birthday" className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">Birthday</label>
                 <input
+                  id="profile-birthday"
                   type="date"
                   value={profileData.birthday}
                   onChange={(e) => setProfileData({ ...profileData, birthday: e.target.value })}
@@ -590,8 +598,9 @@ export const MyProfilePage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">Mobile Number</label>
+                <label htmlFor="profile-mobile" className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">Mobile Number</label>
                 <input
+                  id="profile-mobile"
                   type="text"
                   placeholder="+91..."
                   value={profileData.mobile}
@@ -601,8 +610,9 @@ export const MyProfilePage = () => {
               </div>
 
               <div className="sm:col-span-2 md:col-span-3">
-                <label className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">LinkedIn Profile URL</label>
+                <label htmlFor="profile-linkedin" className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">LinkedIn Profile URL</label>
                 <input
+                  id="profile-linkedin"
                   type="url"
                   placeholder="https://www.linkedin.com/in/your-profile"
                   value={profileData.linkedinUrl}
@@ -612,8 +622,9 @@ export const MyProfilePage = () => {
               </div>
 
               <div className="sm:col-span-2 md:col-span-3">
-                <label className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">About / Bio</label>
+                <label htmlFor="profile-bio" className="block text-xs font-bold font-['Space_Mono',monospace] uppercase mb-1">About / Bio</label>
                 <textarea
+                  id="profile-bio"
                   rows="3"
                   placeholder="Tell your team about your interests, focus sector, and goals..."
                   value={profileData.bio}
@@ -688,7 +699,7 @@ export const MyProfilePage = () => {
               <div className="space-y-3">
                 {profileData.education.map((edu, idx) => (
                   <div
-                    key={idx}
+                    key={edu.id || `${edu.institution}-${edu.degree}-${edu.startYear}`}
                     className="flex items-start justify-between p-3.5 bg-[#FDFBF7] border-2 border-[#1A1A1A] rounded-xl shadow-[2px_2px_0px_0px_#1A1A1A]"
                   >
                     <div>
@@ -735,7 +746,7 @@ export const MyProfilePage = () => {
               <div className="space-y-3">
                 {profileData.projects.map((proj, idx) => (
                   <div
-                    key={idx}
+                    key={proj.id || `${proj.title}-${proj.url || ''}`}
                     className="flex items-start justify-between p-3.5 bg-[#FDFBF7] border-2 border-[#1A1A1A] rounded-xl shadow-[2px_2px_0px_0px_#1A1A1A]"
                   >
                     <div>
@@ -791,8 +802,9 @@ export const MyProfilePage = () => {
             <h3 className="font-['Barlow_Condensed',sans-serif] font-black text-xl uppercase mb-3">Add Education</h3>
             <div className="space-y-3 font-['Space_Mono',monospace] text-xs">
               <div>
-                <label className="block font-bold mb-1">Institution *</label>
+                <label htmlFor="edu-institution" className="block font-bold mb-1">Institution *</label>
                 <input
+                  id="edu-institution"
                   type="text"
                   placeholder="e.g. Graphic Era University"
                   value={eduForm.institution}
@@ -801,8 +813,9 @@ export const MyProfilePage = () => {
                 />
               </div>
               <div>
-                <label className="block font-bold mb-1">Degree</label>
+                <label htmlFor="edu-degree" className="block font-bold mb-1">Degree</label>
                 <input
+                  id="edu-degree"
                   type="text"
                   placeholder="e.g. Master of Computer Applications"
                   value={eduForm.degree}
@@ -811,8 +824,9 @@ export const MyProfilePage = () => {
                 />
               </div>
               <div>
-                <label className="block font-bold mb-1">Field of Study</label>
+                <label htmlFor="edu-fieldOfStudy" className="block font-bold mb-1">Field of Study</label>
                 <input
+                  id="edu-fieldOfStudy"
                   type="text"
                   placeholder="e.g. Computer Science / Information Technology"
                   value={eduForm.fieldOfStudy}
@@ -822,8 +836,9 @@ export const MyProfilePage = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold mb-1">Start Year</label>
+                  <label htmlFor="edu-startYear" className="block font-bold mb-1">Start Year</label>
                   <input
+                    id="edu-startYear"
                     type="number"
                     placeholder="2022"
                     value={eduForm.startYear}
@@ -832,8 +847,9 @@ export const MyProfilePage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold mb-1">End Year</label>
+                  <label htmlFor="edu-endYear" className="block font-bold mb-1">End Year</label>
                   <input
+                    id="edu-endYear"
                     type="number"
                     placeholder="2024"
                     value={eduForm.endYear}
@@ -870,8 +886,9 @@ export const MyProfilePage = () => {
             <h3 className="font-['Barlow_Condensed',sans-serif] font-black text-xl uppercase mb-3">Add Project</h3>
             <div className="space-y-3 font-['Space_Mono',monospace] text-xs">
               <div>
-                <label className="block font-bold mb-1">Project Title *</label>
+                <label htmlFor="proj-title" className="block font-bold mb-1">Project Title *</label>
                 <input
+                  id="proj-title"
                   type="text"
                   placeholder="e.g. Employee Portal"
                   value={projForm.title}
@@ -880,8 +897,9 @@ export const MyProfilePage = () => {
                 />
               </div>
               <div>
-                <label className="block font-bold mb-1">Description</label>
+                <label htmlFor="proj-description" className="block font-bold mb-1">Description</label>
                 <textarea
+                  id="proj-description"
                   rows="2"
                   placeholder="Brief summary of your project..."
                   value={projForm.description}
@@ -890,8 +908,9 @@ export const MyProfilePage = () => {
                 />
               </div>
               <div>
-                <label className="block font-bold mb-1">Project Link (optional)</label>
+                <label htmlFor="proj-url" className="block font-bold mb-1">Project Link (optional)</label>
                 <input
+                  id="proj-url"
                   type="url"
                   placeholder="https://github.com/..."
                   value={projForm.url}

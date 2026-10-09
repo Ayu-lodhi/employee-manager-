@@ -33,7 +33,7 @@ function calculateProgressScore(metrics = {}) {
   const breakdown = {};
 
   // 1. Attendance (40%)
-  if (typeof metrics.attendanceRatio === 'number' && !isNaN(metrics.attendanceRatio)) {
+  if (typeof metrics.attendanceRatio === 'number' && !Number.isNaN(metrics.attendanceRatio)) {
     const ratio = Math.max(0, Math.min(1, metrics.attendanceRatio));
     const scorePortion = ratio * SIGNAL_WEIGHTS.attendance;
     earnedWeight += scorePortion;
@@ -42,7 +42,7 @@ function calculateProgressScore(metrics = {}) {
   }
 
   // 2. Events joined (20%)
-  if (typeof metrics.eventsRatio === 'number' && !isNaN(metrics.eventsRatio)) {
+  if (typeof metrics.eventsRatio === 'number' && !Number.isNaN(metrics.eventsRatio)) {
     const ratio = Math.max(0, Math.min(1, metrics.eventsRatio));
     const scorePortion = ratio * SIGNAL_WEIGHTS.events;
     earnedWeight += scorePortion;
@@ -51,7 +51,7 @@ function calculateProgressScore(metrics = {}) {
   }
 
   // 3. Team participation (15%)
-  if (typeof metrics.teamParticipationRatio === 'number' && !isNaN(metrics.teamParticipationRatio)) {
+  if (typeof metrics.teamParticipationRatio === 'number' && !Number.isNaN(metrics.teamParticipationRatio)) {
     const ratio = Math.max(0, Math.min(1, metrics.teamParticipationRatio));
     const scorePortion = ratio * SIGNAL_WEIGHTS.teamParticipation;
     earnedWeight += scorePortion;
@@ -60,7 +60,7 @@ function calculateProgressScore(metrics = {}) {
   }
 
   // 4. Certificates (15%) - capped at 3 certificates for 100% of this signal
-  if (typeof metrics.certificatesCount === 'number' && !isNaN(metrics.certificatesCount)) {
+  if (typeof metrics.certificatesCount === 'number' && !Number.isNaN(metrics.certificatesCount)) {
     const ratio = Math.max(0, Math.min(1, metrics.certificatesCount / 3));
     const scorePortion = ratio * SIGNAL_WEIGHTS.certificates;
     earnedWeight += scorePortion;
@@ -69,7 +69,7 @@ function calculateProgressScore(metrics = {}) {
   }
 
   // 5. Review ratings (10%) - scaled from 1-5 stars
-  if (typeof metrics.averageRating === 'number' && !isNaN(metrics.averageRating) && metrics.averageRating > 0) {
+  if (typeof metrics.averageRating === 'number' && !Number.isNaN(metrics.averageRating) && metrics.averageRating > 0) {
     const ratio = Math.max(0, Math.min(1, metrics.averageRating / 5));
     const scorePortion = ratio * SIGNAL_WEIGHTS.reviews;
     earnedWeight += scorePortion;

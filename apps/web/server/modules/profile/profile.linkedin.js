@@ -56,13 +56,19 @@ function validateLinkedInUrl(raw) {
   }
 
   // Path must start with /in/ and have a non-empty profile identifier
-  const slug = parsed.pathname.replace(/^\/in\/?/, '').replace(/\/+$/, '');
+  let slug = parsed.pathname.startsWith('/in/') ? parsed.pathname.slice(4) : '';
+  while (slug.endsWith('/')) {
+    slug = slug.slice(0, -1);
+  }
   if (!parsed.pathname.startsWith('/in/') || !slug) {
     return { valid: false, normalized: null, reason: 'LinkedIn URL must be a /in/ profile link' };
   }
 
   // Normalize: strip tracking parameters and fragments
-  const normalized = `https://${host}${parsed.pathname}`.replace(/\/+$/, '');
+  let normalized = `https://${host}${parsed.pathname}`;
+  while (normalized.endsWith('/')) {
+    normalized = normalized.slice(0, -1);
+  }
 
   return { valid: true, normalized, reason: null };
 }

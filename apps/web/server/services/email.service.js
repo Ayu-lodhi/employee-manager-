@@ -2,11 +2,11 @@ const nodemailer = require('nodemailer');
 
 // Encode profile text where it enters HTML, preserving stored and plain-text names.
 const escapeHtml = (value) => String(value)
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;');
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;');
 
 // ====================================================================
 // Email Service — Nodemailer with two modes:
@@ -28,7 +28,7 @@ const initTransporter = async () => {
     console.log('EMAIL_INIT :: Using real SMTP:', process.env.EMAIL_HOST);
     transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
-      port: parseInt(process.env.EMAIL_PORT) || 587,
+      port: Number.parseInt(process.env.EMAIL_PORT, 10) || 587,
       secure: false,
       requireTLS: true,
       auth: {

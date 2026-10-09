@@ -126,20 +126,21 @@ exports.getTeamProfiles = async (req, res, next) => {
     const memberIds = await profileService.getLedTeamMemberIds(callerId);
     const members = await User.find({ _id: { $in: memberIds } }).select('name email role tier phone');
 
-    const results = [];
-    for (const m of members) {
-      const { profile } = await profileService.getOrCreateProfile(m._id);
-      const sanitized = sanitizeProfileForViewer(profile, 't3_team');
-      results.push({
-        user: {
-          id: m._id,
-          name: m.name,
-          role: m.role,
-          tier: resolveTier(m.role, m.tier),
-        },
-        profile: sanitized,
-      });
-    }
+    const results = await Promise.all(
+      members.map(async (m) => {
+        const { profile } = await profileService.getOrCreateProfile(m._id);
+        const sanitized = sanitizeProfileForViewer(profile, 't3_team');
+        return {
+          user: {
+            id: m._id,
+            name: m.name,
+            role: m.role,
+            tier: resolveTier(m.role, m.tier),
+          },
+          profile: sanitized,
+        };
+      })
+    );
 
     return res.status(200).json({
       success: true,
