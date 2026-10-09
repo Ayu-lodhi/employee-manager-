@@ -50,6 +50,20 @@ router.delete('/sessions/:id', async (req, res) => {
       { new: true }
     ).select('name email role activeSessionId');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    await AuditLog.create({
+      action: 'TERMINATE_SESSION',
+      performedBy: req.user.id,
+      performedByName: req.user.name,
+      targetId: user._id,
+      targetType: 'User',
+      ipAddress: req.ip || req.connection.remoteAddress,
+      details: {
+        email: user.email,
+        role: user.role
+      }
+    });
+
     res.json({ success: true, message: 'Session terminated successfully', data: user });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
