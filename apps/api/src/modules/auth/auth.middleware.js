@@ -209,7 +209,7 @@ exports.requireAdminPermission = (requiredPermission) => {
 
     let effectivePermissions;
     if (customGrants && Array.isArray(customGrants) && customGrants.length > 0) {
-      effectivePermissions = [...new Set([...adminDefaults, ...customGrants])];
+      effectivePermissions = customGrants;
     } else {
       effectivePermissions = adminDefaults;
     }
