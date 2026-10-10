@@ -24,6 +24,11 @@ const { protect, restrictTo } = require('./modules/auth/auth.middleware');
 
 const app = express();
 
+const trustProxyConfig = process.env.TRUST_PROXY || false;
+// Parse to number if it's a digit string, else keep as string (e.g. 'loopback') or boolean
+app.set('trust proxy', /^\d+$/.test(trustProxyConfig) ? parseInt(trustProxyConfig, 10) : (trustProxyConfig === 'true' ? true : (trustProxyConfig === 'false' ? false : trustProxyConfig)));
+
+
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
   if (process.env.ALLOWED_ORIGINS) {
