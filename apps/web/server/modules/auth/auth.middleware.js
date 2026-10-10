@@ -211,7 +211,7 @@ exports.requireTeam = (teamName) => {
   };
 };
 // Admin granular permission check (only checks if role is ADMIN)
-const { ROLE_DEFAULT_PERMISSIONS } = require('@tbi/shared-constants');
+const { ROLE_DEFAULT_PERMISSIONS } = require('@tbi/shared-constants/permissions');
 
 exports.requireAdminPermission = (requiredPermission) => {
   return async (req, res, next) => {
@@ -223,7 +223,7 @@ exports.requireAdminPermission = (requiredPermission) => {
 
     let effectivePermissions;
     if (customGrants && Array.isArray(customGrants) && customGrants.length > 0) {
-      effectivePermissions = customGrants;
+      effectivePermissions = [...new Set([...adminDefaults, ...customGrants])];
     } else {
       effectivePermissions = adminDefaults;
     }
