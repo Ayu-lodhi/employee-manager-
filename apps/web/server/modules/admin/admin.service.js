@@ -3,6 +3,13 @@ const crypto = require('crypto');
 const { disconnectUserSockets } = require('../../config/socket');
 const User = require('./admin.model');
 const { sendWelcomeEmail, sendPasswordResetLinkEmail, sendProfileUpdatedEmail, sendPasswordChangedEmail, sendEmailChangedEmail } = require('../../services/email.service');
+let ROLE_DEFAULT_PERMISSIONS;
+try {
+  ({ ROLE_DEFAULT_PERMISSIONS } = require('@tbi/shared-constants/permissions'));
+} catch (err) {
+  console.error('FATAL ERROR: Failed to load @tbi/shared-constants/permissions.', err);
+  process.exit(1);
+}
 
 const generateDefaultPassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -371,10 +378,15 @@ exports.updateUserPermissions = async (targetUserId, customGrants, adminUser, ip
   const user = await User.findById(targetUserId);
   if (!user) throw new Error('User not found');
 
+  if (adminUser?.role !== 'SUPER_ADMIN') {
+    const err = new Error('Forbidden');
+    err.statusCode = 403;
+    throw err;
+  }
+
   if (user.role === 'SUPER_ADMIN') throw new Error('Cannot change permissions of a Super Admin');
   if (user.role !== 'ADMIN') throw new Error('Permissions can only be managed for ADMIN accounts');
 
-  const { ROLE_DEFAULT_PERMISSIONS } = require('@tbi/shared-constants/permissions');
   const adminDefaults = ROLE_DEFAULT_PERMISSIONS['ADMIN'] || [];
 
   let newGrants;
