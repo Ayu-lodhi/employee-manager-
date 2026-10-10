@@ -8,6 +8,12 @@ let initError = null;
 
 try {
   process.env.VERCEL = '1';
+
+  // Auto-fallback to memory rate-limiting if Redis is not configured in Vercel yet
+  if (!process.env.REDIS_CACHE_URL) {
+    process.env.ALLOW_NO_REDIS = 'true';
+  }
+
   app = require('../server/server.js');
 } catch (e) {
   initError = e;
