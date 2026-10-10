@@ -2,13 +2,18 @@
 // Distributed Redis Rate Limiter with In-Memory Fallback
 // ====================================================================
 
+const { logger } = require('../core/utils/logger');
+
 let redisCache = null;
 try {
   redisCache = require('../core/config/redis-cache.client').redisCache;
 } catch (err) {
-  // Fallback if not configured
+  if (process.env.NODE_ENV === 'production') {
+    logger.error('Redis cache is required in production for rate limiting', { error: err.message });
+    throw err;
+  }
+  logger.warn('Fallback to in-memory rate limiters (Redis not configured)', { error: err.message });
 }
-const { logger } = require('../core/utils/logger');
 
 // --- In-Memory Fallback State ---
 const inMemoryRequests = new Map();
@@ -85,8 +90,18 @@ const handleRedisLimiter = async (req, res, next, redisKey, windowMs, maxRequest
       }
     }
   } catch (err) {
+    if (process.env.NODE_ENV === 'production') {
+      logger.error(`Redis limiter failed for ${redisKey}, cannot fallback to memory in production`, { error: err.message });
+      return res.status(500).json({ success: false, message: 'Rate limiter unavailable' });
+    }
     logger.warn(`Redis limiter failed for ${redisKey}; falling back to memory`, { error: err.message });
   }
+
+  if (process.env.NODE_ENV === 'production') {
+    logger.error(`Redis is not ready for ${redisKey}, cannot fallback to memory in production`);
+    return res.status(500).json({ success: false, message: 'Rate limiter unavailable' });
+  }
+
   return fallbackFn(req, res, next, identifier);
 };
 
