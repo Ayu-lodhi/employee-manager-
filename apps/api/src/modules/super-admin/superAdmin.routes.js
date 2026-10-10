@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { protect, restrictTo } = require('../auth/auth.middleware');
 const AuditLog = require('../../models/AuditLog.model');
@@ -25,7 +26,8 @@ router.get('/audit-logs', async (req, res) => {
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('SuperAdmin API Error:', err.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
@@ -37,23 +39,29 @@ router.get('/sessions', async (req, res) => {
       .sort({ lastActivity: -1 });
     res.json({ success: true, data: users });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('SuperAdmin API Error:', err.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
 // Terminate an active session
 router.delete('/sessions/:id', async (req, res) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid User ID format' });
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       { $set: { activeSessionId: null, lastActivity: null } },
       { new: true }
     ).select('name email role activeSessionId');
+    
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     await AuditLog.create({
       action: 'TERMINATE_SESSION',
-      performedBy: req.user.id,
+      performedBy: req.user.sub,
       performedByName: req.user.name,
       targetId: user._id,
       targetType: 'User',
@@ -66,7 +74,8 @@ router.delete('/sessions/:id', async (req, res) => {
 
     res.json({ success: true, message: 'Session terminated successfully', data: user });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('SuperAdmin API Error:', err.message);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
