@@ -126,7 +126,7 @@ exports.updateUser = async (id, data) => {
     }).catch((err) => console.error('Admin profile update email failed:', err.message));
   }
 
-  invalidateUserPermissions(id).catch(() => {});
+  await invalidateUserPermissions(id);
 
   return user;
 };
@@ -161,15 +161,15 @@ exports.revokeUser = async (id, reason, notes, adminId) => {
   user.mustChangePassword = true;
   await user.save();
   disconnectUserSockets(user._id);
-  invalidateUserPermissions(user._id).catch(() => {});
-  recordPermissionAudit({
+  await invalidateUserPermissions(user._id);
+  await recordPermissionAudit({
     performedBy: adminId,
     targetId: user._id,
     targetType: 'User',
     action: 'USER_ROLE_REVOKED',
     oldValue: { isActive: true, role: user.role, reason },
     newValue: { isActive: false, role: user.role },
-  }).catch(() => {});
+  });
 
   return {
     userId: user._id,
@@ -201,15 +201,15 @@ exports.reactivateUser = async (id, adminId) => {
   user.isActive = true;
   user.mustChangePassword = true;  // Force password change on next login
   await user.save();
-  invalidateUserPermissions(user._id).catch(() => {});
-  recordPermissionAudit({
+  await invalidateUserPermissions(user._id);
+  await recordPermissionAudit({
     performedBy: adminId,
     targetId: user._id,
     targetType: 'User',
     action: 'USER_ROLE_REACTIVATED',
     oldValue: { isActive: false, role: user.role },
     newValue: { isActive: true, role: user.role },
-  }).catch(() => {});
+  });
 
   // Send welcome email with new credentials
   sendWelcomeEmail({
@@ -236,7 +236,7 @@ exports.deleteUser = async (id, adminId) => {
   if (user.role === 'SUPER_ADMIN') throw new Error('Cannot delete a Super Admin account');
   if (id.toString() === adminId?.toString()) throw new Error('You cannot delete your own account');
   await User.findByIdAndDelete(id);
-  invalidateUserPermissions(id).catch(() => {});
+  await invalidateUserPermissions(id);
   return user;
 };
 
