@@ -2,7 +2,7 @@
 // pages.jsx — All Page Components for TBI Management System
 // ====================================================================
 
-import React, { useState, createContext, useContext, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import { Navigate, NavLink, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ScrollText, Monitor, Settings, Shield, FileText,
@@ -135,7 +135,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = useCallback((u, t) => {
+  const login = (u, t) => {
     setUser(u);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('tbi_user', JSON.stringify(u));
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('tbi_user');
       localStorage.removeItem('tbi_token');
     }
-  }, []);
+  };
 
   const logout = useCallback(async () => {
     try {
@@ -168,7 +168,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const updateUser = useCallback((updatedFields) => {
+  const updateUser = (updatedFields) => {
     setUser((prev) => {
       const next = { ...prev, ...updatedFields };
       if (typeof window !== 'undefined') {
@@ -176,10 +176,10 @@ export const AuthProvider = ({ children }) => {
       }
       return next;
     });
-  }, []);
+  };
 
   return (
-    <AuthContext.Provider value={useMemo(() => ({ user, login, logout, initializing, updateUser }), [user, login, logout, initializing, updateUser])}>
+    <AuthContext.Provider value={{ user, login, logout, initializing, updateUser }}>
       {children}
       {user && <IdleTimeoutWatcher logout={logout} />}
     </AuthContext.Provider>
