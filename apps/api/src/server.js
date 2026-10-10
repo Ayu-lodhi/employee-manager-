@@ -156,11 +156,12 @@ async function gracefulShutdown(signal) {
     }
   });
 
-  // Force shutdown if cleanup takes longer than 10 seconds
+  // Force shutdown if cleanup takes longer than specified timeout
+  const timeoutMs = parseInt(process.env.SHUTDOWN_TIMEOUT_MS, 10) || 10000;
   setTimeout(() => {
-    console.error('Graceful shutdown timed out, forcing exit.');
+    console.error(`Graceful shutdown timed out (${timeoutMs}ms), forcing exit.`);
     process.exit(1);
-  }, 10000).unref();
+  }, timeoutMs).unref();
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
