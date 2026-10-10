@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+const dotenv = require('dotenv');
 dotenv.config();
 
 const requireEnv = (name) => {
@@ -9,7 +9,7 @@ const requireEnv = (name) => {
   return val;
 };
 
-export const ENV = Object.freeze({
+const ENV = Object.freeze({
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT || '5000', 10),
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -23,9 +23,6 @@ export const ENV = Object.freeze({
   JWT_REFRESH_EXPIRY: process.env.JWT_REFRESH_EXPIRY || '7d'
 });
 
-export default ENV;
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ENV };
-  module.exports.ENV = ENV;
-}
+module.exports = { ENV };
+module.exports.ENV = ENV;
 

@@ -1,8 +1,8 @@
-import Redis from 'ioredis';
-import { ENV } from './env.config.js';
-import { logger } from '../utils/logger.js';
+const Redis = require('ioredis');
+const { ENV } = require('./env.config.js');
+const { logger } = require('../utils/logger.js');
 
-export const redisCache = ENV.REDIS_CACHE_URL ? new Redis(ENV.REDIS_CACHE_URL, {
+const redisCache = ENV.REDIS_CACHE_URL ? new Redis(ENV.REDIS_CACHE_URL, {
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,
   lazyConnect: true,
@@ -14,7 +14,4 @@ if (redisCache) {
   });
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { redisCache };
-  module.exports.redisCache = redisCache;
-}
+module.exports = { redisCache };
