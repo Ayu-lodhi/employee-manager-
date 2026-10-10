@@ -2,15 +2,17 @@ import Redis from 'ioredis';
 import { ENV } from './env.config.js';
 import { logger } from '../utils/logger.js';
 
-export const redisQueue = new Redis(ENV.REDIS_QUEUE_URL, {
+export const redisQueue = ENV.REDIS_QUEUE_URL ? new Redis(ENV.REDIS_QUEUE_URL, {
   maxRetriesPerRequest: null, // Required by BullMQ
   enableReadyCheck: true,
   lazyConnect: true
-});
+}) : null;
 
-redisQueue.on('error', (err) => {
-  logger.error('Redis Queue Client Error', { error: err.message });
-});
+if (redisQueue) {
+  redisQueue.on('error', (err) => {
+    logger.error('Redis Queue Client Error', { error: err.message });
+  });
+}
 
 export default redisQueue;
 if (typeof module !== 'undefined' && module.exports) {

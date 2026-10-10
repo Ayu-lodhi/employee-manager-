@@ -23,14 +23,16 @@ if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
-const REQUIRED_ENV_VARS = [
-  'MONGODB_URI',
-  'JWT_ACCESS_SECRET',
-  'JWT_REFRESH_SECRET',
-  'REDIS_CACHE_URL',
-  'REDIS_PUBSUB_URL',
-  'REDIS_QUEUE_URL'
-];
+const REQUIRED_ENV_VARS = process.env.ALLOW_NO_REDIS === 'true'
+  ? ['MONGODB_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET']
+  : [
+      'MONGODB_URI',
+      'JWT_ACCESS_SECRET',
+      'JWT_REFRESH_SECRET',
+      'REDIS_CACHE_URL',
+      'REDIS_PUBSUB_URL',
+      'REDIS_QUEUE_URL'
+    ];
 
 function getMissingEnvVars() {
   return REQUIRED_ENV_VARS.filter((name) => !process.env[name]);

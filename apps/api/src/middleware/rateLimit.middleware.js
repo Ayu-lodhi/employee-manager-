@@ -7,8 +7,9 @@ const { logger } = require('../core/utils/logger');
 let redisCache = null;
 try {
   redisCache = require('../core/config/redis-cache.client').redisCache;
+  if (!redisCache) throw new Error('Redis cache is disabled or not configured');
 } catch (err) {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_NO_REDIS !== 'true') {
     logger.error('Redis cache is required in production for rate limiting', { error: err.message });
     throw err;
   }
