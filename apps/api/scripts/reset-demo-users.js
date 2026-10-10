@@ -1,10 +1,10 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-
 if (process.env.NODE_ENV === 'production') {
   console.error('FATAL: reset-demo-users cannot be executed in production environment.');
   process.exit(1);
 }
+
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const URI = process.env.MONGODB_URI;
 if (!URI) {
