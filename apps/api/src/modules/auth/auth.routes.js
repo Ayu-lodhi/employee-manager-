@@ -5,8 +5,7 @@ const { protect, protectPasswordChange } = require('./auth.middleware');
 
 router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 const verifyCaptcha = require('../../middleware/verifyCaptcha');
-const { loginLimiter } = require('../../middleware/rateLimit.middleware');
-router.post('/login', verifyCaptcha, loginLimiter, authController.login);
+router.post('/login', verifyCaptcha, authController.login);
 router.post('/mfa/verify', authController.verifyMfa);
 router.get('/me', protect, authController.getMe);
 router.get('/profile', protect, authController.getProfile);

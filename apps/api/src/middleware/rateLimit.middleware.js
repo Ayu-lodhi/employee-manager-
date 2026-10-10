@@ -16,7 +16,6 @@ const inMemoryUserCreateRequests = new Map();
 const inMemoryBulkImportRequests = new Map();
 const inMemoryAttendanceGenRequests = new Map();
 const inMemoryAttendanceScanRequests = new Map();
-const inMemoryLoginRequests = new Map();
 
 const GLOBAL_WINDOW_MS = 15 * 60 * 1000;
 const GLOBAL_MAX_REQUESTS = 500;
@@ -33,8 +32,6 @@ const ATTENDANCE_GENERATE_MAX_REQUESTS = 10;
 const ATTENDANCE_SCAN_WINDOW_MS = 60 * 1000;
 const ATTENDANCE_SCAN_MAX_REQUESTS = 30;
 
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_MAX_REQUESTS = 5;
 
 // Pruning interval
 setInterval(() => {
@@ -45,7 +42,6 @@ setInterval(() => {
     [inMemoryBulkImportRequests, BULK_IMPORT_WINDOW_MS],
     [inMemoryAttendanceGenRequests, ATTENDANCE_GENERATE_WINDOW_MS],
     [inMemoryAttendanceScanRequests, ATTENDANCE_SCAN_WINDOW_MS],
-    [inMemoryLoginRequests, LOGIN_WINDOW_MS]
   ]) {
     for (const [key, record] of map.entries()) {
       if (now > record.resetTime) {
@@ -154,14 +150,7 @@ exports.attendanceScanLimiter = (req, res, next) => {
     identifier, 'Too many attendance submissions, please try again later.');
 };
 
-exports.loginLimiter = (req, res, next) => {
-  const identifier = getClientIdentifier(req);
-  return handleRedisLimiter(req, res, next, `rl:login:${identifier}`, LOGIN_WINDOW_MS, LOGIN_MAX_REQUESTS,
-    (rq, rs, nx, id) => handleMemoryLimiter(rq, rs, nx, inMemoryLoginRequests, LOGIN_WINDOW_MS, LOGIN_MAX_REQUESTS, id, 'Too many login attempts, please try again later.'),
-    identifier, 'Too many login attempts, please try again later.');
-};
 
 exports._inMemoryAttendanceGenRequests = inMemoryAttendanceGenRequests;
 exports._inMemoryAttendanceScanRequests = inMemoryAttendanceScanRequests;
-exports._inMemoryLoginRequests = inMemoryLoginRequests;
 
